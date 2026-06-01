@@ -49,6 +49,7 @@ web_modules/
 
 # Optional npm cache directory
 .npm
+.npm-cache/
 
 # Optional eslint cache
 .eslintcache
@@ -141,3 +142,11 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
+.claude/
+CLAUDE.md
+.beads/

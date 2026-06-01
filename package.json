@@ -1,0 +1,91 @@
+{
+  "name": "eslint-plugin-legibility",
+  "version": "0.1.0",
+  "description": "ESLint and Oxlint JS plugin rules for readable, performance-conscious code.",
+  "license": "MIT",
+  "author": "Jeffry Wainwright",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yowainwright/eslint-plugin-legibility.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yowainwright/eslint-plugin-legibility/issues"
+  },
+  "homepage": "https://github.com/yowainwright/eslint-plugin-legibility#readme",
+  "keywords": [
+    "eslint",
+    "eslintplugin",
+    "oxlint",
+    "readability",
+    "legibility",
+    "performance",
+    "ai"
+  ],
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js",
+      "require": "./index.js",
+      "default": "./index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "LICENSE",
+    "NOTICE.md",
+    "README.md",
+    "SECURITY.md"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "packageManager": "pnpm@10.12.1",
+  "scripts": {
+    "lint": "eslint .",
+    "lint:oxlint": "oxlint .",
+    "pack:check": "npm pack --dry-run --cache ./.npm-cache",
+    "release": "node scripts/release.js",
+    "release:patch": "node scripts/release.js --increment=patch",
+    "release:patch:dry": "node scripts/release.js --increment=patch --dry-run",
+    "release:minor": "node scripts/release.js --increment=minor",
+    "release:minor:dry": "node scripts/release.js --increment=minor --dry-run",
+    "release:major": "node scripts/release.js --increment=major",
+    "release:major:dry": "node scripts/release.js --increment=major --dry-run",
+    "release:beta": "node scripts/release.js --preRelease=beta",
+    "release:beta:dry": "node scripts/release.js --preRelease=beta --dry-run",
+    "release:alpha": "node scripts/release.js --preRelease=alpha",
+    "release:alpha:dry": "node scripts/release.js --preRelease=alpha --dry-run",
+    "release:tag": "node scripts/tag-release.js",
+    "release:tag:dry": "node scripts/tag-release.js --dry-run",
+    "release:dry": "node scripts/release.js --dry-run",
+    "test": "node --test test/*.test.js",
+    "validate": "pnpm test && pnpm lint && pnpm lint:oxlint && pnpm pack:check"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
+    "oxlint": "^1.0.0",
+    "release-it": "20.1.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "release-it": {
+    "git": {
+      "commitMessage": "chore(release): ${version}",
+      "commitArgs": [
+        "--no-verify"
+      ],
+      "tagName": "v${version}"
+    },
+    "npm": {
+      "publish": false
+    }
+  }
+}
