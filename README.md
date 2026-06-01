@@ -150,7 +150,8 @@ If the package name resolves to a different plugin name in your setup, alias it:
 
 - No runtime dependencies.
 - Published package contents are allowlisted with `files`.
-- Releases are tag-triggered and publish npm provenance, a GitHub attestation bundle, and release assets.
+- Releases are tag-triggered and publish a GitHub attestation bundle and release assets.
+- npm trusted publishing is supported; npm provenance is automatic when publishing from a public repository.
 - CI runs tests, ESLint, Oxlint, and `npm pack --dry-run`.
 - Security policy and GitHub security scanning configuration are included in the repo.
 
