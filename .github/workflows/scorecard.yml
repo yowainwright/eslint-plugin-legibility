@@ -15,6 +15,7 @@ permissions:
 jobs:
   scorecard:
     name: Scorecard
+    if: github.event.repository.private == false
     runs-on: ubuntu-latest
     permissions:
       actions: read

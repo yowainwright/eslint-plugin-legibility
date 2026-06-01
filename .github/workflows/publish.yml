@@ -28,6 +28,8 @@ jobs:
           registry-url: https://registry.npmjs.org
       - name: Enable pnpm
         run: corepack enable
+      - name: Use npm with OIDC support
+        run: npm install -g npm@11.15.0
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
       - run: pnpm lint
@@ -61,7 +63,6 @@ jobs:
           echo "sigstore_bundle=$SIGSTORE_BUNDLE" >> "$GITHUB_OUTPUT"
       - name: Publish npm package
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           PACKAGE_NAME: eslint-plugin-legibility
           PACKAGE_VERSION: ${{ github.ref_name }}
         run: |
@@ -71,7 +72,7 @@ jobs:
             exit 0
           fi
 
-          npm publish "${{ steps.pack.outputs.tarball }}" --provenance --access public --tag "${{ steps.dist-tag.outputs.tag }}"
+          npm publish "${{ steps.pack.outputs.tarball }}" --access public --tag "${{ steps.dist-tag.outputs.tag }}"
       - name: Publish GitHub release assets
         env:
           GITHUB_TOKEN: ${{ github.token }}
