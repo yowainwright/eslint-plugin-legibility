@@ -11,10 +11,12 @@ test("release args parse increments and prereleases", () => {
   assert.deepEqual(release.parseArgs(["--increment=minor", "--dry-run"]), {
     dryRun: true,
     increment: "minor",
+    trustedPublishing: false,
   });
-  assert.deepEqual(release.parseArgs(["--preRelease=beta"]), {
+  assert.deepEqual(release.parseArgs(["--preRelease=beta", "--trusted-publishing"]), {
     dryRun: false,
     preRelease: "beta",
+    trustedPublishing: true,
   });
 });
 
@@ -81,4 +83,78 @@ test("tag-release reads and validates package versions", () => {
   } finally {
     rmSync(directory, { force: true, recursive: true });
   }
+});
+
+test("tag-release parses release flags and GitHub repository URLs", () => {
+  assert.deepEqual(tagRelease.parseArgs(["--dry-run", "--trusted-publishing"]), {
+    dryRun: true,
+    trustedPublishing: true,
+  });
+  assert.equal(
+    tagRelease.parseRepositoryName("git+https://github.com/yowainwright/eslint-plugin-legibility.git"),
+    "yowainwright/eslint-plugin-legibility",
+  );
+  assert.equal(
+    tagRelease.parseRepositoryName({ url: "git@github.com:yowainwright/eslint-plugin-legibility.git" }),
+    "yowainwright/eslint-plugin-legibility",
+  );
+});
+
+test("publish auth check accepts repository and environment NPM_TOKEN secrets", () => {
+  const calls = [];
+  const gh = (args) => {
+    calls.push(args);
+    if (args.includes("--env")) return { status: 0, stdout: "NPM_TOKEN\t2026-06-01\n", stderr: "" };
+    return { status: 0, stdout: "OTHER_SECRET\t2026-06-01\n", stderr: "" };
+  };
+
+  assert.doesNotThrow(() => {
+    tagRelease.assertPublishAuthReady({ gh, repository: "yowainwright/eslint-plugin-legibility" });
+  });
+  assert.deepEqual(calls, [
+    ["secret", "list", "--repo", "yowainwright/eslint-plugin-legibility"],
+    ["secret", "list", "--env", "npm-publish", "--repo", "yowainwright/eslint-plugin-legibility"],
+  ]);
+});
+
+test("publish auth check can be explicitly satisfied by trusted publishing", () => {
+  let called = false;
+
+  tagRelease.assertPublishAuthReady({
+    gh: () => {
+      called = true;
+      return { status: 1, stdout: "", stderr: "should not run" };
+    },
+    trustedPublishing: true,
+  });
+
+  assert.equal(called, false);
+});
+
+test("publish auth check fails before a tag is pushed without publish credentials", () => {
+  const gitCalls = [];
+  const git = (args) => {
+    gitCalls.push(args);
+    if (args[0] === "branch") return { status: 0, stdout: "main\n", stderr: "" };
+    if (args[0] === "status") return { status: 0, stdout: "", stderr: "" };
+    if (args[0] === "fetch") return { status: 0, stdout: "", stderr: "" };
+    if (args[0] === "rev-parse") return { status: 1, stdout: "", stderr: "" };
+    if (args[0] === "ls-remote") return { status: 2, stdout: "", stderr: "" };
+    if (args[0] === "tag") return { status: 0, stdout: "", stderr: "" };
+    return { status: 0, stdout: "", stderr: "" };
+  };
+  const gh = () => ({ status: 0, stdout: "OTHER_SECRET\t2026-06-01\n", stderr: "" });
+
+  assert.throws(
+    () =>
+      tagRelease.runReleaseTag({
+        gh,
+        git,
+        repository: "yowainwright/eslint-plugin-legibility",
+        requireUpstream: false,
+        version: "0.1.0",
+      }),
+    /NPM_TOKEN secret is not configured/,
+  );
+  assert.equal(gitCalls.some((args) => args[0] === "tag" && args[1] === "--annotate"), false);
 });

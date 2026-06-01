@@ -62,6 +62,7 @@
     "release:alpha:dry": "node scripts/release.js --preRelease=alpha --dry-run",
     "release:tag": "node scripts/tag-release.js",
     "release:tag:dry": "node scripts/tag-release.js --dry-run",
+    "release:tag:trusted": "node scripts/tag-release.js --trusted-publishing",
     "release:dry": "node scripts/release.js --dry-run",
     "test": "node --test test/*.test.js",
     "validate": "pnpm test && pnpm lint && pnpm lint:oxlint && pnpm pack:check"

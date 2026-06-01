@@ -170,6 +170,8 @@ pnpm release:alpha
 
 The release script creates the release commit locally, tags it, pushes only the tag, and restores local `main` to its starting commit. The pushed tag triggers npm publishing and GitHub release asset upload.
 
+Before pushing a release tag, the script checks that GitHub Actions can publish with an `NPM_TOKEN` secret in the repository or `npm-publish` environment. After the package exists on npm and trusted publishing is configured for `.github/workflows/publish.yml`, use `pnpm release:tag:trusted` or pass `--trusted-publishing` to the release script instead.
+
 ## Attribution
 
 The first rules were adapted from the Pastoralist `scripts/oxlint-plugin` rule set, then packaged for ESLint and Oxlint with additional legibility and performance rules.

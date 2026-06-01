@@ -5,9 +5,13 @@ const { readFileSync } = require("node:fs");
 const { join } = require("node:path");
 
 const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+const DEFAULT_PUBLISH_ENVIRONMENT = "npm-publish";
 
 function parseArgs(args) {
-  return { dryRun: args.includes("--dry-run") };
+  return {
+    dryRun: args.includes("--dry-run"),
+    trustedPublishing: args.includes("--trusted-publishing"),
+  };
 }
 
 function formatTagName(version) {
@@ -21,9 +25,34 @@ function readPackageVersion(cwd) {
   return manifest.version;
 }
 
+function readPackageRepository(cwd) {
+  const manifest = JSON.parse(readFileSync(join(cwd, "package.json"), "utf8"));
+  return parseRepositoryName(manifest.repository);
+}
+
+function parseRepositoryName(repository) {
+  const url = typeof repository === "string" ? repository : repository?.url;
+  if (typeof url !== "string") throw new Error("package.json repository URL is missing");
+
+  const match = url.match(/github\.com[:/]([^/#]+)\/([^/#]+?)(?:\.git)?(?:[#/].*)?$/);
+  if (!match) throw new Error(`Unable to resolve GitHub repository from: ${url}`);
+  return `${match[1]}/${match[2]}`;
+}
+
 function createGitRunner(cwd) {
   return (args) => {
     const result = spawnSync("git", Array.from(args), { cwd, encoding: "utf8" });
+    return {
+      status: result.status,
+      stdout: result.stdout ?? "",
+      stderr: result.stderr ?? "",
+    };
+  };
+}
+
+function createGhRunner(cwd) {
+  return (args) => {
+    const result = spawnSync("gh", Array.from(args), { cwd, encoding: "utf8" });
     return {
       status: result.status,
       stdout: result.stdout ?? "",
@@ -72,12 +101,57 @@ function assertReleaseReady(
   assertMissingTag(git, tagName);
 }
 
+function parseSecretNames(output) {
+  return output
+    .split(/\r?\n/)
+    .map((line) => line.trim().split(/\s+/)[0])
+    .filter(Boolean);
+}
+
+function secretListHasNpmToken(result) {
+  return result.status === 0 && parseSecretNames(result.stdout).includes("NPM_TOKEN");
+}
+
+function assertPublishAuthReady({
+  environment = DEFAULT_PUBLISH_ENVIRONMENT,
+  gh,
+  repository,
+  trustedPublishing = false,
+} = {}) {
+  if (trustedPublishing) return;
+  if (!repository) throw new Error("GitHub repository is required for publish auth checks");
+
+  const repoSecrets = gh(["secret", "list", "--repo", repository]);
+  if (secretListHasNpmToken(repoSecrets)) return;
+  if (repoSecrets.status !== 0) {
+    throw new Error(repoSecrets.stderr.trim() || "Unable to list repository secrets");
+  }
+
+  const environmentSecrets = gh(["secret", "list", "--env", environment, "--repo", repository]);
+  if (secretListHasNpmToken(environmentSecrets)) return;
+  if (environmentSecrets.status !== 0) {
+    throw new Error(environmentSecrets.stderr.trim() || `Unable to list ${environment} secrets`);
+  }
+
+  throw new Error(
+    [
+      `NPM_TOKEN secret is not configured for ${repository}.`,
+      `Add NPM_TOKEN to the repository or ${environment} environment before tagging,`,
+      "or pass --trusted-publishing after configuring npm trusted publishing for this package.",
+    ].join(" "),
+  );
+}
+
 function runReleaseTag({
   cwd = process.cwd(),
   dryRun = false,
   git = createGitRunner(cwd),
+  gh = createGhRunner(cwd),
   logger = console,
+  publishEnvironment = DEFAULT_PUBLISH_ENVIRONMENT,
   requireUpstream = true,
+  repository = readPackageRepository(cwd),
+  trustedPublishing = false,
   version = readPackageVersion(cwd),
 } = {}) {
   const tagName = formatTagName(version);
@@ -87,6 +161,13 @@ function runReleaseTag({
     logger.log(`Dry run: would create and push ${tagName}`);
     return 0;
   }
+
+  assertPublishAuthReady({
+    environment: publishEnvironment,
+    gh,
+    repository,
+    trustedPublishing,
+  });
 
   gitText(
     git,
@@ -105,11 +186,16 @@ function runReleaseTag({
 
 module.exports = {
   assertMissingTag,
+  assertPublishAuthReady,
   assertReleaseReady,
   createGitRunner,
+  createGhRunner,
   formatTagName,
   gitText,
   parseArgs,
+  parseRepositoryName,
+  parseSecretNames,
+  readPackageRepository,
   readPackageVersion,
   runReleaseTag,
 };

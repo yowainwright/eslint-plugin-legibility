@@ -13,7 +13,10 @@ function parseArgs(args) {
   const preRelease = parsePreRelease(args);
   const increment = parseIncrement(args);
   return Object.assign(
-    { dryRun: args.includes("--dry-run") },
+    {
+      dryRun: args.includes("--dry-run"),
+      trustedPublishing: args.includes("--trusted-publishing"),
+    },
     increment ? { increment } : undefined,
     preRelease ? { preRelease } : undefined,
   );
@@ -136,6 +139,7 @@ async function runRelease(options = {}) {
       git: (args) => runner("git", args),
       logger,
       requireUpstream: false,
+      trustedPublishing: releaseArgs.trustedPublishing,
       version: packageVersion,
     });
     logger.log(`Tagged current package version ${packageVersion}.`);
@@ -160,6 +164,7 @@ async function runRelease(options = {}) {
       git: (args) => runner("git", args),
       logger,
       requireUpstream: false,
+      trustedPublishing: releaseArgs.trustedPublishing,
       version,
     });
     logger.log("No PR was created and main was not pushed.");
@@ -182,6 +187,7 @@ function normalizeOptions(options) {
     dryRun: options.dryRun ?? false,
     increment: options.increment,
     preRelease: options.preRelease,
+    trustedPublishing: options.trustedPublishing ?? false,
   };
 }
 
