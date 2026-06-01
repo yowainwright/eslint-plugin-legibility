@@ -63,6 +63,7 @@ jobs:
           echo "sigstore_bundle=$SIGSTORE_BUNDLE" >> "$GITHUB_OUTPUT"
       - name: Publish npm package
         env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           PACKAGE_NAME: eslint-plugin-legibility
           PACKAGE_VERSION: ${{ github.ref_name }}
         run: |
@@ -70,6 +71,10 @@ jobs:
           if npm view "$PACKAGE_NAME@$VERSION" version > /dev/null 2>&1; then
             echo "$PACKAGE_NAME@$VERSION is already published"
             exit 0
+          fi
+
+          if [ -n "$NPM_TOKEN" ]; then
+            npm config set //registry.npmjs.org/:_authToken "$NPM_TOKEN"
           fi
 
           npm publish "${{ steps.pack.outputs.tarball }}" --access public --tag "${{ steps.dist-tag.outputs.tag }}"
