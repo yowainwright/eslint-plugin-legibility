@@ -1,7 +1,7 @@
 "use strict";
 
 const PLUGIN_NAME = "legibility";
-const PACKAGE_VERSION = "0.1.0";
+const { version: PACKAGE_VERSION } = require("./package.json");
 
 const DEFAULT_MAX_EXPRESSION_OPERATORS = 4;
 const DEFAULT_MAX_IF_OPERATORS = 0;
@@ -1368,14 +1368,33 @@ function createNoComplexTernaries(context) {
 }
 
 function enterLoop(loopStack, context, node) {
-  if (loopStack.length > 0) {
+  if (loopStack.some((loop) => isNodeInsideLoopBody(node, loop))) {
     context.report({ node, messageId: "nestedLoop" });
   }
   return loopStack.concat(node);
 }
 
+function isAncestorOrSelf(ancestor, node) {
+  let current = node;
+  while (isRecord(current)) {
+    if (current === ancestor) return true;
+    current = current.parent;
+  }
+  return false;
+}
+
+function getLoopBody(loopNode) {
+  if (!isRecord(loopNode)) return null;
+  return isRecord(loopNode.body) ? loopNode.body : null;
+}
+
+function isNodeInsideLoopBody(node, loopNode) {
+  const body = getLoopBody(loopNode);
+  return Boolean(body && isAncestorOrSelf(body, node));
+}
+
 function checkSearchInLoop(loopStack, context, node) {
-  if (loopStack.length === 0) return;
+  if (!loopStack.some((loop) => isNodeInsideLoopBody(node, loop))) return;
   if (!isMethodCall(node, SEARCH_METHODS)) return;
   context.report({
     node,
@@ -1448,8 +1467,9 @@ function createControlFlowVisitors(context) {
   const max = getConfiguredMax(context, DEFAULT_MAX_CONTROL_FLOW_DEPTH);
   let depth = 0;
   const stack = [];
+  const functionStack = [];
 
-  return Object.fromEntries(
+  const controlVisitors = Object.fromEntries(
     Array.from(CONTROL_FLOW_TYPES).flatMap((type) => [
       [
         type,
@@ -1473,6 +1493,26 @@ function createControlFlowVisitors(context) {
       ],
     ]),
   );
+  const functionVisitors = Object.fromEntries(
+    Array.from(FUNCTION_NODE_TYPES).flatMap((type) => [
+      [
+        type,
+        () => {
+          functionStack.push({ depth, stackLength: stack.length });
+          depth = 0;
+        },
+      ],
+      [
+        `${type}:exit`,
+        () => {
+          const previous = functionStack.pop();
+          depth = previous?.depth ?? 0;
+          stack.length = previous?.stackLength ?? 0;
+        },
+      ],
+    ]),
+  );
+  return Object.assign({}, controlVisitors, functionVisitors);
 }
 
 function createMaxControlFlowDepth(context) {
@@ -1646,6 +1686,7 @@ function getCalleeDisplayName(context, node) {
 
 function checkTrivialWrapperFunction(context, node) {
   if (isCallbackArgument(node)) return;
+  if (node.async || node.generator) return;
   const paramNames = getFunctionParamNames(node);
   if (!paramNames.length && (node.params ?? []).length) return;
   const returned = getSingleReturnExpression(node.body);

@@ -3,6 +3,7 @@ const { spawnSync } = require("node:child_process");
 const test = require("node:test");
 
 const plugin = require("../index.js");
+const manifest = require("../package.json");
 
 function createContext(options = [], overrides = {}) {
   const reports = [];
@@ -68,6 +69,26 @@ function methodCall(object, property, args = []) {
   return node;
 }
 
+function expressionStatement(expression) {
+  const node = {
+    type: "ExpressionStatement",
+    expression,
+  };
+  expression.parent = node;
+  return node;
+}
+
+function block(body = []) {
+  const node = {
+    type: "BlockStatement",
+    body,
+  };
+  body.forEach((statement) => {
+    statement.parent = node;
+  });
+  return node;
+}
+
 function id(name) {
   return {
     type: "Identifier",
@@ -123,6 +144,7 @@ function arrow(params, body) {
 
 test("exports an ESLint and Oxlint compatible plugin shape", () => {
   assert.equal(plugin.meta.name, "legibility");
+  assert.equal(plugin.meta.version, manifest.version);
   assert.ok(plugin.rules["max-expression-operators"]);
   assert.ok(plugin.rules["prefer-early-return"]);
   assert.ok(plugin.configs["flat/recommended"].plugins.legibility);
@@ -154,8 +176,10 @@ test("hoist-if-operators reports boolean-heavy if conditions", () => {
 
 test("no-quadratic-patterns reports search calls inside loops", () => {
   const { visitor, reports } = createRule("no-quadratic-patterns");
-  const loop = { type: "ForStatement" };
   const search = methodCall(id("items"), "find");
+  const body = block([expressionStatement(search)]);
+  const loop = { type: "ForStatement", body };
+  body.parent = loop;
 
   visitor.ForStatement(loop);
   visitor.CallExpression(search);
@@ -163,6 +187,25 @@ test("no-quadratic-patterns reports search calls inside loops", () => {
 
   assert.equal(reports.length, 1);
   assert.equal(reports[0].messageId, "searchInLoop");
+});
+
+test("no-quadratic-patterns ignores one-time search calls in loop headers", () => {
+  const { visitor, reports } = createRule("no-quadratic-patterns");
+  const filter = methodCall(id("users"), "filter", [id("Boolean")]);
+  const body = block();
+  const loop = {
+    type: "ForOfStatement",
+    right: filter,
+    body,
+  };
+  filter.parent = loop;
+  body.parent = loop;
+
+  visitor.ForOfStatement(loop);
+  visitor.CallExpression(filter);
+  visitor["ForOfStatement:exit"](loop);
+
+  assert.equal(reports.length, 0);
 });
 
 test("require-executable-shebang reports configured executable sources without shebangs", () => {
@@ -295,6 +338,32 @@ test("max-control-flow-depth reports branches beyond the configured depth", () =
   assert.equal(reports[0].messageId, "tooDeep");
 });
 
+test("max-control-flow-depth resets depth inside nested function declarations", () => {
+  const { visitor, reports } = createRule("max-control-flow-depth", [{ max: 3 }]);
+  const outer = { type: "IfStatement" };
+  const fn = {
+    type: "FunctionDeclaration",
+    body: block(),
+    parent: outer,
+  };
+  const first = { type: "IfStatement", parent: fn.body };
+  const second = { type: "IfStatement", parent: first };
+  const third = { type: "IfStatement", parent: second };
+
+  visitor.IfStatement(outer);
+  visitor.FunctionDeclaration(fn);
+  visitor.IfStatement(first);
+  visitor.IfStatement(second);
+  visitor.IfStatement(third);
+  visitor["IfStatement:exit"](third);
+  visitor["IfStatement:exit"](second);
+  visitor["IfStatement:exit"](first);
+  visitor["FunctionDeclaration:exit"](fn);
+  visitor["IfStatement:exit"](outer);
+
+  assert.equal(reports.length, 0);
+});
+
 test("max-array-chain-depth reports long array callback chains once", () => {
   const { visitor, reports } = createRule("max-array-chain-depth", [{ max: 2 }]);
   const filterCall = methodCall(id("items"), "filter");
@@ -350,6 +419,33 @@ test("no-trivial-wrapper-functions reports parameter-forwarding wrappers", () =>
 
   assert.equal(reports.length, 1);
   assert.equal(reports[0].messageId, "trivialWrapper");
+});
+
+test("no-trivial-wrapper-functions ignores async and generator wrappers", () => {
+  const { visitor, reports } = createRule("no-trivial-wrapper-functions");
+  const asyncWrapper = arrow([id("userId")], call(id("fetchUser"), [id("userId")]));
+  asyncWrapper.async = true;
+  asyncWrapper.parent = {
+    type: "VariableDeclarator",
+    id: id("loadUser"),
+  };
+  const generatorWrapper = {
+    type: "FunctionDeclaration",
+    id: id("ids"),
+    generator: true,
+    params: [id("items")],
+    body: block([
+      {
+        type: "ReturnStatement",
+        argument: call(id("iterate"), [id("items")]),
+      },
+    ]),
+  };
+
+  visitor.ArrowFunctionExpression(asyncWrapper);
+  visitor.FunctionDeclaration(generatorWrapper);
+
+  assert.equal(reports.length, 0);
 });
 
 test("prefer-positive-condition-names reports negative boolean names", () => {
