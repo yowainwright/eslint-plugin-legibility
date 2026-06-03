@@ -117,28 +117,37 @@ If the package name resolves to a different plugin name in your setup, alias it:
 
 ### Options
 
+Rules not listed here do not take options.
+
+The operator-counting rules `max-expression-operators`, `hoist-if-operators`, `no-computed-values`, and `no-complex-ternaries` share these options: `max`, `operators`, and `complexity`. `operators` selects which operator tokens count; `complexity` assigns per-operator weights.
+
+- `max-expression-operators`: `{ max: 4, operators: ["&&", "||", "??", "?:", "!", "===", "!=="], complexity: { "?:": 2 } }`
+- `hoist-if-operators`: `{ max: 0, operators: ["&&", "||", "??", "?:"] }`
+- `no-computed-values`: `{ max: 1, operators: ["+", "-", "*", "/", "&&", "||", "??", "?:"] }`
+- `no-complex-ternaries`: `{ max: 2, operators: ["&&", "||", "??", "?:"] }`
+- `max-control-flow-depth`: `{ max: 3 }`
+- `max-array-chain-depth`: `{ max: 2, iterationMethods: ["map", "filter", "reduce", "select"] }`
+- `no-quadratic-patterns`: `{ iterationMethods: ["map", "filter", "reduce", "select"], searchMethods: ["find", "includes", "lookup"] }`
+- `no-repeated-collection-search`: `{ searchMethods: ["find", "includes", "lookup"] }`
+- `no-hidden-side-effects`: `{ mutatingMethods: ["push", "set", "delete", "commit"], sideEffectFreeIterationMethods: ["map", "filter", "some"] }`
+- `no-standalone-array-mutations`: `{ arrayMutatingMethods: ["push", "splice", "append"], mutatingMethods: ["push", "splice", "append"] }`
+- `no-redundant-boolean-logic`: `{ equalityOperators: ["===", "!==", "==", "!="] }`
+- `prefer-positive-condition-names`: `{ booleanOperators: ["===", "!==", "in", "instanceof"] }`
+- `prefer-object-lookup`: `{ min: 3, operators: ["===", "=="] }`
+- `require-executable-shebang`: `{ files: ["src/index.ts", "src/cli/index.ts"], runtimes: ["node", "bun"] }`
+- `no-direct-node-bin-smoke`: `{ entryPatterns: ["src/index.ts", "dist/index.js"] }`
+
+Example:
+
 ```js
 {
   rules: {
-    "legibility/hoist-if-operators": ["warn", { max: 0 }],
-    "legibility/no-computed-values": ["warn", { max: 1 }],
-    "legibility/no-complex-ternaries": ["warn", { max: 2 }],
     "legibility/max-expression-operators": [
       "warn",
       {
         max: 4,
         operators: ["&&", "||", "??", "?:", "!", "===", "!=="],
-        complexity: {
-          "?:": 2,
-          "&&": 1
-        }
-      }
-    ],
-    "legibility/no-quadratic-patterns": [
-      "warn",
-      {
-        iterationMethods: ["map", "filter", "reduce", "select"],
-        searchMethods: ["find", "includes", "lookup"]
+        complexity: { "?:": 2 }
       }
     ],
     "legibility/no-hidden-side-effects": [
@@ -148,32 +157,16 @@ If the package name resolves to a different plugin name in your setup, alias it:
         sideEffectFreeIterationMethods: ["map", "filter", "some"]
       }
     ],
-    "legibility/max-control-flow-depth": ["warn", { max: 3 }],
-    "legibility/max-array-chain-depth": [
-      "warn",
-      { max: 2, iterationMethods: ["map", "filter", "reduce", "select"] }
-    ],
-    "legibility/prefer-object-lookup": ["warn", { min: 3, operators: ["===", "=="] }],
     "legibility/require-executable-shebang": [
       "error",
       {
         files: ["src/index.ts", "src/cli/index.ts"],
         runtimes: ["node", "bun"]
       }
-    ],
-    "legibility/no-direct-node-bin-smoke": [
-      "error",
-      {
-        entryPatterns: ["src/index.ts", "dist/index.js"]
-      }
     ]
   }
 }
 ```
-
-The operator-counting rules `max-expression-operators`, `hoist-if-operators`, `no-computed-values`, and `no-complex-ternaries` support `operators` and `complexity`. `operators` selects which operator tokens count; `complexity` assigns per-operator weights.
-
-Collection and mutation rules support project-specific method names: `iterationMethods`, `searchMethods`, `mutatingMethods`, `arrayMutatingMethods`, `sideEffectFreeIterationMethods`, `equalityOperators`, and `booleanOperators` where relevant.
 
 ## Security Posture
 
