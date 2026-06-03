@@ -1,7 +1,20 @@
 {
-  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "noEmit": true
+    "allowSyntheticDefaultImports": true,
+    "declaration": false,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "lib": ["ES2024"],
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "noEmit": true,
+    "noImplicitAny": false,
+    "noUncheckedIndexedAccess": false,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": false,
+    "target": "ES2022",
+    "types": ["node"]
   },
   "include": ["eslint.config.ts", "scripts/**/*.ts", "src/**/*.ts", "tests/**/*.ts"]
 }

@@ -4,8 +4,8 @@ const { tmpdir } = require("node:os");
 const { join } = require("node:path");
 const test = require("node:test");
 
-const release = require("../../.scripts-dist/scripts/release.js");
-const tagRelease = require("../../.scripts-dist/scripts/tag-release.js");
+const release = require("../scripts/release.js");
+const tagRelease = require("../scripts/tag-release.js");
 
 test("release args parse increments and prereleases", () => {
   assert.deepEqual(release.parseArgs(["--increment=minor", "--dry-run"]), {

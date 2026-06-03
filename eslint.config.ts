@@ -5,8 +5,7 @@ import tseslint from "typescript-eslint";
 export default [
   {
     ignores: [
-      ".scripts-dist/**",
-      ".test-dist/**",
+      ".build/**",
       "coverage/**",
       "dist/**",
       "node_modules/**",

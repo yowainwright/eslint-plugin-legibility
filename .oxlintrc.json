@@ -1,7 +1,6 @@
 {
   "ignorePatterns": [
-    ".scripts-dist/**",
-    ".test-dist/**",
+    ".build/**",
     "coverage/**",
     "dist/**",
     "node_modules/**",

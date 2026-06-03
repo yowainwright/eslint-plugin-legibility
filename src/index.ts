@@ -1,15 +1,33 @@
-"use strict";
-
-const PLUGIN_NAME = "legibility";
-const { version: PACKAGE_VERSION } = require("../package.json");
-
-const DEFAULT_MAX_EXPRESSION_OPERATORS = 4;
-const DEFAULT_MAX_IF_OPERATORS = 0;
-const DEFAULT_MAX_TERNARY_OPERATORS = 2;
-const DEFAULT_MAX_COMPUTED_VALUE_OPERATORS = 1;
-const DEFAULT_MAX_CONTROL_FLOW_DEPTH = 3;
-const DEFAULT_MAX_ARRAY_CHAIN_DEPTH = 2;
-const DEFAULT_MIN_OBJECT_LOOKUP_CHAIN_LENGTH = 3;
+import {
+  ARRAY_MUTATING_METHODS,
+  COMPARISON_OPERATORS,
+  COMPUTED_VALUE_OPERATOR_NODE_TYPES,
+  CONTROL_FLOW_TYPES,
+  DEFAULT_DIRECT_BIN_ENTRY_PATTERNS,
+  DEFAULT_EXECUTABLE_ENTRY_PATTERNS,
+  DEFAULT_EXECUTABLE_RUNTIMES,
+  DEFAULT_MAX_ARRAY_CHAIN_DEPTH,
+  DEFAULT_MAX_COMPUTED_VALUE_OPERATORS,
+  DEFAULT_MAX_CONTROL_FLOW_DEPTH,
+  DEFAULT_MAX_EXPRESSION_OPERATORS,
+  DEFAULT_MAX_IF_OPERATORS,
+  DEFAULT_MAX_TERNARY_OPERATORS,
+  DEFAULT_MIN_OBJECT_LOOKUP_CHAIN_LENGTH,
+  EQUALITY_OPERATORS,
+  EXPRESSION_CONTAINER_NODE_TYPES,
+  FUNCTION_NODE_TYPES,
+  IF_CONDITION_OPERATOR_NODE_TYPES,
+  ITERATION_METHODS,
+  LOOP_TYPES,
+  MUTATING_METHODS,
+  PACKAGE_VERSION,
+  PLUGIN_NAME,
+  READABILITY_OPERATOR_NODE_TYPES,
+  SEARCH_METHODS,
+  SIDE_EFFECT_FREE_ITERATION_METHODS,
+  SKIP_KEYS,
+  TERMINAL_STATEMENT_TYPES,
+} from "./constants";
 
 type Severity = "off" | "warn" | "error" | 0 | 1 | 2;
 
@@ -52,151 +70,6 @@ interface LegibilityPlugin {
     "flat/strict": FlatConfig;
   };
 }
-
-const SKIP_KEYS = new Set(["parent", "loc", "range", "tokens", "comments"]);
-
-const FUNCTION_NODE_TYPES = new Set([
-  "ArrowFunctionExpression",
-  "FunctionDeclaration",
-  "FunctionExpression",
-]);
-
-const EXPRESSION_CONTAINER_NODE_TYPES = new Set([
-  "ArrayExpression",
-  "CallExpression",
-  "ObjectExpression",
-  "TaggedTemplateExpression",
-  "TemplateLiteral",
-]);
-
-const READABILITY_OPERATOR_NODE_TYPES = new Set([
-  "ConditionalExpression",
-  "LogicalExpression",
-]);
-
-const IF_CONDITION_OPERATOR_NODE_TYPES = new Set([
-  "ConditionalExpression",
-  "LogicalExpression",
-]);
-
-const COMPUTED_VALUE_OPERATOR_NODE_TYPES = new Set([
-  "BinaryExpression",
-  "ConditionalExpression",
-  "LogicalExpression",
-  "UnaryExpression",
-]);
-
-const COMPARISON_OPERATORS = new Set([
-  "!=",
-  "!==",
-  "<",
-  "<=",
-  "==",
-  "===",
-  ">",
-  ">=",
-  "in",
-  "instanceof",
-]);
-
-const LOOP_TYPES = new Set([
-  "DoWhileStatement",
-  "ForInStatement",
-  "ForOfStatement",
-  "ForStatement",
-  "WhileStatement",
-]);
-
-const CONTROL_FLOW_TYPES = new Set([
-  "CatchClause",
-  "DoWhileStatement",
-  "ForInStatement",
-  "ForOfStatement",
-  "ForStatement",
-  "IfStatement",
-  "SwitchStatement",
-  "WhileStatement",
-]);
-
-const TERMINAL_STATEMENT_TYPES = new Set([
-  "BreakStatement",
-  "ContinueStatement",
-  "ReturnStatement",
-  "ThrowStatement",
-]);
-
-const SEARCH_METHODS = new Set(["filter", "find", "includes", "indexOf", "some"]);
-
-const EQUALITY_OPERATORS = new Set(["==", "===", "!=", "!=="]);
-
-const ITERATION_METHODS = new Set([
-  "every",
-  "filter",
-  "find",
-  "flatMap",
-  "forEach",
-  "map",
-  "reduce",
-  "some",
-]);
-
-const SIDE_EFFECT_FREE_ITERATION_METHODS = new Set([
-  "every",
-  "filter",
-  "find",
-  "flatMap",
-  "map",
-  "some",
-]);
-
-const MUTATING_METHODS = new Set([
-  "add",
-  "clear",
-  "copyWithin",
-  "delete",
-  "fill",
-  "pop",
-  "push",
-  "reverse",
-  "set",
-  "shift",
-  "sort",
-  "splice",
-  "unshift",
-]);
-
-const ARRAY_MUTATING_METHODS = new Set([
-  "copyWithin",
-  "fill",
-  "pop",
-  "push",
-  "reverse",
-  "shift",
-  "sort",
-  "splice",
-  "unshift",
-]);
-
-const DEFAULT_EXECUTABLE_ENTRY_PATTERNS = [
-  "src/index.js",
-  "src/index.ts",
-  "src/cli/index.js",
-  "src/cli/index.ts",
-];
-
-const DEFAULT_EXECUTABLE_RUNTIMES = ["bun", "node"];
-
-const DEFAULT_DIRECT_BIN_ENTRY_PATTERNS = [
-  "app/*/index.js",
-  "dist/cli/index.js",
-  "dist/index.js",
-  "src/cli/index.js",
-  "src/cli/index.ts",
-  "src/index.js",
-  "src/index.ts",
-  "*/dist/cli/index.js",
-  "*/dist/index.js",
-];
 
 function ruleUrl(ruleName) {
   return `https://github.com/yowainwright/eslint-plugin-legibility#${ruleName}`;
