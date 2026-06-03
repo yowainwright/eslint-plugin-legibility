@@ -1,3 +1,11 @@
 {
-  "ignorePatterns": ["coverage/**", "node_modules/**", "pnpm-lock.yaml", "test/fixtures/oxlint/**"]
+  "ignorePatterns": [
+    ".scripts-dist/**",
+    ".test-dist/**",
+    "coverage/**",
+    "dist/**",
+    "node_modules/**",
+    "pnpm-lock.yaml",
+    "tests/fixtures/oxlint/**"
+  ]
 }

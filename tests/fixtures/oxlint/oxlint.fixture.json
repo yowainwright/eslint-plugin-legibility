@@ -2,7 +2,7 @@
   "jsPlugins": [
     {
       "name": "legibility",
-      "specifier": "../../../index.js"
+      "specifier": "../../../dist/index.js"
     }
   ],
   "rules": {

@@ -2,10 +2,10 @@ const assert = require("node:assert/strict");
 const { spawnSync } = require("node:child_process");
 const test = require("node:test");
 
-const plugin = require("../index.js");
-const manifest = require("../package.json");
+const plugin = require("../../dist/index.js");
+const manifest = require("../../package.json");
 
-function createContext(options = [], overrides = {}) {
+function createContext(options: any[] = [], overrides: any = {}) {
   const reports = [];
   const context = {
     options,
@@ -25,7 +25,7 @@ function createContext(options = [], overrides = {}) {
   return { context, reports };
 }
 
-function createRule(name, options, overrides) {
+function createRule(name: string, options: any[] = [], overrides: any = {}) {
   const { context, reports } = createContext(options, overrides);
   return {
     reports,
@@ -33,8 +33,8 @@ function createRule(name, options, overrides) {
   };
 }
 
-function call(callee, args = []) {
-  const node = {
+function call(callee: any, args: any[] = []): any {
+  const node: any = {
     type: "CallExpression",
     callee,
     arguments: args,
@@ -48,8 +48,8 @@ function call(callee, args = []) {
   return node;
 }
 
-function member(object, property) {
-  const node = {
+function member(object: any, property: string): any {
+  const node: any = {
     type: "MemberExpression",
     object,
     property: {
@@ -62,15 +62,15 @@ function member(object, property) {
   return node;
 }
 
-function methodCall(object, property, args = []) {
+function methodCall(object: any, property: string, args: any[] = []): any {
   const memberNode = member(object, property);
   const node = call(memberNode, args);
   memberNode.parent = node;
   return node;
 }
 
-function expressionStatement(expression) {
-  const node = {
+function expressionStatement(expression: any): any {
+  const node: any = {
     type: "ExpressionStatement",
     expression,
   };
@@ -78,8 +78,8 @@ function expressionStatement(expression) {
   return node;
 }
 
-function block(body = []) {
-  const node = {
+function block(body: any[] = []): any {
+  const node: any = {
     type: "BlockStatement",
     body,
   };
@@ -89,7 +89,7 @@ function block(body = []) {
   return node;
 }
 
-function id(name) {
+function id(name: string): any {
   return {
     type: "Identifier",
     name,
@@ -97,7 +97,7 @@ function id(name) {
   };
 }
 
-function literal(value) {
+function literal(value: any): any {
   return {
     type: "Literal",
     value,
@@ -105,8 +105,8 @@ function literal(value) {
   };
 }
 
-function binary(left, operator, right) {
-  const node = {
+function binary(left: any, operator: string, right: any): any {
+  const node: any = {
     type: "BinaryExpression",
     operator,
     left,
@@ -117,8 +117,8 @@ function binary(left, operator, right) {
   return node;
 }
 
-function logical(left, right, operator = "&&") {
-  const node = {
+function logical(left: any, right: any, operator = "&&"): any {
+  const node: any = {
     type: "LogicalExpression",
     operator,
     left,
@@ -129,8 +129,8 @@ function logical(left, right, operator = "&&") {
   return node;
 }
 
-function arrow(params, body) {
-  const node = {
+function arrow(params: any[], body: any): any {
+  const node: any = {
     type: "ArrowFunctionExpression",
     params,
     body,
@@ -597,8 +597,8 @@ test("oxlint can load the package as a JS plugin when oxlint is installed", (t) 
       "exec",
       "oxlint",
       "--config",
-      "test/fixtures/oxlint/oxlint.fixture.json",
-      "test/fixtures/oxlint/bad.js",
+      "tests/fixtures/oxlint/oxlint.fixture.json",
+      "tests/fixtures/oxlint/bad.ts",
     ],
     { encoding: "utf8" },
   );

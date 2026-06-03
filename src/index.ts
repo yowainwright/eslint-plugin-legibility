@@ -1,7 +1,7 @@
 "use strict";
 
 const PLUGIN_NAME = "legibility";
-const { version: PACKAGE_VERSION } = require("./package.json");
+const { version: PACKAGE_VERSION } = require("../package.json");
 
 const DEFAULT_MAX_EXPRESSION_OPERATORS = 4;
 const DEFAULT_MAX_IF_OPERATORS = 0;
@@ -10,6 +10,48 @@ const DEFAULT_MAX_COMPUTED_VALUE_OPERATORS = 1;
 const DEFAULT_MAX_CONTROL_FLOW_DEPTH = 3;
 const DEFAULT_MAX_ARRAY_CHAIN_DEPTH = 2;
 const DEFAULT_MIN_OBJECT_LOOKUP_CHAIN_LENGTH = 3;
+
+type Severity = "off" | "warn" | "error" | 0 | 1 | 2;
+
+interface RuleMeta {
+  type: "problem" | "suggestion" | "layout";
+  docs?: {
+    description?: string;
+    recommended?: boolean;
+    url?: string;
+  };
+  schema?: unknown;
+  messages: Record<string, string>;
+}
+
+interface RuleModule {
+  meta: RuleMeta;
+  create(context: unknown): Record<string, unknown>;
+}
+
+interface LegacyConfig {
+  plugins: string[];
+  rules: Record<string, Severity | [Severity, unknown]>;
+}
+
+interface FlatConfig {
+  plugins: Record<string, LegibilityPlugin>;
+  rules: Record<string, Severity | [Severity, unknown]>;
+}
+
+interface LegibilityPlugin {
+  meta: {
+    name: "legibility";
+    version: string;
+  };
+  rules: Record<string, RuleModule>;
+  configs: {
+    recommended: LegacyConfig;
+    strict: LegacyConfig;
+    "flat/recommended": FlatConfig;
+    "flat/strict": FlatConfig;
+  };
+}
 
 const SKIP_KEYS = new Set(["parent", "loc", "range", "tokens", "comments"]);
 
@@ -801,7 +843,7 @@ function getFunctionParamNames(node) {
   return params.map((param) => param.name);
 }
 
-function isBooleanLiteral(node, value) {
+function isBooleanLiteral(node, value = undefined) {
   if (!isRecord(node)) return false;
   if (node.type !== "Literal") return false;
   if (typeof value === "boolean") return node.value === value;
@@ -2105,13 +2147,13 @@ function buildRuleConfig(ruleNames, level) {
 const recommendedRules = buildRuleConfig(recommendedRuleNames, "warn");
 const strictRules = buildRuleConfig(Object.keys(rules), "error");
 
-const plugin = {
+const plugin: LegibilityPlugin = {
   meta: {
     name: PLUGIN_NAME,
     version: PACKAGE_VERSION,
   },
   rules,
-  configs: {},
+  configs: {} as LegibilityPlugin["configs"],
 };
 
 plugin.configs.recommended = {
@@ -2138,4 +2180,4 @@ plugin.configs["flat/strict"] = {
   rules: strictRules,
 };
 
-module.exports = plugin;
+export = plugin;

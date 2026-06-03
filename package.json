@@ -21,20 +21,19 @@
     "performance",
     "ai"
   ],
-  "main": "./index.js",
-  "types": "./index.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./index.d.ts",
-      "import": "./index.js",
-      "require": "./index.js",
-      "default": "./index.js"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./package.json": "./package.json"
   },
   "files": [
-    "index.js",
-    "index.d.ts",
+    "dist",
     "LICENSE",
     "NOTICE.md",
     "README.md",
@@ -42,36 +41,46 @@
   ],
   "sideEffects": false,
   "engines": {
-    "node": ">=18.18.0"
+    "node": ">=20"
   },
   "packageManager": "pnpm@10.12.1",
   "scripts": {
-    "lint": "eslint .",
+    "build": "pnpm build:plugin && pnpm build:scripts && pnpm build:tests",
+    "build:plugin": "tsc -p tsconfig.build.json",
+    "build:scripts": "tsc -p tsconfig.scripts.json",
+    "build:tests": "tsc -p tsconfig.tests.json",
+    "typecheck": "pnpm build:plugin && tsc -p tsconfig.json",
+    "lint": "pnpm build:plugin && eslint .",
     "lint:oxlint": "oxlint .",
-    "pack:check": "npm pack --dry-run --cache ./.npm-cache",
-    "release": "node scripts/release.js",
-    "release:patch": "node scripts/release.js --increment=patch",
-    "release:patch:dry": "node scripts/release.js --increment=patch --dry-run",
-    "release:minor": "node scripts/release.js --increment=minor",
-    "release:minor:dry": "node scripts/release.js --increment=minor --dry-run",
-    "release:major": "node scripts/release.js --increment=major",
-    "release:major:dry": "node scripts/release.js --increment=major --dry-run",
-    "release:beta": "node scripts/release.js --preRelease=beta",
-    "release:beta:dry": "node scripts/release.js --preRelease=beta --dry-run",
-    "release:alpha": "node scripts/release.js --preRelease=alpha",
-    "release:alpha:dry": "node scripts/release.js --preRelease=alpha --dry-run",
-    "release:tag": "node scripts/tag-release.js",
-    "release:tag:dry": "node scripts/tag-release.js --dry-run",
-    "release:tag:trusted": "node scripts/tag-release.js --trusted-publishing",
-    "release:dry": "node scripts/release.js --dry-run",
-    "test": "node --test test/*.test.js",
-    "validate": "pnpm test && pnpm lint && pnpm lint:oxlint && pnpm pack:check"
+    "pack:check": "pnpm build:plugin && npm pack --dry-run --cache ./.npm-cache",
+    "prepack": "pnpm build:plugin",
+    "release": "pnpm build:scripts && node .scripts-dist/scripts/release.js",
+    "release:patch": "pnpm build:scripts && node .scripts-dist/scripts/release.js --increment=patch",
+    "release:patch:dry": "pnpm build:scripts && node .scripts-dist/scripts/release.js --increment=patch --dry-run",
+    "release:minor": "pnpm build:scripts && node .scripts-dist/scripts/release.js --increment=minor",
+    "release:minor:dry": "pnpm build:scripts && node .scripts-dist/scripts/release.js --increment=minor --dry-run",
+    "release:major": "pnpm build:scripts && node .scripts-dist/scripts/release.js --increment=major",
+    "release:major:dry": "pnpm build:scripts && node .scripts-dist/scripts/release.js --increment=major --dry-run",
+    "release:beta": "pnpm build:scripts && node .scripts-dist/scripts/release.js --preRelease=beta",
+    "release:beta:dry": "pnpm build:scripts && node .scripts-dist/scripts/release.js --preRelease=beta --dry-run",
+    "release:alpha": "pnpm build:scripts && node .scripts-dist/scripts/release.js --preRelease=alpha",
+    "release:alpha:dry": "pnpm build:scripts && node .scripts-dist/scripts/release.js --preRelease=alpha --dry-run",
+    "release:tag": "pnpm build:scripts && node .scripts-dist/scripts/tag-release.js",
+    "release:tag:dry": "pnpm build:scripts && node .scripts-dist/scripts/tag-release.js --dry-run",
+    "release:tag:trusted": "pnpm build:scripts && node .scripts-dist/scripts/tag-release.js --trusted-publishing",
+    "release:dry": "pnpm build:scripts && node .scripts-dist/scripts/release.js --dry-run",
+    "test": "pnpm build && node --test .test-dist/tests/*.test.js",
+    "validate": "pnpm typecheck && pnpm test && pnpm lint && pnpm lint:oxlint && pnpm pack:check"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
+    "@types/node": "^25.9.1",
     "eslint": "^9.0.0",
+    "jiti": "^2.7.0",
     "oxlint": "^1.0.0",
-    "release-it": "20.1.0"
+    "release-it": "20.1.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.60.1"
   },
   "publishConfig": {
     "access": "public"

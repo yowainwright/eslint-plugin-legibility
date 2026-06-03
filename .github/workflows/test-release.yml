@@ -1,0 +1,162 @@
+name: Test Published Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Published eslint-plugin-legibility version to test (leave empty for latest on npm)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  test-published-release:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package-manager: [npm, pnpm]
+    name: ${{ matrix.package-manager }} smoke
+
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 26
+
+      - name: Enable pnpm
+        if: matrix.package-manager == 'pnpm'
+        run: corepack enable
+
+      - name: Determine version to test
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="$(npm view eslint-plugin-legibility version)"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Testing eslint-plugin-legibility@$VERSION"
+
+      - name: Wait for npm package availability
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "Waiting for eslint-plugin-legibility@$VERSION to be available on npm..."
+          for attempt in {1..30}; do
+            if npm view "eslint-plugin-legibility@$VERSION" version >/dev/null 2>&1; then
+              echo "eslint-plugin-legibility@$VERSION is available on npm"
+              exit 0
+            fi
+            echo "Attempt $attempt/30: package not available yet, waiting 30 seconds..."
+            sleep 30
+          done
+          echo "eslint-plugin-legibility@$VERSION was not available on npm in time"
+          exit 1
+
+      - name: Install published package
+        env:
+          PACKAGE_MANAGER: ${{ matrix.package-manager }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir release-smoke
+          cd release-smoke
+          printf '{"private":true,"type":"commonjs"}\n' > package.json
+
+          if [ "$PACKAGE_MANAGER" = "pnpm" ]; then
+            pnpm add -D eslint@^9 oxlint "eslint-plugin-legibility@$VERSION"
+          else
+            npm install --save-dev eslint@^9 oxlint "eslint-plugin-legibility@$VERSION"
+          fi
+
+      - name: Verify ESLint plugin loading
+        env:
+          PACKAGE_MANAGER: ${{ matrix.package-manager }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          cd release-smoke
+          cat > eslint.config.cjs <<'EOF'
+          const legibility = require("eslint-plugin-legibility");
+
+          module.exports = [
+            {
+              plugins: { legibility },
+              rules: {
+                "legibility/hoist-if-operators": "error",
+              },
+            },
+          ];
+          EOF
+          cat > eslint-bad.js <<'EOF'
+          if (ready && enabled) {
+            run();
+          }
+          EOF
+
+          node -e 'const plugin = require("eslint-plugin-legibility"); if (plugin.meta.name !== "legibility") throw new Error("Unexpected plugin name"); if (plugin.meta.version !== process.env.VERSION) throw new Error(`Unexpected plugin version: ${plugin.meta.version}`);'
+
+          if [ "$PACKAGE_MANAGER" = "pnpm" ]; then
+            RUN=(pnpm exec)
+          else
+            RUN=(npx)
+          fi
+
+          set +e
+          "${RUN[@]}" eslint eslint-bad.js > eslint.log 2>&1
+          status=$?
+          set -e
+          cat eslint.log
+          test "$status" -ne 0
+          grep -q "legibility/hoist-if-operators" eslint.log
+
+      - name: Verify Oxlint plugin loading
+        env:
+          PACKAGE_MANAGER: ${{ matrix.package-manager }}
+        run: |
+          cd release-smoke
+          cat > oxlint.config.json <<'EOF'
+          {
+            "jsPlugins": [
+              {
+                "name": "legibility",
+                "specifier": "eslint-plugin-legibility"
+              }
+            ],
+            "rules": {
+              "legibility/prefer-early-return": "error"
+            }
+          }
+          EOF
+          cat > oxlint-bad.js <<'EOF'
+          function save(failed) {
+            if (failed) {
+              return;
+            } else {
+              run();
+            }
+          }
+          EOF
+
+          if [ "$PACKAGE_MANAGER" = "pnpm" ]; then
+            RUN=(pnpm exec)
+          else
+            RUN=(npx)
+          fi
+
+          set +e
+          "${RUN[@]}" oxlint --config oxlint.config.json oxlint-bad.js > oxlint.log 2>&1
+          status=$?
+          set -e
+          cat oxlint.log
+          test "$status" -ne 0
+          grep -Eq "legibility(/|\\()prefer-early-return" oxlint.log
+
+      - name: Report test result
+        run: |
+          echo "Tested eslint-plugin-legibility@${{ steps.version.outputs.version }}"
+          echo "Package manager: ${{ matrix.package-manager }}"
+          echo "ESLint and Oxlint published-package smoke tests passed"

@@ -117,7 +117,7 @@ function assertPublishAuthReady({
   gh,
   repository,
   trustedPublishing = false,
-} = {}) {
+}: any = {}) {
   if (trustedPublishing) return;
   if (!repository) throw new Error("GitHub repository is required for publish auth checks");
 

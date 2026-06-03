@@ -117,7 +117,7 @@ function createRunner(cwd) {
   };
 }
 
-async function runRelease(options = {}) {
+async function runRelease(options: any = {}) {
   const cwd = options.cwd ?? process.cwd();
   const logger = options.logger ?? console;
   const runner = options.runner ?? createRunner(cwd);

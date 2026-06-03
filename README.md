@@ -4,6 +4,8 @@ Rules for keeping JavaScript and TypeScript readable, explicit, and reasonably p
 
 The package is an ESLint-compatible plugin with no runtime dependencies. Oxlint can load the same plugin through its JavaScript plugin support.
 
+The repository is authored in TypeScript and publishes compiled CommonJS output from `dist/`.
+
 ## Install
 
 ```sh
@@ -152,7 +154,7 @@ If the package name resolves to a different plugin name in your setup, alias it:
 - Published package contents are allowlisted with `files`.
 - Releases are tag-triggered and publish a GitHub attestation bundle and release assets.
 - npm trusted publishing is supported; npm provenance is automatic when publishing from a public repository.
-- CI runs tests, ESLint, Oxlint, and `npm pack --dry-run`.
+- CI runs TypeScript typecheck, Node test runner tests from `tests/`, ESLint, Oxlint, and `npm pack --dry-run`.
 - Security policy and GitHub security scanning configuration are included in the repo.
 
 ## Releases
@@ -171,6 +173,8 @@ pnpm release:alpha
 The release script creates the release commit locally, tags it, pushes only the tag, and restores local `main` to its starting commit. The pushed tag triggers npm publishing and GitHub release asset upload.
 
 Before pushing a release tag, the script checks that GitHub Actions can publish with an `NPM_TOKEN` secret in the repository or `npm-publish` environment. After the package exists on npm and trusted publishing is configured for `.github/workflows/publish.yml`, use `pnpm release:tag:trusted` or pass `--trusted-publishing` to the release script instead.
+
+The `npm-publish` GitHub environment needs an `NPM_TOKEN` secret for the first publish. The publish workflow creates npm and GitHub release assets, and the release test workflow installs the published package from npm with npm and pnpm, then verifies ESLint and Oxlint can load the plugin.
 
 ## Attribution
 
