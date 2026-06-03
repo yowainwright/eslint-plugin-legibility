@@ -163,6 +163,33 @@ test("max-expression-operators reports operator-heavy expressions", () => {
   assert.equal(reports[0].data.count, 2);
 });
 
+test("max-expression-operators allows custom operators and complexity weights", () => {
+  const { visitor, reports } = createRule("max-expression-operators", [
+    { complexity: { "+": 3 }, max: 2, operators: ["+"] },
+  ]);
+
+  visitor.ReturnStatement({
+    type: "ReturnStatement",
+    argument: binary(id("a"), "+", id("b")),
+  });
+
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].data.count, 3);
+});
+
+test("max-expression-operators respects explicitly empty operator lists", () => {
+  const { visitor, reports } = createRule("max-expression-operators", [
+    { max: 0, operators: [] },
+  ]);
+
+  visitor.ReturnStatement({
+    type: "ReturnStatement",
+    argument: logical(id("a"), id("b")),
+  });
+
+  assert.equal(reports.length, 0);
+});
+
 test("hoist-if-operators reports boolean-heavy if conditions", () => {
   const { visitor, reports } = createRule("hoist-if-operators");
 
@@ -175,9 +202,40 @@ test("hoist-if-operators reports boolean-heavy if conditions", () => {
   assert.equal(reports[0].messageId, "tooMany");
 });
 
+test("hoist-if-operators allows custom condition operators", () => {
+  const { visitor, reports } = createRule("hoist-if-operators", [
+    { max: 0, operators: ["==="] },
+  ]);
+
+  visitor.IfStatement({
+    type: "IfStatement",
+    test: binary(id("status"), "===", literal("ready")),
+  });
+
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].data.count, 1);
+});
+
 test("no-quadratic-patterns reports search calls inside loops", () => {
   const { visitor, reports } = createRule("no-quadratic-patterns");
   const search = methodCall(id("items"), "find");
+  const body = block([expressionStatement(search)]);
+  const loop = { type: "ForStatement", body };
+  body.parent = loop;
+
+  visitor.ForStatement(loop);
+  visitor.CallExpression(search);
+  visitor["ForStatement:exit"](loop);
+
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].messageId, "searchInLoop");
+});
+
+test("no-quadratic-patterns allows custom search methods", () => {
+  const { visitor, reports } = createRule("no-quadratic-patterns", [
+    { searchMethods: ["lookup"] },
+  ]);
+  const search = methodCall(id("items"), "lookup");
   const body = block([expressionStatement(search)]);
   const loop = { type: "ForStatement", body };
   body.parent = loop;
@@ -248,6 +306,22 @@ test("no-complex-ternaries reports nested ternaries", () => {
   assert.equal(reports[0].messageId, "nested");
 });
 
+test("no-complex-ternaries allows custom ternary complexity", () => {
+  const { visitor, reports } = createRule("no-complex-ternaries", [
+    { complexity: { "?:": 2 }, max: 1, operators: ["?:"] },
+  ]);
+
+  visitor.ConditionalExpression({
+    type: "ConditionalExpression",
+    test: id("ready"),
+    consequent: id("enabled"),
+    alternate: id("disabled"),
+  });
+
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].data.count, 2);
+});
+
 test("no-computed-values reports computed object values", () => {
   const { visitor, reports } = createRule("no-computed-values", [{ max: 1 }]);
 
@@ -258,6 +332,20 @@ test("no-computed-values reports computed object values", () => {
 
   assert.equal(reports.length, 1);
   assert.equal(reports[0].messageId, "computedObjectValue");
+});
+
+test("no-computed-values allows custom computed operator complexity", () => {
+  const { visitor, reports } = createRule("no-computed-values", [
+    { complexity: { "+": 2 }, max: 1, operators: ["+"] },
+  ]);
+
+  visitor.Property({
+    type: "Property",
+    value: binary(id("subtotal"), "+", id("tax")),
+  });
+
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].data.count, 2);
 });
 
 test("no-hidden-side-effects reports nested assignments", () => {
@@ -273,6 +361,19 @@ test("no-hidden-side-effects reports nested assignments", () => {
   assert.equal(reports[0].messageId, "hiddenSideEffect");
 });
 
+test("no-hidden-side-effects allows custom mutating methods", () => {
+  const { visitor, reports } = createRule("no-hidden-side-effects", [
+    { mutatingMethods: ["commit"] },
+  ]);
+  const commitCall = methodCall(id("store"), "commit");
+  commitCall.parent = { type: "ReturnStatement", argument: commitCall };
+
+  visitor.CallExpression(commitCall);
+
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].messageId, "hiddenSideEffect");
+});
+
 test("no-standalone-array-mutations reports standalone mutating calls", () => {
   const { visitor, reports } = createRule("no-standalone-array-mutations");
   const pushCall = methodCall(id("items"), "push");
@@ -282,6 +383,22 @@ test("no-standalone-array-mutations reports standalone mutating calls", () => {
   };
 
   visitor.CallExpression(pushCall);
+
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].messageId, "standaloneArrayMutation");
+});
+
+test("no-standalone-array-mutations allows custom mutating methods", () => {
+  const { visitor, reports } = createRule("no-standalone-array-mutations", [
+    { arrayMutatingMethods: ["append"], mutatingMethods: ["append"] },
+  ]);
+  const appendCall = methodCall(id("items"), "append");
+  appendCall.parent = {
+    type: "ExpressionStatement",
+    expression: appendCall,
+  };
+
+  visitor.CallExpression(appendCall);
 
   assert.equal(reports.length, 1);
   assert.equal(reports[0].messageId, "standaloneArrayMutation");
@@ -380,6 +497,20 @@ test("max-array-chain-depth reports long array callback chains once", () => {
   assert.equal(reports[0].data.chain, "filter.map.some");
 });
 
+test("max-array-chain-depth allows custom iteration methods", () => {
+  const { visitor, reports } = createRule("max-array-chain-depth", [
+    { iterationMethods: ["collect", "select"], max: 1 },
+  ]);
+  const collectCall = methodCall(id("items"), "collect");
+  const selectCall = methodCall(collectCall, "select");
+
+  visitor.CallExpression(collectCall);
+  visitor.CallExpression(selectCall);
+
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].data.chain, "collect.select");
+});
+
 test("no-repeated-collection-search reports repeated scoped scans", () => {
   const { visitor, reports } = createRule("no-repeated-collection-search");
 
@@ -390,6 +521,20 @@ test("no-repeated-collection-search reports repeated scoped scans", () => {
 
   assert.equal(reports.length, 1);
   assert.equal(reports[0].messageId, "repeatedSearch");
+});
+
+test("no-repeated-collection-search allows custom search methods", () => {
+  const { visitor, reports } = createRule("no-repeated-collection-search", [
+    { searchMethods: ["lookup"] },
+  ]);
+
+  visitor.Program({ type: "Program" });
+  visitor.CallExpression(methodCall(id("users"), "lookup"));
+  visitor.CallExpression(methodCall(id("users"), "lookup"));
+  visitor["Program:exit"]({ type: "Program" });
+
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].data.method, "lookup");
 });
 
 test("no-redundant-boolean-logic reports boolean comparisons and ternaries", () => {
@@ -406,6 +551,17 @@ test("no-redundant-boolean-logic reports boolean comparisons and ternaries", () 
   assert.equal(reports.length, 2);
   assert.equal(reports[0].messageId, "booleanComparison");
   assert.equal(reports[1].messageId, "booleanTernary");
+});
+
+test("no-redundant-boolean-logic allows custom equality operators", () => {
+  const { visitor, reports } = createRule("no-redundant-boolean-logic", [
+    { equalityOperators: ["~~"] },
+  ]);
+
+  visitor.BinaryExpression(binary(id("isReady"), "~~", literal(true)));
+
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].messageId, "booleanComparison");
 });
 
 test("no-trivial-wrapper-functions reports parameter-forwarding wrappers", () => {
@@ -456,6 +612,21 @@ test("prefer-positive-condition-names reports negative boolean names", () => {
     type: "VariableDeclarator",
     id: id("isNotReady"),
     init: literal(false),
+  });
+
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].messageId, "negativeName");
+});
+
+test("prefer-positive-condition-names allows custom boolean operators", () => {
+  const { visitor, reports } = createRule("prefer-positive-condition-names", [
+    { booleanOperators: ["matches"] },
+  ]);
+
+  visitor.VariableDeclarator({
+    type: "VariableDeclarator",
+    id: id("isNotReady"),
+    init: binary(id("status"), "matches", literal("ready")),
   });
 
   assert.equal(reports.length, 1);
@@ -558,6 +729,20 @@ test("prefer-object-lookup reports long equality OR chains", () => {
   const second = binary(id("type"), "===", literal("b"));
   const third = binary(id("type"), "===", literal("c"));
   const chain = logical(logical(first, second, "||"), third, "||");
+
+  visitor.LogicalExpression(chain);
+
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].messageId, "preferLookup");
+});
+
+test("prefer-object-lookup allows custom equality operators", () => {
+  const { visitor, reports } = createRule("prefer-object-lookup", [
+    { min: 2, operators: ["is"] },
+  ]);
+  const first = binary(id("type"), "is", literal("a"));
+  const second = binary(id("type"), "is", literal("b"));
+  const chain = logical(first, second, "||");
 
   visitor.LogicalExpression(chain);
 

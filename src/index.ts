@@ -1,11 +1,13 @@
 import {
   ARRAY_MUTATING_METHODS,
+  ARG_COMMAND_FUNCTIONS,
   COMPARISON_OPERATORS,
-  COMPUTED_VALUE_OPERATOR_NODE_TYPES,
   CONTROL_FLOW_TYPES,
+  DEFAULT_COMPUTED_VALUE_OPERATOR_COMPLEXITY,
   DEFAULT_DIRECT_BIN_ENTRY_PATTERNS,
   DEFAULT_EXECUTABLE_ENTRY_PATTERNS,
   DEFAULT_EXECUTABLE_RUNTIMES,
+  DEFAULT_IF_CONDITION_OPERATOR_COMPLEXITY,
   DEFAULT_MAX_ARRAY_CHAIN_DEPTH,
   DEFAULT_MAX_COMPUTED_VALUE_OPERATORS,
   DEFAULT_MAX_CONTROL_FLOW_DEPTH,
@@ -13,457 +15,51 @@ import {
   DEFAULT_MAX_IF_OPERATORS,
   DEFAULT_MAX_TERNARY_OPERATORS,
   DEFAULT_MIN_OBJECT_LOOKUP_CHAIN_LENGTH,
+  DEFAULT_READABILITY_OPERATOR_COMPLEXITY,
   EQUALITY_OPERATORS,
   EXPRESSION_CONTAINER_NODE_TYPES,
+  FLAT_METHODS,
   FUNCTION_NODE_TYPES,
-  IF_CONDITION_OPERATOR_NODE_TYPES,
+  HOIST_IF_OPERATORS_META,
   ITERATION_METHODS,
   LOOP_TYPES,
+  MAP_METHODS,
+  MAX_ARRAY_CHAIN_DEPTH_META,
+  MAX_CONTROL_FLOW_DEPTH_META,
+  MAX_EXPRESSION_OPERATORS_META,
   MUTATING_METHODS,
+  NEGATIVE_CONDITION_NAME_PATTERN,
+  NO_COMPLEX_TERNARIES_META,
+  NO_COMPUTED_VALUES_META,
+  NO_DIRECT_NODE_BIN_SMOKE_META,
+  NO_HIDDEN_SIDE_EFFECTS_META,
+  NO_IDENTITY_ARRAY_CALLBACK_META,
+  NO_QUADRATIC_PATTERNS_META,
+  NO_REDUNDANT_BOOLEAN_LOGIC_META,
+  NO_REDUNDANT_NULLISH_FALLBACK_META,
+  NO_REPEATED_COLLECTION_SEARCH_META,
+  NO_SINGLE_USE_RENAMING_ALIAS_META,
+  NO_STANDALONE_ARRAY_MUTATIONS_META,
+  NO_TRIVIAL_WRAPPER_FUNCTIONS_META,
+  NO_UNNECESSARY_BLOCK_CALLBACK_META,
+  OBJECT_LOOKUP_OPERATORS,
   PACKAGE_VERSION,
   PLUGIN_NAME,
-  READABILITY_OPERATOR_NODE_TYPES,
+  PREFER_CONCAT_OBJECT_ASSIGN_META,
+  PREFER_EARLY_RETURN_META,
+  PREFER_FLAT_MAP_META,
+  PREFER_GUARD_CLAUSES_META,
+  PREFER_OBJECT_LOOKUP_META,
+  PREFER_POSITIVE_CONDITION_NAMES_META,
+  RECOMMENDED_RULE_NAMES,
+  REQUIRE_EXECUTABLE_SHEBANG_META,
   SEARCH_METHODS,
   SIDE_EFFECT_FREE_ITERATION_METHODS,
+  SHELL_COMMAND_FUNCTIONS,
   SKIP_KEYS,
   TERMINAL_STATEMENT_TYPES,
 } from "./constants";
-
-type Severity = "off" | "warn" | "error" | 0 | 1 | 2;
-
-interface RuleMeta {
-  type: "problem" | "suggestion" | "layout";
-  docs?: {
-    description?: string;
-    recommended?: boolean;
-    url?: string;
-  };
-  schema?: unknown;
-  messages: Record<string, string>;
-}
-
-interface RuleModule {
-  meta: RuleMeta;
-  create(context: unknown): Record<string, unknown>;
-}
-
-interface LegacyConfig {
-  plugins: string[];
-  rules: Record<string, Severity | [Severity, unknown]>;
-}
-
-interface FlatConfig {
-  plugins: Record<string, LegibilityPlugin>;
-  rules: Record<string, Severity | [Severity, unknown]>;
-}
-
-interface LegibilityPlugin {
-  meta: {
-    name: "legibility";
-    version: string;
-  };
-  rules: Record<string, RuleModule>;
-  configs: {
-    recommended: LegacyConfig;
-    strict: LegacyConfig;
-    "flat/recommended": FlatConfig;
-    "flat/strict": FlatConfig;
-  };
-}
-
-function ruleUrl(ruleName) {
-  return `https://github.com/yowainwright/eslint-plugin-legibility#${ruleName}`;
-}
-
-function defineMeta(ruleName, meta) {
-  const docs = Object.assign({}, meta.docs, { url: ruleUrl(ruleName) });
-  return Object.assign({}, meta, { docs });
-}
-
-const MAX_EXPRESSION_OPERATORS_META = defineMeta("max-expression-operators", {
-  type: "suggestion",
-  docs: {
-    description: "Limit readable-complexity operators inside a single expression.",
-    recommended: true,
-  },
-  schema: [
-    {
-      type: "object",
-      properties: { max: { type: "integer", minimum: 1 } },
-      additionalProperties: false,
-    },
-  ],
-  messages: {
-    tooMany:
-      "Expression has {{count}} readability operators (max {{max}}). Extract named sub-expressions.",
-  },
-});
-
-const NO_QUADRATIC_PATTERNS_META = defineMeta("no-quadratic-patterns", {
-  type: "suggestion",
-  docs: {
-    description: "Flag nested loops, search-in-loop, and nested array iteration patterns.",
-    recommended: true,
-  },
-  schema: [],
-  messages: {
-    nestedIteration:
-      "Nested array iteration (.{{outer}}() containing .{{inner}}()) is likely O(n^2). Consider restructuring.",
-    nestedLoop: "Nested loop detected. Consider using a Map or Set for lookups.",
-    searchInLoop:
-      "Array search method .{{method}}() inside a loop is likely O(n^2). Consider using a Map or Set.",
-  },
-});
-
-const HOIST_IF_OPERATORS_META = defineMeta("hoist-if-operators", {
-  type: "suggestion",
-  docs: {
-    description: "Prefer named boolean expressions before operator-heavy if statements.",
-    recommended: true,
-  },
-  schema: [
-    {
-      type: "object",
-      properties: { max: { type: "integer", minimum: 0 } },
-      additionalProperties: false,
-    },
-  ],
-  messages: {
-    tooMany:
-      "If condition has {{count}} readability operators (max {{max}}). Hoist it into a named boolean.",
-  },
-});
-
-const NO_HIDDEN_SIDE_EFFECTS_META = defineMeta("no-hidden-side-effects", {
-  type: "suggestion",
-  docs: {
-    description: "Flag side effects hidden inside expressions and side-effect-free callbacks.",
-    recommended: true,
-  },
-  schema: [],
-  messages: {
-    callbackSideEffect:
-      "Avoid side effects inside .{{method}}() callbacks. Extract the mutation or use a clearer control flow.",
-    hiddenSideEffect:
-      "Avoid side effects inside expressions. Move this mutation into its own statement.",
-  },
-});
-
-const NO_STANDALONE_ARRAY_MUTATIONS_META = defineMeta("no-standalone-array-mutations", {
-  type: "suggestion",
-  docs: {
-    description: "Avoid standalone array mutations when a composable expression is clearer.",
-    recommended: true,
-  },
-  schema: [],
-  messages: {
-    standaloneArrayMutation:
-      "Avoid standalone .{{method}}() array mutation. Prefer a returned array expression or a named helper.",
-  },
-});
-
-const NO_COMPUTED_VALUES_META = defineMeta("no-computed-values", {
-  type: "suggestion",
-  docs: {
-    description:
-      "Prefer named values before returning computed expressions or assigning computed object values.",
-    recommended: true,
-  },
-  schema: [
-    {
-      type: "object",
-      properties: { max: { type: "integer", minimum: 0 } },
-      additionalProperties: false,
-    },
-  ],
-  messages: {
-    computedObjectValue:
-      "Object value has {{count}} computed operators (max {{max}}). Extract it into a named value before building the object.",
-    computedReturn:
-      "Return value has {{count}} computed operators (max {{max}}). Extract it into a named value before returning.",
-  },
-});
-
-const PREFER_CONCAT_OBJECT_ASSIGN_META = defineMeta("prefer-concat-object-assign", {
-  type: "suggestion",
-  docs: {
-    description:
-      "Prefer explicit concat/Object.assign composition over array or object literal spread.",
-    recommended: true,
-  },
-  schema: [],
-  messages: {
-    arraySpread: "Prefer Array#concat over array literal spread so array composition is explicit.",
-    objectSpread:
-      "Prefer Object.assign with an empty target over object literal spread so object composition is explicit.",
-  },
-});
-
-const NO_COMPLEX_TERNARIES_META = defineMeta("no-complex-ternaries", {
-  type: "suggestion",
-  docs: {
-    description: "Keep ternaries simple enough to read without extracting branches.",
-    recommended: true,
-  },
-  schema: [
-    {
-      type: "object",
-      properties: { max: { type: "integer", minimum: 1 } },
-      additionalProperties: false,
-    },
-  ],
-  messages: {
-    tooMany:
-      "Ternary has {{count}} readability operators (max {{max}}). Extract named branches or use an if statement.",
-    nested: "Nested ternary detected. Extract named branches or use an if statement.",
-  },
-});
-
-const REQUIRE_EXECUTABLE_SHEBANG_META = defineMeta("require-executable-shebang", {
-  type: "problem",
-  docs: {
-    description: "Require configured executable entry source files to start with a shebang.",
-    recommended: true,
-  },
-  schema: [
-    {
-      type: "object",
-      properties: {
-        files: { type: "array", items: { type: "string" } },
-        runtimes: { type: "array", items: { type: "string" } },
-      },
-      additionalProperties: false,
-    },
-  ],
-  messages: {
-    missingShebang:
-      "{{file}} is configured as an executable entry source but has no Node/Bun shebang.",
-  },
-});
-
-const NO_DIRECT_NODE_BIN_SMOKE_META = defineMeta("no-direct-node-bin-smoke", {
-  type: "problem",
-  docs: {
-    description:
-      "Prefer smoke-testing installed package binaries instead of direct node entrypoint execution.",
-    recommended: true,
-  },
-  schema: [
-    {
-      type: "object",
-      properties: {
-        entryPatterns: { type: "array", items: { type: "string" } },
-      },
-      additionalProperties: false,
-    },
-  ],
-  messages: {
-    directNodeBin:
-      "Smoke tests should execute the installed package bin, not `node {{entry}}`, so bin shims and shebangs are exercised.",
-  },
-});
-
-const MAX_CONTROL_FLOW_DEPTH_META = defineMeta("max-control-flow-depth", {
-  type: "suggestion",
-  docs: {
-    description: "Limit nested control flow so branches stay easy to scan.",
-    recommended: true,
-  },
-  schema: [
-    {
-      type: "object",
-      properties: { max: { type: "integer", minimum: 1 } },
-      additionalProperties: false,
-    },
-  ],
-  messages: {
-    tooDeep:
-      "Control-flow depth is {{depth}} (max {{max}}). Extract a helper or return early to flatten the branch.",
-  },
-});
-
-const PREFER_EARLY_RETURN_META = defineMeta("prefer-early-return", {
-  type: "suggestion",
-  docs: {
-    description: "Avoid else branches after an if branch already exits.",
-    recommended: true,
-  },
-  schema: [],
-  messages: {
-    avoidElse:
-      "Avoid an else branch after this if branch exits. Return early and keep the follow-up path unindented.",
-  },
-});
-
-const MAX_ARRAY_CHAIN_DEPTH_META = defineMeta("max-array-chain-depth", {
-  type: "suggestion",
-  docs: {
-    description: "Limit consecutive array callback chains to keep data flow readable.",
-    recommended: true,
-  },
-  schema: [
-    {
-      type: "object",
-      properties: { max: { type: "integer", minimum: 1 } },
-      additionalProperties: false,
-    },
-  ],
-  messages: {
-    tooMany:
-      "Array method chain has {{count}} steps (max {{max}}): {{chain}}. Name intermediate values or use a single pass.",
-  },
-});
-
-const NO_REPEATED_COLLECTION_SEARCH_META = defineMeta("no-repeated-collection-search", {
-  type: "suggestion",
-  docs: {
-    description:
-      "Flag repeated searches over the same collection in one scope; prefer a named lookup Map or Set.",
-    recommended: false,
-  },
-  schema: [],
-  messages: {
-    repeatedSearch:
-      "{{collection}} is searched multiple times with .{{method}}() in this scope. Build a named lookup when repeated scans are intentional.",
-  },
-});
-
-const NO_REDUNDANT_BOOLEAN_LOGIC_META = defineMeta("no-redundant-boolean-logic", {
-  type: "suggestion",
-  docs: {
-    description: "Avoid verbose boolean comparisons and boolean-only ternaries.",
-    recommended: true,
-  },
-  schema: [],
-  messages: {
-    booleanComparison:
-      "Avoid comparing to {{value}}. Use the boolean expression directly.",
-    booleanTernary:
-      "Avoid a ternary that only returns booleans. Use the condition or its negation.",
-  },
-});
-
-const NO_TRIVIAL_WRAPPER_FUNCTIONS_META = defineMeta("no-trivial-wrapper-functions", {
-  type: "suggestion",
-  docs: {
-    description: "Avoid functions that only forward their parameters to another call.",
-    recommended: true,
-  },
-  schema: [],
-  messages: {
-    trivialWrapper:
-      "{{name}} only forwards its parameters to {{target}}. Inline it or give the wrapper distinct behavior.",
-  },
-});
-
-const PREFER_POSITIVE_CONDITION_NAMES_META = defineMeta("prefer-positive-condition-names", {
-  type: "suggestion",
-  docs: {
-    description: "Prefer positive boolean names instead of double-negative condition names.",
-    recommended: false,
-  },
-  schema: [],
-  messages: {
-    negativeName:
-      "Prefer a positive condition name instead of {{name}} to avoid double negatives.",
-  },
-});
-
-const NO_SINGLE_USE_RENAMING_ALIAS_META = defineMeta("no-single-use-renaming-alias", {
-  type: "suggestion",
-  docs: {
-    description: "Avoid aliases that only rename another identifier or member once.",
-    recommended: false,
-  },
-  schema: [],
-  messages: {
-    singleUseAlias:
-      "{{name}} only renames {{target}} for one use. Use the original value or extract a more meaningful expression.",
-  },
-});
-
-const PREFER_GUARD_CLAUSES_META = defineMeta("prefer-guard-clauses", {
-  type: "suggestion",
-  docs: {
-    description: "Prefer guard clauses over wrapping a whole function body in one branch.",
-    recommended: true,
-  },
-  schema: [],
-  messages: {
-    preferGuard:
-      "Prefer a guard clause before the main path instead of wrapping the function body in an if statement.",
-  },
-});
-
-const NO_UNNECESSARY_BLOCK_CALLBACK_META = defineMeta("no-unnecessary-block-callback", {
-  type: "suggestion",
-  docs: {
-    description: "Prefer expression-bodied arrow callbacks when the block only returns.",
-    recommended: true,
-  },
-  schema: [],
-  messages: {
-    unnecessaryBlock:
-      "This arrow callback only returns a value. Use an expression body instead.",
-  },
-});
-
-const PREFER_FLAT_MAP_META = defineMeta("prefer-flat-map", {
-  type: "suggestion",
-  docs: {
-    description: "Prefer flatMap over map followed by flat.",
-    recommended: true,
-  },
-  schema: [],
-  messages: {
-    preferFlatMap: "Prefer .flatMap() over .map().flat() for one-pass flattening.",
-  },
-});
-
-const NO_IDENTITY_ARRAY_CALLBACK_META = defineMeta("no-identity-array-callback", {
-  type: "suggestion",
-  docs: {
-    description: "Avoid array callbacks that keep every item unchanged.",
-    recommended: true,
-  },
-  schema: [],
-  messages: {
-    identityMap: "Avoid .map() callbacks that return the item unchanged.",
-    alwaysTrueFilter: "Avoid .filter() callbacks that always keep every item.",
-  },
-});
-
-const NO_REDUNDANT_NULLISH_FALLBACK_META = defineMeta("no-redundant-nullish-fallback", {
-  type: "suggestion",
-  docs: {
-    description: "Avoid nullish fallbacks that return undefined unchanged.",
-    recommended: true,
-  },
-  schema: [],
-  messages: {
-    redundantUndefined:
-      "Avoid `?? undefined`; the expression already evaluates to undefined when nullish.",
-  },
-});
-
-const PREFER_OBJECT_LOOKUP_META = defineMeta("prefer-object-lookup", {
-  type: "suggestion",
-  docs: {
-    description: "Prefer Set or object lookups over long equality OR chains.",
-    recommended: true,
-  },
-  schema: [
-    {
-      type: "object",
-      properties: { min: { type: "integer", minimum: 2 } },
-      additionalProperties: false,
-    },
-  ],
-  messages: {
-    preferLookup:
-      "Replace repeated {{name}} equality checks with a Set or lookup object.",
-  },
-});
+import type { LegibilityPlugin } from "./types";
 
 function defineRule(meta, create) {
   return { meta, create };
@@ -497,96 +93,55 @@ function isSkippedExpressionRoot(expression) {
   return isFunctionNode(expression) || isExpressionContainer(expression) || isJsxNode(expression);
 }
 
-function getOperatorWeight(node) {
-  if (READABILITY_OPERATOR_NODE_TYPES.has(String(node.type))) return 1;
-  const isComparisonExpression =
-    node.type === "BinaryExpression" && COMPARISON_OPERATORS.has(String(node.operator));
-  if (isComparisonExpression) return 1;
-
-  const isNegationExpression = node.type === "UnaryExpression" && node.operator === "!";
-  if (isNegationExpression) return 1;
-  return 0;
+function getOperatorToken(node) {
+  if (!isRecord(node)) return null;
+  if (node.type === "ConditionalExpression") return "?:";
+  if (typeof node.operator === "string") return node.operator;
+  return null;
 }
 
-function getIfConditionOperatorWeight(node) {
-  if (IF_CONDITION_OPERATOR_NODE_TYPES.has(String(node.type))) return 1;
-  return 0;
+function getOperatorWeight(node, complexity) {
+  const token = getOperatorToken(node);
+  if (!token) return 0;
+  const weight = complexity[token];
+  return typeof weight === "number" ? weight : 0;
 }
 
-function getComputedValueOperatorWeight(node) {
-  if (COMPUTED_VALUE_OPERATOR_NODE_TYPES.has(String(node.type))) return 1;
-  return 0;
-}
-
-function countChildOperators(child, root) {
+function countChildOperators(child, root, complexity) {
   if (Array.isArray(child)) {
-    return child.reduce((sum, item) => sum + countChildOperators(item, root), 0);
+    return child.reduce((sum, item) => sum + countChildOperators(item, root, complexity), 0);
   }
   if (!isRecord(child)) return 0;
-  return countOperatorNode(child, root);
+  return countOperatorNode(child, root, complexity);
 }
 
-function countOperatorNode(node, root) {
+function countOperatorNode(node, root, complexity) {
   if (isFunctionBoundary(node, root)) return 0;
   const isNestedContainer = node !== root && (isExpressionContainer(node) || isJsxNode(node));
   if (isNestedContainer) return 0;
   const childCount = Object.entries(node).reduce((sum, [key, child]) => {
     if (SKIP_KEYS.has(key)) return sum;
-    return sum + countChildOperators(child, root);
+    return sum + countChildOperators(child, root, complexity);
   }, 0);
-  return getOperatorWeight(node) + childCount;
+  return getOperatorWeight(node, complexity) + childCount;
 }
 
-function countIfConditionChildOperators(child, root) {
-  if (Array.isArray(child)) {
-    return child.reduce((sum, item) => sum + countIfConditionChildOperators(item, root), 0);
-  }
-  if (!isRecord(child)) return 0;
-  return countIfConditionOperatorNode(child, root);
-}
-
-function countIfConditionOperatorNode(node, root) {
-  if (isFunctionBoundary(node, root)) return 0;
-  const childCount = Object.entries(node).reduce((sum, [key, child]) => {
-    if (SKIP_KEYS.has(key)) return sum;
-    return sum + countIfConditionChildOperators(child, root);
-  }, 0);
-  return getIfConditionOperatorWeight(node) + childCount;
-}
-
-function countComputedValueChildOperators(child, root) {
-  if (Array.isArray(child)) {
-    return child.reduce((sum, item) => sum + countComputedValueChildOperators(item, root), 0);
-  }
-  if (!isRecord(child)) return 0;
-  return countComputedValueOperatorNode(child, root);
-}
-
-function countComputedValueOperatorNode(node, root) {
-  if (isFunctionBoundary(node, root)) return 0;
-  const childCount = Object.entries(node).reduce((sum, [key, child]) => {
-    if (SKIP_KEYS.has(key)) return sum;
-    return sum + countComputedValueChildOperators(child, root);
-  }, 0);
-  return getComputedValueOperatorWeight(node) + childCount;
-}
-
-function countExpressionOperators(expression) {
+function countExpressionOperators(expression, complexity) {
   if (!isRecord(expression)) return 0;
   if (isSkippedExpressionRoot(expression)) return 0;
-  return countOperatorNode(expression, expression);
+  return countOperatorNode(expression, expression, complexity);
 }
 
-function countIfConditionOperators(expression) {
+function countIfConditionOperators(expression, complexity) {
   if (!isRecord(expression)) return 0;
-  return countIfConditionOperatorNode(expression, expression);
+  return countOperatorNode(expression, expression, complexity);
 }
 
-function countComputedValueOperators(expression) {
+function countComputedValueOperators(expression, complexity) {
   if (!isRecord(expression)) return 0;
   if (isFunctionNode(expression)) return 0;
   if (isJsxNode(expression)) return 0;
-  return countComputedValueOperatorNode(expression, expression);
+  return countOperatorNode(expression, expression, complexity);
 }
 
 function unwrapChainExpression(node) {
@@ -762,8 +317,48 @@ function getConfiguredStringArray(context, key, fallback) {
   if (!isRecord(value)) return fallback;
   const configured = value[key];
   if (!Array.isArray(configured)) return fallback;
-  const strings = configured.filter((item) => typeof item === "string");
-  return strings.length ? strings : fallback;
+  return configured.filter((item) => typeof item === "string");
+}
+
+function getConfiguredStringSet(context, key, fallback) {
+  return new Set(getConfiguredStringArray(context, key, Array.from(fallback)));
+}
+
+function isNonnegativeNumber(value): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+function getConfiguredOperatorComplexity(context, fallback) {
+  const options = context.options ?? [];
+  const value = options[0];
+  if (!isRecord(value)) return fallback;
+
+  const fallbackComplexity = fallback as Record<string, number>;
+  const complexity = (isRecord(value.complexity) ? value.complexity : {}) as Record<
+    string,
+    unknown
+  >;
+  const hasOperatorsOption = Array.isArray(value.operators);
+  const configuredOperators: string[] = hasOperatorsOption
+    ? value.operators.filter((operator): operator is string => typeof operator === "string")
+    : [];
+  const operatorNames = new Set<string>(
+    hasOperatorsOption ? configuredOperators : Object.keys(fallbackComplexity),
+  );
+  if (!hasOperatorsOption) {
+    Object.keys(complexity).forEach((operator) => {
+      operatorNames.add(operator);
+    });
+  }
+
+  const configured: Record<string, number> = {};
+  for (const operator of operatorNames) {
+    const configuredWeight = complexity[operator];
+    const fallbackWeight = fallbackComplexity[operator] ?? 1;
+    const weight = isNonnegativeNumber(configuredWeight) ? configuredWeight : fallbackWeight;
+    if (weight > 0) configured[operator] = weight;
+  }
+  return configured;
 }
 
 function normalizePath(path) {
@@ -914,9 +509,6 @@ function getCalleeName(node) {
   return getStaticPropertyName(callee);
 }
 
-const SHELL_COMMAND_FUNCTIONS = new Set(["exec", "execSync"]);
-const ARG_COMMAND_FUNCTIONS = new Set(["execFile", "execFileSync", "spawn", "spawnSync"]);
-
 function stripCommandQuotes(value) {
   return value.replace(/^["']|["']$/g, "");
 }
@@ -990,13 +582,17 @@ function createNoDirectNodeBinSmoke(context) {
 
 function createExpressionCheck(context) {
   const max = getConfiguredMax(context, DEFAULT_MAX_EXPRESSION_OPERATORS);
+  const complexity = getConfiguredOperatorComplexity(
+    context,
+    DEFAULT_READABILITY_OPERATOR_COMPLEXITY,
+  );
   const checked = new WeakSet();
   return (expression) => {
     if (!isRecord(expression)) return;
     if (isSkippedExpressionRoot(expression)) return;
     if (checked.has(expression)) return;
     checked.add(expression);
-    const count = countExpressionOperators(expression);
+    const count = countExpressionOperators(expression, complexity);
     if (count <= max) return;
     context.report({
       node: expression,
@@ -1048,9 +644,13 @@ function createMaxExpressionOperators(context) {
 
 function createHoistIfOperators(context) {
   const max = getConfiguredMax(context, DEFAULT_MAX_IF_OPERATORS);
+  const complexity = getConfiguredOperatorComplexity(
+    context,
+    DEFAULT_IF_CONDITION_OPERATOR_COMPLEXITY,
+  );
   return {
     IfStatement(node) {
-      const count = countIfConditionOperators(node.test);
+      const count = countIfConditionOperators(node.test, complexity);
       if (count <= max) return;
       context.report({
         node: node.test,
@@ -1089,12 +689,12 @@ function isAssignmentSideEffect(node) {
   return isAssignment || isUpdate;
 }
 
-function isMutatingMethodCall(node) {
-  return isMethodCall(node, MUTATING_METHODS);
+function isMutatingMethodCall(node, mutatingMethods) {
+  return isMethodCall(node, mutatingMethods);
 }
 
-function isArrayMutatingMethodCall(node) {
-  return isMethodCall(node, ARRAY_MUTATING_METHODS);
+function isArrayMutatingMethodCall(node, arrayMutatingMethods) {
+  return isMethodCall(node, arrayMutatingMethods);
 }
 
 function getMemberObject(node) {
@@ -1110,33 +710,33 @@ function isFreshMutationTarget(target) {
   return target.type === "CallExpression";
 }
 
-function isFreshMutatingMethodCall(node) {
-  if (!isMutatingMethodCall(node)) return false;
+function isFreshMutatingMethodCall(node, mutatingMethods) {
+  if (!isMutatingMethodCall(node, mutatingMethods)) return false;
   return isFreshMutationTarget(getMemberObject(node));
 }
 
-function isSideEffectNode(node) {
+function isSideEffectNode(node, mutatingMethods) {
   if (!isRecord(node)) return false;
   if (isAssignmentSideEffect(node)) return true;
-  if (isFreshMutatingMethodCall(node)) return false;
-  return isMutatingMethodCall(node);
+  if (isFreshMutatingMethodCall(node, mutatingMethods)) return false;
+  return isMutatingMethodCall(node, mutatingMethods);
 }
 
-function childContainsSideEffect(child, root) {
+function childContainsSideEffect(child, root, mutatingMethods) {
   if (Array.isArray(child)) {
     const childNodes = child.filter(isRecord);
-    return childNodes.some((item) => containsSideEffect(item, root));
+    return childNodes.some((item) => containsSideEffect(item, root, mutatingMethods));
   }
   if (!isRecord(child)) return false;
-  return containsSideEffect(child, root);
+  return containsSideEffect(child, root, mutatingMethods);
 }
 
-function containsSideEffect(node, root = node) {
+function containsSideEffect(node, root = node, mutatingMethods = MUTATING_METHODS) {
   if (isFunctionBoundary(node, root)) return false;
-  if (isSideEffectNode(node)) return true;
+  if (isSideEffectNode(node, mutatingMethods)) return true;
   return Object.entries(node).some(([key, child]) => {
     if (SKIP_KEYS.has(key)) return false;
-    return childContainsSideEffect(child, root);
+    return childContainsSideEffect(child, root, mutatingMethods);
   });
 }
 
@@ -1145,11 +745,11 @@ function reportHiddenSideEffect(context, node) {
   context.report({ node, messageId: "hiddenSideEffect" });
 }
 
-function checkCallbackSideEffects(context, node) {
-  if (!isMethodCall(node, SIDE_EFFECT_FREE_ITERATION_METHODS)) return false;
+function checkCallbackSideEffects(context, node, sideEffectFreeIterationMethods, mutatingMethods) {
+  if (!isMethodCall(node, sideEffectFreeIterationMethods)) return false;
   const body = getCallbackBody(node);
   if (!isRecord(body)) return false;
-  if (!containsSideEffect(body)) return false;
+  if (!containsSideEffect(body, body, mutatingMethods)) return false;
   context.report({
     node,
     messageId: "callbackSideEffect",
@@ -1159,14 +759,20 @@ function checkCallbackSideEffects(context, node) {
 }
 
 function createNoHiddenSideEffects(context) {
+  const mutatingMethods = getConfiguredStringSet(context, "mutatingMethods", MUTATING_METHODS);
+  const sideEffectFreeIterationMethods = getConfiguredStringSet(
+    context,
+    "sideEffectFreeIterationMethods",
+    SIDE_EFFECT_FREE_ITERATION_METHODS,
+  );
   return {
     AssignmentExpression(node) {
       reportHiddenSideEffect(context, node);
     },
     CallExpression(node) {
-      checkCallbackSideEffects(context, node);
-      if (!isMutatingMethodCall(node)) return;
-      if (isFreshMutatingMethodCall(node)) return;
+      checkCallbackSideEffects(context, node, sideEffectFreeIterationMethods, mutatingMethods);
+      if (!isMutatingMethodCall(node, mutatingMethods)) return;
+      if (isFreshMutatingMethodCall(node, mutatingMethods)) return;
       reportHiddenSideEffect(context, node);
     },
     UpdateExpression(node) {
@@ -1176,10 +782,16 @@ function createNoHiddenSideEffects(context) {
 }
 
 function createNoStandaloneArrayMutations(context) {
+  const arrayMutatingMethods = getConfiguredStringSet(
+    context,
+    "arrayMutatingMethods",
+    ARRAY_MUTATING_METHODS,
+  );
+  const mutatingMethods = getConfiguredStringSet(context, "mutatingMethods", MUTATING_METHODS);
   return {
     CallExpression(node) {
-      if (!isArrayMutatingMethodCall(node)) return;
-      if (isFreshMutatingMethodCall(node)) return;
+      if (!isArrayMutatingMethodCall(node, arrayMutatingMethods)) return;
+      if (isFreshMutatingMethodCall(node, mutatingMethods)) return;
       if (!isStandaloneSideEffect(node)) return;
       context.report({
         node,
@@ -1190,9 +802,9 @@ function createNoStandaloneArrayMutations(context) {
   };
 }
 
-function reportComputedValue(context, node, messageId, max) {
+function reportComputedValue(context, node, messageId, max, complexity) {
   if (!isRecord(node)) return;
-  const count = countComputedValueOperators(node);
+  const count = countComputedValueOperators(node, complexity);
   if (count <= max) return;
   context.report({ node, messageId, data: { count, max } });
 }
@@ -1206,18 +818,22 @@ function isComputedReturnSkipped(argument) {
 
 function createNoComputedValues(context) {
   const max = getConfiguredMax(context, DEFAULT_MAX_COMPUTED_VALUE_OPERATORS);
+  const complexity = getConfiguredOperatorComplexity(
+    context,
+    DEFAULT_COMPUTED_VALUE_OPERATOR_COMPLEXITY,
+  );
   return {
     Property(node) {
       const value = node.value;
       if (!isRecord(value)) return;
       if (isFunctionNode(value)) return;
       if (isJsxNode(value)) return;
-      reportComputedValue(context, value, "computedObjectValue", max);
+      reportComputedValue(context, value, "computedObjectValue", max, complexity);
     },
     ReturnStatement(node) {
       const argument = node.argument;
       if (isComputedReturnSkipped(argument)) return;
-      reportComputedValue(context, argument, "computedReturn", max);
+      reportComputedValue(context, argument, "computedReturn", max, complexity);
     },
   };
 }
@@ -1264,6 +880,10 @@ function hasNestedTernary(node) {
 
 function createNoComplexTernaries(context) {
   const max = getConfiguredMax(context, DEFAULT_MAX_TERNARY_OPERATORS);
+  const complexity = getConfiguredOperatorComplexity(
+    context,
+    DEFAULT_READABILITY_OPERATOR_COMPLEXITY,
+  );
   return {
     ConditionalExpression(node) {
       if (hasNestedTernary(node)) {
@@ -1271,7 +891,7 @@ function createNoComplexTernaries(context) {
         return;
       }
 
-      const count = countExpressionOperators(node);
+      const count = countExpressionOperators(node, complexity);
       if (count <= max) return;
       context.report({
         node,
@@ -1308,9 +928,9 @@ function isNodeInsideLoopBody(node, loopNode) {
   return Boolean(body && isAncestorOrSelf(body, node));
 }
 
-function checkSearchInLoop(loopStack, context, node) {
+function checkSearchInLoop(loopStack, context, node, searchMethods) {
   if (!loopStack.some((loop) => isNodeInsideLoopBody(node, loop))) return;
-  if (!isMethodCall(node, SEARCH_METHODS)) return;
+  if (!isMethodCall(node, searchMethods)) return;
   context.report({
     node,
     messageId: "searchInLoop",
@@ -1318,13 +938,13 @@ function checkSearchInLoop(loopStack, context, node) {
   });
 }
 
-function checkNestedIteration(context, node) {
-  if (!isMethodCall(node, ITERATION_METHODS)) return false;
+function checkNestedIteration(context, node, iterationMethods) {
+  if (!isMethodCall(node, iterationMethods)) return false;
   const body = getCallbackBody(node);
   if (!body) return false;
-  if (!containsCallTo(body, ITERATION_METHODS)) return false;
+  if (!containsCallTo(body, iterationMethods)) return false;
 
-  const innerMatch = Array.from(ITERATION_METHODS).find((method) =>
+  const innerMatch = Array.from(iterationMethods).find((method) =>
     containsCallTo(body, new Set([method])),
   );
   if (!innerMatch) return false;
@@ -1356,6 +976,8 @@ function createLoopVisitors(context, getLoopStack, setLoopStack) {
 }
 
 function createNoQuadraticPatterns(context) {
+  const iterationMethods = getConfiguredStringSet(context, "iterationMethods", ITERATION_METHODS);
+  const searchMethods = getConfiguredStringSet(context, "searchMethods", SEARCH_METHODS);
   let loopStack = [];
   const loopVisitors = createLoopVisitors(
     context,
@@ -1367,8 +989,8 @@ function createNoQuadraticPatterns(context) {
 
   return Object.assign({}, loopVisitors, {
     CallExpression(node) {
-      if (checkNestedIteration(context, node)) return;
-      checkSearchInLoop(loopStack, context, node);
+      if (checkNestedIteration(context, node, iterationMethods)) return;
+      checkSearchInLoop(loopStack, context, node, searchMethods);
     },
   });
 }
@@ -1464,20 +1086,20 @@ function createPreferEarlyReturn(context) {
   };
 }
 
-function isParentArrayChainCall(node) {
+function isParentArrayChainCall(node, iterationMethods) {
   const parent = node.parent;
   if (!isRecord(parent) || parent.type !== "MemberExpression") return false;
   if (unwrapChainExpression(parent.object) !== node) return false;
   const grandparent = parent.parent;
   if (!isRecord(grandparent)) return false;
-  return isMethodCall(grandparent, ITERATION_METHODS);
+  return isMethodCall(grandparent, iterationMethods);
 }
 
-function getChainedArrayMethods(node) {
+function getChainedArrayMethods(node, iterationMethods) {
   const methods = [];
   let current = unwrapChainExpression(node);
 
-  while (isRecord(current) && isMethodCall(current, ITERATION_METHODS)) {
+  while (isRecord(current) && isMethodCall(current, iterationMethods)) {
     const method = getMethodName(current);
     if (!method) break;
     methods.unshift(method);
@@ -1489,10 +1111,11 @@ function getChainedArrayMethods(node) {
 
 function createMaxArrayChainDepth(context) {
   const max = getConfiguredMax(context, DEFAULT_MAX_ARRAY_CHAIN_DEPTH);
+  const iterationMethods = getConfiguredStringSet(context, "iterationMethods", ITERATION_METHODS);
   return {
     CallExpression(node) {
-      if (isParentArrayChainCall(node)) return;
-      const methods = getChainedArrayMethods(node);
+      if (isParentArrayChainCall(node, iterationMethods)) return;
+      const methods = getChainedArrayMethods(node, iterationMethods);
       if (methods.length <= max) return;
       context.report({
         node,
@@ -1527,6 +1150,7 @@ function createScopeVisitors(onEnter, onExit) {
 }
 
 function createNoRepeatedCollectionSearch(context) {
+  const searchMethods = getConfiguredStringSet(context, "searchMethods", SEARCH_METHODS);
   const scopes = [];
   const enterScope = () => {
     scopes.push(new Map());
@@ -1537,7 +1161,7 @@ function createNoRepeatedCollectionSearch(context) {
 
   return Object.assign({}, createScopeVisitors(enterScope, exitScope), {
     CallExpression(node) {
-      if (!isMethodCall(node, SEARCH_METHODS)) return;
+      if (!isMethodCall(node, searchMethods)) return;
       const collection = getStableObjectKey(getMemberObject(node));
       const method = getMethodName(node);
       if (!collection || !method) return;
@@ -1558,9 +1182,10 @@ function createNoRepeatedCollectionSearch(context) {
 }
 
 function createNoRedundantBooleanLogic(context) {
+  const equalityOperators = getConfiguredStringSet(context, "equalityOperators", EQUALITY_OPERATORS);
   return {
     BinaryExpression(node) {
-      if (!EQUALITY_OPERATORS.has(String(node.operator))) return;
+      if (!equalityOperators.has(String(node.operator))) return;
       const leftBoolean = isBooleanLiteral(node.left);
       const rightBoolean = isBooleanLiteral(node.right);
       if (!leftBoolean && !rightBoolean) return;
@@ -1632,9 +1257,6 @@ function createNoTrivialWrapperFunctions(context) {
   };
 }
 
-const NEGATIVE_CONDITION_NAME_PATTERN =
-  /^(?:is|are|was|were|has|have|had|can|could|should|will|would|did|does)(?:Not|No)[A-Z]/;
-
 function isNegativeConditionName(name) {
   if (typeof name !== "string") return false;
   if (NEGATIVE_CONDITION_NAME_PATTERN.test(name)) return true;
@@ -1672,17 +1294,18 @@ function reportNegativeConditionNames(context, root) {
   });
 }
 
-function isBooleanishInit(node) {
+function isBooleanishInit(node, booleanOperators) {
   if (!isRecord(node)) return false;
   if (isBooleanLiteral(node)) return true;
   if (node.type === "UnaryExpression" && node.operator === "!") return true;
   if (node.type === "LogicalExpression") return true;
-  if (node.type === "BinaryExpression") return COMPARISON_OPERATORS.has(String(node.operator));
+  if (node.type === "BinaryExpression") return booleanOperators.has(String(node.operator));
   if (node.type === "CallExpression") return true;
   return node.type === "ConditionalExpression";
 }
 
 function createPreferPositiveConditionNames(context) {
+  const booleanOperators = getConfiguredStringSet(context, "booleanOperators", COMPARISON_OPERATORS);
   return {
     DoWhileStatement(node) {
       reportNegativeConditionNames(context, node.test);
@@ -1694,7 +1317,7 @@ function createPreferPositiveConditionNames(context) {
       const idNode = node.id;
       if (!isRecord(idNode) || idNode.type !== "Identifier") return;
       if (!isNegativeConditionName(idNode.name)) return;
-      if (!isBooleanishInit(node.init)) return;
+      if (!isBooleanishInit(node.init, booleanOperators)) return;
       context.report({
         node: idNode,
         messageId: "negativeName",
@@ -1830,7 +1453,7 @@ function createNoUnnecessaryBlockCallback(context) {
 }
 
 function isFlatOneCall(node) {
-  if (!isMethodCall(node, new Set(["flat"]))) return false;
+  if (!isMethodCall(node, FLAT_METHODS)) return false;
   const args = node.arguments ?? [];
   if (!args.length) return true;
   const [depth] = args;
@@ -1842,7 +1465,7 @@ function createPreferFlatMap(context) {
     CallExpression(node) {
       if (!isFlatOneCall(node)) return;
       const receiver = getMemberObject(node);
-      if (!isMethodCall(receiver, new Set(["map"]))) return;
+      if (!isMethodCall(receiver, MAP_METHODS)) return;
       context.report({ node, messageId: "preferFlatMap" });
     },
   };
@@ -1880,9 +1503,9 @@ function createNoRedundantNullishFallback(context) {
   };
 }
 
-function getEqualityLookupPart(node) {
+function getEqualityLookupPart(node, operators) {
   if (!isRecord(node) || node.type !== "BinaryExpression") return null;
-  if (node.operator !== "===" && node.operator !== "==") return null;
+  if (!operators.has(String(node.operator))) return null;
 
   const leftKey = getStableObjectKey(node.left);
   const rightKey = getStableObjectKey(node.right);
@@ -1895,17 +1518,20 @@ function getEqualityLookupPart(node) {
   return null;
 }
 
-function collectEqualityLookupParts(node) {
+function collectEqualityLookupParts(node, operators) {
   if (!isRecord(node)) return [];
   if (node.type === "LogicalExpression" && node.operator === "||") {
-    return collectEqualityLookupParts(node.left).concat(collectEqualityLookupParts(node.right));
+    return collectEqualityLookupParts(node.left, operators).concat(
+      collectEqualityLookupParts(node.right, operators),
+    );
   }
-  const part = getEqualityLookupPart(node);
+  const part = getEqualityLookupPart(node, operators);
   return part ? [part] : [];
 }
 
 function createPreferObjectLookup(context) {
   const min = getConfiguredNumber(context, "min", DEFAULT_MIN_OBJECT_LOOKUP_CHAIN_LENGTH);
+  const operators = getConfiguredStringSet(context, "operators", OBJECT_LOOKUP_OPERATORS);
   return {
     LogicalExpression(node) {
       if (node.operator !== "||") return;
@@ -1913,7 +1539,7 @@ function createPreferObjectLookup(context) {
       if (isRecord(parent) && parent.type === "LogicalExpression" && parent.operator === "||") {
         return;
       }
-      const parts = collectEqualityLookupParts(node);
+      const parts = collectEqualityLookupParts(node, operators);
       if (parts.length < min) return;
       const [firstPart] = parts;
       if (!parts.every((part) => part.key === firstPart.key)) return;
@@ -1989,35 +1615,11 @@ const rules = {
   ),
 };
 
-const recommendedRuleNames = [
-  "hoist-if-operators",
-  "max-array-chain-depth",
-  "max-control-flow-depth",
-  "max-expression-operators",
-  "no-complex-ternaries",
-  "no-computed-values",
-  "no-direct-node-bin-smoke",
-  "no-hidden-side-effects",
-  "no-identity-array-callback",
-  "no-quadratic-patterns",
-  "no-redundant-boolean-logic",
-  "no-redundant-nullish-fallback",
-  "no-trivial-wrapper-functions",
-  "no-standalone-array-mutations",
-  "no-unnecessary-block-callback",
-  "prefer-concat-object-assign",
-  "prefer-early-return",
-  "prefer-flat-map",
-  "prefer-guard-clauses",
-  "prefer-object-lookup",
-  "require-executable-shebang",
-];
-
 function buildRuleConfig(ruleNames, level) {
   return Object.fromEntries(ruleNames.map((ruleName) => [`${PLUGIN_NAME}/${ruleName}`, level]));
 }
 
-const recommendedRules = buildRuleConfig(recommendedRuleNames, "warn");
+const recommendedRules = buildRuleConfig(RECOMMENDED_RULE_NAMES, "warn");
 const strictRules = buildRuleConfig(Object.keys(rules), "error");
 
 const plugin: LegibilityPlugin = {

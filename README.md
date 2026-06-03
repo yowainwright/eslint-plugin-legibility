@@ -120,13 +120,40 @@ If the package name resolves to a different plugin name in your setup, alias it:
 ```js
 {
   rules: {
-    "legibility/max-expression-operators": ["warn", { max: 4 }],
     "legibility/hoist-if-operators": ["warn", { max: 0 }],
     "legibility/no-computed-values": ["warn", { max: 1 }],
     "legibility/no-complex-ternaries": ["warn", { max: 2 }],
+    "legibility/max-expression-operators": [
+      "warn",
+      {
+        max: 4,
+        operators: ["&&", "||", "??", "?:", "!", "===", "!=="],
+        complexity: {
+          "?:": 2,
+          "&&": 1
+        }
+      }
+    ],
+    "legibility/no-quadratic-patterns": [
+      "warn",
+      {
+        iterationMethods: ["map", "filter", "reduce", "select"],
+        searchMethods: ["find", "includes", "lookup"]
+      }
+    ],
+    "legibility/no-hidden-side-effects": [
+      "warn",
+      {
+        mutatingMethods: ["push", "set", "delete", "commit"],
+        sideEffectFreeIterationMethods: ["map", "filter", "some"]
+      }
+    ],
     "legibility/max-control-flow-depth": ["warn", { max: 3 }],
-    "legibility/max-array-chain-depth": ["warn", { max: 2 }],
-    "legibility/prefer-object-lookup": ["warn", { min: 3 }],
+    "legibility/max-array-chain-depth": [
+      "warn",
+      { max: 2, iterationMethods: ["map", "filter", "reduce", "select"] }
+    ],
+    "legibility/prefer-object-lookup": ["warn", { min: 3, operators: ["===", "=="] }],
     "legibility/require-executable-shebang": [
       "error",
       {
@@ -143,6 +170,10 @@ If the package name resolves to a different plugin name in your setup, alias it:
   }
 }
 ```
+
+The operator-counting rules `max-expression-operators`, `hoist-if-operators`, `no-computed-values`, and `no-complex-ternaries` support `operators` and `complexity`. `operators` selects which operator tokens count; `complexity` assigns per-operator weights.
+
+Collection and mutation rules support project-specific method names: `iterationMethods`, `searchMethods`, `mutatingMethods`, `arrayMutatingMethods`, `sideEffectFreeIterationMethods`, `equalityOperators`, and `booleanOperators` where relevant.
 
 ## Security Posture
 
