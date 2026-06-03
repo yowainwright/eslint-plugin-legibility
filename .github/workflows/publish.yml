@@ -44,8 +44,8 @@ jobs:
       - name: Pack npm tarball
         id: pack
         run: |
-          npm pack --ignore-scripts --json --cache ./.npm-cache > npm-pack.json
-          TARBALL="$(node -e "const fs = require('node:fs'); const text = fs.readFileSync('npm-pack.json', 'utf8'); const start = text.indexOf('['); if (start < 0) throw new Error('npm pack JSON output not found'); const [pkg] = JSON.parse(text.slice(start)); console.log(pkg.filename)")"
+          pnpm pack --json --pack-destination ./.npm-cache > npm-pack.json
+          TARBALL="$(node -e "const fs = require('node:fs'); const text = fs.readFileSync('npm-pack.json', 'utf8'); const objectStart = text.indexOf('{'); const arrayStart = text.indexOf('['); const starts = [objectStart, arrayStart].filter((index) => index >= 0); const start = Math.min(...starts); if (!Number.isFinite(start)) throw new Error('pack JSON output not found'); const parsed = JSON.parse(text.slice(start)); const pkg = Array.isArray(parsed) ? parsed[0] : parsed; console.log(pkg.filename)")"
           test -n "$TARBALL"
           echo "tarball=$TARBALL" >> "$GITHUB_OUTPUT"
       - name: Attest npm tarball

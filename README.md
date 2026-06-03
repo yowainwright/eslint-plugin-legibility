@@ -12,10 +12,6 @@ The repository is authored in TypeScript and publishes compiled CommonJS output 
 pnpm add -D eslint-plugin-legibility
 ```
 
-```sh
-npm install --save-dev eslint-plugin-legibility
-```
-
 ## ESLint Flat Config
 
 ```js
@@ -154,7 +150,7 @@ If the package name resolves to a different plugin name in your setup, alias it:
 - Published package contents are allowlisted with `files`.
 - Releases are tag-triggered and publish a GitHub attestation bundle and release assets.
 - npm trusted publishing is supported; npm provenance is automatic when publishing from a public repository.
-- CI runs TypeScript typecheck, Node test runner tests from `tests/`, ESLint, Oxlint, and `npm pack --dry-run`.
+- CI runs TypeScript typecheck, Node test runner tests from `tests/`, ESLint, Oxlint, and `pnpm pack`.
 - Security policy and GitHub security scanning configuration are included in the repo.
 
 ## Releases
@@ -174,7 +170,7 @@ The release script creates the release commit locally, tags it, pushes only the 
 
 Before pushing a release tag, the script checks that GitHub Actions can publish with an `NPM_TOKEN` secret in the repository or `npm-publish` environment. After the package exists on npm and trusted publishing is configured for `.github/workflows/publish.yml`, use `pnpm release:tag:trusted` or pass `--trusted-publishing` to the release script instead.
 
-The `npm-publish` GitHub environment needs an `NPM_TOKEN` secret for the first publish. The publish workflow creates npm and GitHub release assets, and the release test workflow installs the published package from npm with npm and pnpm, then verifies ESLint and Oxlint can load the plugin.
+The `npm-publish` GitHub environment needs an `NPM_TOKEN` secret for the first publish. The publish workflow creates npm and GitHub release assets, and the release test workflow installs the published package from npm with pnpm, then verifies ESLint and Oxlint can load the plugin.
 
 ## Attribution
 

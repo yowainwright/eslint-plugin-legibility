@@ -52,7 +52,7 @@
     "typecheck": "pnpm build:plugin && tsc -p tsconfig.json",
     "lint": "pnpm build:plugin && eslint .",
     "lint:oxlint": "oxlint .",
-    "pack:check": "pnpm build:plugin && npm pack --dry-run --cache ./.npm-cache",
+    "pack:check": "pnpm build:plugin && pnpm pack --json --pack-destination ./.npm-cache",
     "prepack": "pnpm build:plugin",
     "release": "pnpm build:scripts && node .scripts-dist/scripts/release.js",
     "release:patch": "pnpm build:scripts && node .scripts-dist/scripts/release.js --increment=patch",
