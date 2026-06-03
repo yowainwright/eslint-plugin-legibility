@@ -4,8 +4,14 @@ const { tmpdir } = require("node:os");
 const { join } = require("node:path");
 const test = require("node:test");
 
-const release = require("../scripts/release.js");
-const tagRelease = require("../scripts/tag-release.js");
+function requireRuntimeScript(name) {
+  const extension = __filename.endsWith(".ts") ? "ts" : "js";
+  const runtimeRoot = extension === "ts" ? process.cwd() : join(process.cwd(), ".build");
+  return require(join(runtimeRoot, "scripts", `${name}.${extension}`));
+}
+
+const release = requireRuntimeScript("release");
+const tagRelease = requireRuntimeScript("tag-release");
 
 test("release args parse increments and prereleases", () => {
   assert.deepEqual(release.parseArgs(["--increment=minor", "--dry-run"]), {

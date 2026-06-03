@@ -1,7 +1,8 @@
 "use strict";
 
 const { spawnSync } = require("node:child_process");
-const { readPackageVersion, runReleaseTag } = require("./tag-release.js");
+const scriptExtension = __filename.endsWith(".ts") ? "ts" : "js";
+const { readPackageVersion, runReleaseTag } = require(`./tag-release.${scriptExtension}`);
 
 const VERSION_PATTERN = /\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?/g;
 const STABLE_VERSION_PATTERN = /^\d+\.\d+\.\d+$/;

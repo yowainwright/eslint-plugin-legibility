@@ -150,7 +150,9 @@ If the package name resolves to a different plugin name in your setup, alias it:
 - Published package contents are allowlisted with `files`.
 - Releases are tag-triggered and publish a GitHub attestation bundle and release assets.
 - npm trusted publishing is supported; npm provenance is automatic when publishing from a public repository.
-- CI runs TypeScript typecheck, Node test runner tests from `tests/`, ESLint, Oxlint, and `pnpm pack`.
+- Node 26 is the default development runtime. CI tests Node 20, 22, 24, and 26.
+- `pnpm test` runs the TypeScript tests in `tests/` directly through Node's test runner on the default runtime; Node 20 CI uses `pnpm test:compat`.
+- CI runs TypeScript typecheck, Node test runner tests, ESLint, Oxlint, and `pnpm pack`.
 - Security policy and GitHub security scanning configuration are included in the repo.
 
 ## Releases

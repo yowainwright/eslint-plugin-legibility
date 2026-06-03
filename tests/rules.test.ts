@@ -1,9 +1,10 @@
 const assert = require("node:assert/strict");
 const { spawnSync } = require("node:child_process");
+const { join } = require("node:path");
 const test = require("node:test");
 
-const plugin = require("../../dist/index.js");
-const manifest = require("../../package.json");
+const plugin = require(join(process.cwd(), "dist", "index.js"));
+const manifest = require(join(process.cwd(), "package.json"));
 
 function createContext(options: any[] = [], overrides: any = {}) {
   const reports = [];

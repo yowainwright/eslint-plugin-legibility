@@ -47,4 +47,7 @@ jobs:
       - name: Enable pnpm
         run: corepack enable
       - run: pnpm install --frozen-lockfile
+      - run: pnpm validate:compat
+        if: ${{ matrix.node-version == 20 }}
       - run: pnpm validate
+        if: ${{ matrix.node-version != 20 }}
