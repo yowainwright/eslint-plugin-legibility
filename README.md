@@ -119,53 +119,264 @@ If the package name resolves to a different plugin name in your setup, alias it:
 
 Rules not listed here do not take options.
 
-The operator-counting rules `max-expression-operators`, `hoist-if-operators`, `no-computed-values`, and `no-complex-ternaries` share these options: `max`, `operators`, and `complexity`. `operators` selects which operator tokens count; `complexity` assigns per-operator weights.
+The operator-counting rules share these options:
 
-- `max-expression-operators`: `{ max: 4, operators: ["&&", "||", "??", "?:", "!", "===", "!=="], complexity: { "?:": 2 } }`
-- `hoist-if-operators`: `{ max: 0, operators: ["&&", "||", "??", "?:"] }`
-- `no-computed-values`: `{ max: 1, operators: ["+", "-", "*", "/", "&&", "||", "??", "?:"] }`
-- `no-complex-ternaries`: `{ max: 2, operators: ["&&", "||", "??", "?:"] }`
-- `max-control-flow-depth`: `{ max: 3 }`
-- `max-array-chain-depth`: `{ max: 2, iterationMethods: ["map", "filter", "reduce", "select"] }`
-- `no-quadratic-patterns`: `{ iterationMethods: ["map", "filter", "reduce", "select"], searchMethods: ["find", "includes", "lookup"] }`
-- `no-repeated-collection-search`: `{ searchMethods: ["find", "includes", "lookup"] }`
-- `no-hidden-side-effects`: `{ mutatingMethods: ["push", "set", "delete", "commit"], sideEffectFreeIterationMethods: ["map", "filter", "some"] }`
-- `no-standalone-array-mutations`: `{ arrayMutatingMethods: ["push", "splice", "append"], mutatingMethods: ["push", "splice", "append"] }`
-- `no-redundant-boolean-logic`: `{ equalityOperators: ["===", "!==", "==", "!="] }`
-- `prefer-positive-condition-names`: `{ booleanOperators: ["===", "!==", "in", "instanceof"] }`
-- `prefer-object-lookup`: `{ min: 3, operators: ["===", "=="] }`
-- `require-executable-shebang`: `{ files: ["src/index.ts", "src/cli/index.ts"], runtimes: ["node", "bun"] }`
-- `no-direct-node-bin-smoke`: `{ entryPatterns: ["src/index.ts", "dist/index.js"] }`
+- `max`: maximum total complexity before reporting.
+- `operators`: operator tokens to count.
+- `complexity`: per-operator numeric weights.
 
-Example:
+#### `legibility/max-expression-operators`
+
+Limits readability operators inside one expression.
+
+Options:
+
+- `max`: number, default `4`.
+- `operators`: string array, default readability operators such as `&&`, `||`, `??`, `?:`, `!`, `===`, and `!==`.
+- `complexity`: object, default weight `1` for each counted operator.
 
 ```js
-{
-  rules: {
-    "legibility/max-expression-operators": [
-      "warn",
-      {
-        max: 4,
-        operators: ["&&", "||", "??", "?:", "!", "===", "!=="],
-        complexity: { "?:": 2 }
-      }
-    ],
-    "legibility/no-hidden-side-effects": [
-      "warn",
-      {
-        mutatingMethods: ["push", "set", "delete", "commit"],
-        sideEffectFreeIterationMethods: ["map", "filter", "some"]
-      }
-    ],
-    "legibility/require-executable-shebang": [
-      "error",
-      {
-        files: ["src/index.ts", "src/cli/index.ts"],
-        runtimes: ["node", "bun"]
-      }
-    ]
+"legibility/max-expression-operators": [
+  "warn",
+  {
+    max: 4,
+    operators: ["&&", "||", "??", "?:", "!", "===", "!=="],
+    complexity: { "?:": 2 }
   }
-}
+]
+```
+
+#### `legibility/hoist-if-operators`
+
+Limits operators inside `if` conditions.
+
+Options:
+
+- `max`: number, default `0`.
+- `operators`: string array, default condition operators such as `&&`, `||`, `??`, and `?:`.
+- `complexity`: object, default weight `1` for each counted operator.
+
+```js
+"legibility/hoist-if-operators": [
+  "warn",
+  { max: 0, operators: ["&&", "||", "??", "?:"] }
+]
+```
+
+#### `legibility/no-computed-values`
+
+Limits computed operators in object values and return values.
+
+Options:
+
+- `max`: number, default `1`.
+- `operators`: string array, default computed-value operators such as `+`, `-`, `*`, `/`, `&&`, `||`, `??`, and `?:`.
+- `complexity`: object, default weight `1` for each counted operator.
+
+```js
+"legibility/no-computed-values": [
+  "warn",
+  { max: 1, operators: ["+", "-", "*", "/", "&&", "||", "??", "?:"] }
+]
+```
+
+#### `legibility/no-complex-ternaries`
+
+Rejects nested ternaries and limits operators inside ternary expressions.
+
+Options:
+
+- `max`: number, default `2`.
+- `operators`: string array, default readability operators.
+- `complexity`: object, default weight `1` for each counted operator.
+
+```js
+"legibility/no-complex-ternaries": [
+  "warn",
+  { max: 2, complexity: { "?:": 2 } }
+]
+```
+
+#### `legibility/max-control-flow-depth`
+
+Limits nested control flow.
+
+Options:
+
+- `max`: integer, default `3`.
+
+```js
+"legibility/max-control-flow-depth": ["warn", { max: 3 }]
+```
+
+#### `legibility/max-array-chain-depth`
+
+Limits consecutive collection method chains.
+
+Options:
+
+- `max`: integer, default `2`.
+- `iterationMethods`: string array, default array iteration methods such as `map`, `filter`, `reduce`, and `some`.
+
+```js
+"legibility/max-array-chain-depth": [
+  "warn",
+  { max: 2, iterationMethods: ["map", "filter", "reduce", "select"] }
+]
+```
+
+#### `legibility/no-quadratic-patterns`
+
+Flags nested loops, nested collection iterations, and searches inside loop bodies.
+
+Options:
+
+- `iterationMethods`: string array, default array iteration methods such as `map`, `filter`, `reduce`, and `some`.
+- `searchMethods`: string array, default search methods such as `find`, `includes`, `indexOf`, and `some`.
+
+```js
+"legibility/no-quadratic-patterns": [
+  "warn",
+  {
+    iterationMethods: ["map", "filter", "reduce", "select"],
+    searchMethods: ["find", "includes", "lookup"]
+  }
+]
+```
+
+#### `legibility/no-repeated-collection-search`
+
+Flags repeated searches over the same collection in one scope.
+
+Options:
+
+- `searchMethods`: string array, default search methods such as `find`, `includes`, `indexOf`, and `some`.
+
+```js
+"legibility/no-repeated-collection-search": [
+  "warn",
+  { searchMethods: ["find", "includes", "lookup"] }
+]
+```
+
+#### `legibility/no-hidden-side-effects`
+
+Flags assignments, updates, and mutating method calls hidden inside expressions or side-effect-free callbacks.
+
+Options:
+
+- `mutatingMethods`: string array, default mutating methods such as `push`, `set`, `delete`, and `splice`.
+- `sideEffectFreeIterationMethods`: string array, default iteration methods such as `map`, `filter`, and `some`.
+
+```js
+"legibility/no-hidden-side-effects": [
+  "warn",
+  {
+    mutatingMethods: ["push", "set", "delete", "commit"],
+    sideEffectFreeIterationMethods: ["map", "filter", "some"]
+  }
+]
+```
+
+#### `legibility/no-standalone-array-mutations`
+
+Flags standalone array mutation calls.
+
+Options:
+
+- `arrayMutatingMethods`: string array, default array mutating methods such as `push`, `splice`, and `sort`.
+- `mutatingMethods`: string array, default broader mutating methods used to detect fresh mutation targets.
+
+```js
+"legibility/no-standalone-array-mutations": [
+  "warn",
+  {
+    arrayMutatingMethods: ["push", "splice", "append"],
+    mutatingMethods: ["push", "splice", "append"]
+  }
+]
+```
+
+#### `legibility/no-redundant-boolean-logic`
+
+Flags redundant boolean comparisons and boolean-only ternaries.
+
+Options:
+
+- `equalityOperators`: string array, default `==`, `===`, `!=`, and `!==`.
+
+```js
+"legibility/no-redundant-boolean-logic": [
+  "warn",
+  { equalityOperators: ["===", "!==", "==", "!="] }
+]
+```
+
+#### `legibility/prefer-positive-condition-names`
+
+Flags negative boolean condition names when initialized from boolean-like expressions.
+
+Options:
+
+- `booleanOperators`: string array, default comparison operators such as `===`, `!==`, `in`, and `instanceof`.
+
+```js
+"legibility/prefer-positive-condition-names": [
+  "warn",
+  { booleanOperators: ["===", "!==", "in", "instanceof"] }
+]
+```
+
+#### `legibility/prefer-object-lookup`
+
+Flags long equality OR chains that can become lookup objects or sets.
+
+Options:
+
+- `min`: integer, default `3`.
+- `operators`: string array, default `==` and `===`.
+
+```js
+"legibility/prefer-object-lookup": [
+  "warn",
+  { min: 3, operators: ["===", "=="] }
+]
+```
+
+#### `legibility/require-executable-shebang`
+
+Requires configured executable entry files to start with an allowed runtime shebang.
+
+Options:
+
+- `files`: string array of path patterns, default common source CLI entries.
+- `runtimes`: string array, default `node` and `bun`.
+
+```js
+"legibility/require-executable-shebang": [
+  "error",
+  {
+    files: ["src/index.ts", "src/cli/index.ts"],
+    runtimes: ["node", "bun"]
+  }
+]
+```
+
+#### `legibility/no-direct-node-bin-smoke`
+
+Flags smoke tests that run source entry files directly with `node`.
+
+Options:
+
+- `entryPatterns`: string array of path patterns, default common source and built CLI entries.
+
+```js
+"legibility/no-direct-node-bin-smoke": [
+  "error",
+  {
+    entryPatterns: ["src/index.ts", "dist/index.js"]
+  }
+]
 ```
 
 ## Security Posture
