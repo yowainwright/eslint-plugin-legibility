@@ -38,8 +38,7 @@
     "dist",
     "LICENSE",
     "NOTICE.md",
-    "README.md",
-    "SECURITY.md"
+    "README.md"
   ],
   "sideEffects": false,
   "engines": {
@@ -75,7 +74,7 @@
     "test:compat": "pnpm build:plugin && pnpm build:runtime && node --test .build/tests/*.test.js",
     "validate": "pnpm typecheck && pnpm typecheck:strict && pnpm type-coverage && pnpm test && pnpm lint && pnpm lint:oxlint && pnpm pack:check",
     "validate:compat": "pnpm typecheck && pnpm typecheck:strict && pnpm type-coverage && pnpm test:compat && pnpm lint && pnpm lint:oxlint && pnpm pack:check",
-    "typecheck:strict": "tsc -p tsconfig.strict.json",
+    "typecheck:strict": "tsc -p tsconfig.build.json --noEmit --strict --noImplicitAny --noUncheckedIndexedAccess",
     "type-coverage": "type-coverage --strict --at-least 99.5 -- src/index.ts src/constants.ts src/types.ts"
   },
   "devDependencies": {
