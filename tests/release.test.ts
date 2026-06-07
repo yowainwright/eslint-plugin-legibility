@@ -1,17 +1,19 @@
-const assert = require("node:assert/strict");
-const { mkdtempSync, rmSync, writeFileSync } = require("node:fs");
-const { tmpdir } = require("node:os");
-const { join } = require("node:path");
-const test = require("node:test");
+import assert from "node:assert/strict";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
-function requireRuntimeScript(name) {
-  const extension = __filename.endsWith(".ts") ? "ts" : "js";
+function runtimeScriptUrl(name: string): string {
+  const filename = fileURLToPath(import.meta.url);
+  const extension = filename.endsWith(".ts") ? "ts" : "js";
   const runtimeRoot = extension === "ts" ? process.cwd() : join(process.cwd(), ".build");
-  return require(join(runtimeRoot, "scripts", `${name}.${extension}`));
+  return pathToFileURL(join(runtimeRoot, "scripts", `${name}.${extension}`)).href;
 }
 
-const release = requireRuntimeScript("release");
-const tagRelease = requireRuntimeScript("tag-release");
+const release = await import(runtimeScriptUrl("release"));
+const tagRelease = await import(runtimeScriptUrl("tag-release"));
 
 test("release args parse increments and prereleases", () => {
   assert.deepEqual(release.parseArgs(["--increment=minor", "--dry-run"]), {

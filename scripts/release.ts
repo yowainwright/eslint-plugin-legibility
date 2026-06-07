@@ -1,8 +1,7 @@
-"use strict";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
-const { spawnSync } = require("node:child_process");
-const scriptExtension = __filename.endsWith(".ts") ? "ts" : "js";
-const { readPackageVersion, runReleaseTag } = require(`./tag-release.${scriptExtension}`);
+import { readPackageVersion, runReleaseTag } from "./tag-release.ts";
 
 const VERSION_PATTERN = /\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?/g;
 const STABLE_VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
@@ -331,7 +330,7 @@ function restoreStartingHead(runner, startingHead) {
   runCommand(runner, "git", ["reset", "--hard", startingHead]);
 }
 
-module.exports = {
+export {
   buildCurrentVersionTagPlan,
   buildReleaseCommands,
   buildReleaseItArgs,
@@ -351,7 +350,7 @@ module.exports = {
   runRelease,
 };
 
-if (require.main === module) {
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
   runRelease(parseArgs(process.argv.slice(2)))
     .then((exitCode) => {
       process.exitCode = exitCode;

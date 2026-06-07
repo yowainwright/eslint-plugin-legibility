@@ -18,7 +18,7 @@ export default [
   {
     languageOptions: {
       ecmaVersion: "latest",
-      sourceType: "commonjs",
+      sourceType: "module",
     },
     plugins: {
       legibility,

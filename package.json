@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "ESLint and Oxlint JS plugin rules for readable, performance-conscious code.",
   "license": "MIT",
+  "type": "module",
   "author": "Jeffry Wainwright",
   "repository": {
     "type": "git",
@@ -22,6 +23,7 @@
     "ai"
   ],
   "main": "./dist/index.js",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
@@ -41,7 +43,7 @@
   ],
   "sideEffects": false,
   "engines": {
-    "node": ">=20"
+    "node": ">=20.19"
   },
   "packageManager": "pnpm@10.12.1",
   "scripts": {
@@ -69,9 +71,12 @@
     "release:tag:trusted": "node scripts/tag-release.ts --trusted-publishing",
     "release:dry": "node scripts/release.ts --dry-run",
     "test": "pnpm build:plugin && node --test tests/*.test.ts",
+    "test:coverage": "pnpm build:plugin && mkdir -p coverage && node --test --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=coverage/lcov.info tests/*.test.ts && sed -e 's|^SF:dist/\\(.*\\)\\.js$|SF:src/\\1.ts|' coverage/lcov.info > coverage/src.info && mv coverage/src.info coverage/lcov.info",
     "test:compat": "pnpm build:plugin && pnpm build:runtime && node --test .build/tests/*.test.js",
-    "validate": "pnpm typecheck && pnpm test && pnpm lint && pnpm lint:oxlint && pnpm pack:check",
-    "validate:compat": "pnpm typecheck && pnpm test:compat && pnpm lint && pnpm lint:oxlint && pnpm pack:check"
+    "validate": "pnpm typecheck && pnpm typecheck:strict && pnpm type-coverage && pnpm test && pnpm lint && pnpm lint:oxlint && pnpm pack:check",
+    "validate:compat": "pnpm typecheck && pnpm typecheck:strict && pnpm type-coverage && pnpm test:compat && pnpm lint && pnpm lint:oxlint && pnpm pack:check",
+    "typecheck:strict": "tsc -p tsconfig.strict.json",
+    "type-coverage": "type-coverage --strict --at-least 99.5 -- src/index.ts src/constants.ts src/types.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
@@ -80,6 +85,7 @@
     "jiti": "^2.7.0",
     "oxlint": "^1.0.0",
     "release-it": "20.1.0",
+    "type-coverage": "^2.29.7",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.60.1"
   },

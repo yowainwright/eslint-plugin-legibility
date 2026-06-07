@@ -1,6 +1,7 @@
-import type { RuleMeta } from "./types";
+import packageManifest from "../package.json" with { type: "json" };
+import type { RuleMeta } from "./types.js";
 
-const { version: PACKAGE_VERSION } = require("../package.json");
+const PACKAGE_VERSION = packageManifest.version;
 
 export { PACKAGE_VERSION };
 
@@ -248,7 +249,7 @@ const OPERATOR_OPTIONS_SCHEMA = {
   operators: STRING_ARRAY_SCHEMA,
 };
 
-function maxOperatorRuleSchema(minimum) {
+function maxOperatorRuleSchema(minimum: number): RuleMeta["schema"] {
   return [
     {
       type: "object",
@@ -261,11 +262,11 @@ function maxOperatorRuleSchema(minimum) {
   ];
 }
 
-function ruleUrl(ruleName) {
+function ruleUrl(ruleName: string): string {
   return `https://github.com/yowainwright/eslint-plugin-legibility#${ruleName}`;
 }
 
-function defineMeta(ruleName, meta: RuleMeta): RuleMeta {
+function defineMeta(ruleName: string, meta: RuleMeta): RuleMeta {
   const docs = Object.assign({}, meta.docs, { url: ruleUrl(ruleName) });
   return Object.assign({}, meta, { docs });
 }

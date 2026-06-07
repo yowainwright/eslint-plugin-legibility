@@ -1,10 +1,16 @@
-const assert = require("node:assert/strict");
-const { spawnSync } = require("node:child_process");
-const { join } = require("node:path");
-const test = require("node:test");
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
+import { join } from "node:path";
+import test from "node:test";
+import { pathToFileURL } from "node:url";
 
-const plugin = require(join(process.cwd(), "dist", "index.js"));
-const manifest = require(join(process.cwd(), "package.json"));
+import manifest from "../package.json" with { type: "json" };
+
+const require = createRequire(import.meta.url);
+const plugin = (await import(pathToFileURL(join(process.cwd(), "dist", "index.js")).href))
+  .default;
+const requiredPlugin = require(join(process.cwd(), "dist", "index.js"));
 
 function createContext(options: any[] = [], overrides: any = {}) {
   const reports = [];
@@ -150,6 +156,8 @@ test("exports an ESLint and Oxlint compatible plugin shape", () => {
   assert.ok(plugin.rules["prefer-early-return"]);
   assert.ok(plugin.configs["flat/recommended"].plugins.legibility);
   assert.equal(plugin.configs.recommended.plugins[0], "legibility");
+  assert.equal(requiredPlugin, plugin);
+  assert.equal(requiredPlugin.meta.name, "legibility");
 });
 
 test("max-expression-operators reports operator-heavy expressions", () => {
@@ -750,10 +758,10 @@ test("prefer-object-lookup allows custom equality operators", () => {
   assert.equal(reports[0].messageId, "preferLookup");
 });
 
-test("flat config works through ESLint Linter when ESLint is installed", (t) => {
+test("flat config works through ESLint Linter when ESLint is installed", async (t) => {
   let Linter;
   try {
-    ({ Linter } = require("eslint"));
+    ({ Linter } = await import("eslint"));
   } catch {
     t.skip("ESLint is not installed");
     return;
@@ -789,7 +797,8 @@ test("oxlint can load the package as a JS plugin when oxlint is installed", (t) 
     { encoding: "utf8" },
   );
 
-  if (result.error && result.error.code === "ENOENT") {
+  const spawnError = result.error as NodeJS.ErrnoException | undefined;
+  if (spawnError?.code === "ENOENT") {
     t.skip("pnpm is not installed");
     return;
   }

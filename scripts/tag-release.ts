@@ -1,8 +1,7 @@
-"use strict";
-
-const { spawnSync } = require("node:child_process");
-const { readFileSync } = require("node:fs");
-const { join } = require("node:path");
+import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 const DEFAULT_PUBLISH_ENVIRONMENT = "npm-publish";
@@ -184,7 +183,7 @@ function runReleaseTag({
   throw new Error(push.stderr.trim() || `Unable to push ${tagName}`);
 }
 
-module.exports = {
+export {
   assertMissingTag,
   assertPublishAuthReady,
   assertReleaseReady,
@@ -200,7 +199,7 @@ module.exports = {
   runReleaseTag,
 };
 
-if (require.main === module) {
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try {
     process.exitCode = runReleaseTag(parseArgs(process.argv.slice(2)));
   } catch (error) {
