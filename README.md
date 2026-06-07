@@ -117,6 +117,41 @@ Legacy ESLint config with every rule enabled as an error.
 
 ---
 
+### Rules
+
+Rules marked `recommended + strict` are enabled by `recommended` as `warn` and by `strict` as `error`. Rules marked `strict only` are enabled by `strict` as `error` and can be enabled directly at any severity.
+
+| Rule | Preset configuration | Options |
+| --- | --- | --- |
+| [`legibility/hoist-if-operators`](#hoist-if-operators) | `recommended + strict` | `{max: 0, operators: ["&&", "\|\|", "??", "?:"], complexity}` |
+| [`legibility/max-array-chain-depth`](#max-array-chain-depth) | `recommended + strict` | `{max: 2, iterationMethods}` |
+| [`legibility/max-control-flow-depth`](#max-control-flow-depth) | `recommended + strict` | `{max: 3}` |
+| [`legibility/max-expression-operators`](#max-expression-operators) | `recommended + strict` | `{max: 4, operators, complexity}` |
+| [`legibility/no-complex-ternaries`](#no-complex-ternaries) | `recommended + strict` | `{max: 2, operators, complexity}` |
+| [`legibility/no-computed-values`](#no-computed-values) | `recommended + strict` | `{max: 1, operators, complexity}` |
+| [`legibility/no-direct-node-bin-smoke`](#no-direct-node-bin-smoke) | `recommended + strict` | `{entryPatterns}` |
+| [`legibility/no-hidden-side-effects`](#no-hidden-side-effects) | `recommended + strict` | `{mutatingMethods, sideEffectFreeIterationMethods}` |
+| [`legibility/no-identity-array-callback`](#no-identity-array-callback) | `recommended + strict` | none |
+| [`legibility/no-quadratic-patterns`](#no-quadratic-patterns) | `recommended + strict` | `{iterationMethods, searchMethods}` |
+| [`legibility/no-redundant-boolean-logic`](#no-redundant-boolean-logic) | `recommended + strict` | `{equalityOperators: ["==", "===", "!=", "!=="]}` |
+| [`legibility/no-redundant-nullish-fallback`](#no-redundant-nullish-fallback) | `recommended + strict` | none |
+| [`legibility/no-repeated-collection-search`](#no-repeated-collection-search) | `strict only` | `{searchMethods}` |
+| [`legibility/no-single-use-renaming-alias`](#no-single-use-renaming-alias) | `strict only` | none |
+| [`legibility/no-standalone-array-mutations`](#no-standalone-array-mutations) | `recommended + strict` | `{arrayMutatingMethods, mutatingMethods}` |
+| [`legibility/no-trivial-wrapper-functions`](#no-trivial-wrapper-functions) | `recommended + strict` | none |
+| [`legibility/no-unnecessary-block-callback`](#no-unnecessary-block-callback) | `recommended + strict` | none |
+| [`legibility/prefer-concat-object-assign`](#prefer-concat-object-assign) | `recommended + strict` | none |
+| [`legibility/prefer-early-return`](#prefer-early-return) | `recommended + strict` | none |
+| [`legibility/prefer-flat-map`](#prefer-flat-map) | `recommended + strict` | none |
+| [`legibility/prefer-guard-clauses`](#prefer-guard-clauses) | `recommended + strict` | none |
+| [`legibility/prefer-object-lookup`](#prefer-object-lookup) | `recommended + strict` | `{min: 3, operators: ["==", "==="]}` |
+| [`legibility/prefer-positive-condition-names`](#prefer-positive-condition-names) | `strict only` | `{booleanOperators}` |
+| [`legibility/require-executable-shebang`](#require-executable-shebang) | `recommended + strict` | `{files, runtimes: ["bun", "node"]}` |
+
+---
+
+<a id="hoist-if-operators"></a>
+
 ### `legibility/hoist-if-operators({options})`
 
 Prefer a named boolean before an operator-heavy `if` condition.
@@ -127,25 +162,22 @@ Prefer a named boolean before an operator-heavy `if` condition.
 - `{operators: string[]}`: operators to count. Default: `["&&", "||", "??", "?:"]`.
 - `{complexity: Record<string, number>}`: per-operator weights.
 
-#### bad
+#### do / don't
 
-```js
-if (user && user.isActive && !user.isLocked) {
-  sendInvite(user);
-}
-```
-
-#### good
-
-```js
-const canInviteUser = user && user.isActive && !user.isLocked;
-
-if (canInviteUser) {
-  sendInvite(user);
-}
+```diff
+- if (user && user.isActive && !user.isLocked) {
+-   sendInvite(user);
+- }
++ const canInviteUser = user && user.isActive && !user.isLocked;
++
++ if (canInviteUser) {
++   sendInvite(user);
++ }
 ```
 
 ---
+
+<a id="max-array-chain-depth"></a>
 
 ### `legibility/max-array-chain-depth({options})`
 
@@ -156,24 +188,21 @@ Limit chained array methods like `items.filter().map().some()`.
 - `{max: number}`: allowed chained items. Default: `2`.
 - `{iterationMethods: string[]}`: method names that count as chain items.
 
-#### bad
+#### do / don't
 
-```js
-const hasLargeActiveItem = items
-  .filter((item) => item.active)
-  .map((item) => item.size)
-  .some((size) => size > 100);
-```
-
-#### good
-
-```js
-const activeItems = items.filter((item) => item.active);
-const itemSizes = activeItems.map((item) => item.size);
-const hasLargeActiveItem = itemSizes.some((size) => size > 100);
+```diff
+- const hasLargeActiveItem = items
+-   .filter((item) => item.active)
+-   .map((item) => item.size)
+-   .some((size) => size > 100);
++ const activeItems = items.filter((item) => item.active);
++ const itemSizes = activeItems.map((item) => item.size);
++ const hasLargeActiveItem = itemSizes.some((size) => size > 100);
 ```
 
 ---
+
+<a id="max-control-flow-depth"></a>
 
 ### `legibility/max-control-flow-depth({options})`
 
@@ -183,29 +212,26 @@ Limit nested branches and loops.
 
 - `{max: number}`: allowed nested control-flow depth. Default: `3`.
 
-#### bad
+#### do / don't
 
-```js
-if (user) {
-  if (user.active) {
-    if (user.email) {
-      sendInvite(user);
-    }
-  }
-}
-```
-
-#### good
-
-```js
-if (!user) return;
-if (!user.active) return;
-if (!user.email) return;
-
-sendInvite(user);
+```diff
+- if (user) {
+-   if (user.active) {
+-     if (user.email) {
+-       sendInvite(user);
+-     }
+-   }
+- }
++ if (!user) return;
++ if (!user.active) return;
++ if (!user.email) return;
++
++ sendInvite(user);
 ```
 
 ---
+
+<a id="max-expression-operators"></a>
 
 ### `legibility/max-expression-operators({options})`
 
@@ -217,23 +243,20 @@ Limit operators inside one expression.
 - `{operators: string[]}`: operators to count.
 - `{complexity: Record<string, number>}`: per-operator weights.
 
-#### bad
+#### do / don't
 
-```js
-return user && user.active && (user.role === "admin" || user.role === "owner");
-```
-
-#### good
-
-```js
-const isAdmin = user.role === "admin";
-const isOwner = user.role === "owner";
-const hasPrivilegedRole = isAdmin || isOwner;
-
-return user && user.active && hasPrivilegedRole;
+```diff
+- return user && user.active && (user.role === "admin" || user.role === "owner");
++ const isAdmin = user.role === "admin";
++ const isOwner = user.role === "owner";
++ const hasPrivilegedRole = isAdmin || isOwner;
++
++ return user && user.active && hasPrivilegedRole;
 ```
 
 ---
+
+<a id="no-complex-ternaries"></a>
 
 ### `legibility/no-complex-ternaries({options})`
 
@@ -245,19 +268,16 @@ Reject nested ternaries and operator-heavy ternaries.
 - `{operators: string[]}`: operators to count.
 - `{complexity: Record<string, number>}`: per-operator weights.
 
-#### bad
+#### do / don't
 
-```js
-const label = isLoading ? "Loading" : hasError ? "Error" : "Ready";
-```
-
-#### good
-
-```js
-const label = getStatusLabel({ hasError, isLoading });
+```diff
+- const label = isLoading ? "Loading" : hasError ? "Error" : "Ready";
++ const label = getStatusLabel({ hasError, isLoading });
 ```
 
 ---
+
+<a id="no-computed-values"></a>
 
 ### `legibility/no-computed-values({options})`
 
@@ -269,21 +289,18 @@ Prefer named values before computed returns and object values.
 - `{operators: string[]}`: operators to count.
 - `{complexity: Record<string, number>}`: per-operator weights.
 
-#### bad
+#### do / don't
 
-```js
-return subtotal + tax - discount;
-```
-
-#### good
-
-```js
-const total = subtotal + tax - discount;
-
-return total;
+```diff
+- return subtotal + tax - discount;
++ const total = subtotal + tax - discount;
++
++ return total;
 ```
 
 ---
+
+<a id="no-direct-node-bin-smoke"></a>
 
 ### `legibility/no-direct-node-bin-smoke({options})`
 
@@ -293,19 +310,16 @@ Smoke-test installed package bins instead of direct `node src/index.js` executio
 
 - `{entryPatterns: string[]}`: entry files that should be tested through the installed bin shim.
 
-#### bad
+#### do / don't
 
-```js
-execSync("node src/index.js --help");
-```
-
-#### good
-
-```js
-execSync("my-cli --help");
+```diff
+- execSync("node src/index.js --help");
++ execSync("my-cli --help");
 ```
 
 ---
+
+<a id="no-hidden-side-effects"></a>
 
 ### `legibility/no-hidden-side-effects({options})`
 
@@ -316,39 +330,33 @@ Keep mutations out of nested expressions and side-effect-free callbacks.
 - `{mutatingMethods: string[]}`: method calls treated as mutations.
 - `{sideEffectFreeIterationMethods: string[]}`: callback methods expected to stay side-effect-free.
 
-#### bad
+#### do / don't
 
-```js
-return (count += 1);
-```
-
-#### good
-
-```js
-count += 1;
-
-return count;
+```diff
+- return (count += 1);
++ count += 1;
++
++ return count;
 ```
 
 ---
+
+<a id="no-identity-array-callback"></a>
 
 ### `legibility/no-identity-array-callback()`
 
 Reject `map` and `filter` callbacks that keep every item unchanged.
 
-#### bad
+#### do / don't
 
-```js
-const nextItems = items.map((item) => item);
-```
-
-#### good
-
-```js
-const nextItems = items;
+```diff
+- const nextItems = items.map((item) => item);
++ const nextItems = items;
 ```
 
 ---
+
+<a id="no-quadratic-patterns"></a>
 
 ### `legibility/no-quadratic-patterns({options})`
 
@@ -359,26 +367,23 @@ Flag nested loops, nested array iteration, and collection searches inside loop b
 - `{iterationMethods: string[]}`: methods checked for nested iteration.
 - `{searchMethods: string[]}`: methods treated as collection searches.
 
-#### bad
+#### do / don't
 
-```js
-const enrichedOrders = orders.map((order) => ({
-  ...order,
-  user: users.find((user) => user.id === order.userId),
-}));
-```
-
-#### good
-
-```js
-const usersById = new Map(users.map((user) => [user.id, user]));
-const enrichedOrders = orders.map((order) => ({
-  ...order,
-  user: usersById.get(order.userId),
-}));
+```diff
+- const enrichedOrders = orders.map((order) => ({
+-   ...order,
+-   user: users.find((user) => user.id === order.userId),
+- }));
++ const usersById = new Map(users.map((user) => [user.id, user]));
++ const enrichedOrders = orders.map((order) => ({
++   ...order,
++   user: usersById.get(order.userId),
++ }));
 ```
 
 ---
+
+<a id="no-redundant-boolean-logic"></a>
 
 ### `legibility/no-redundant-boolean-logic({options})`
 
@@ -388,37 +393,31 @@ Avoid boolean comparisons and boolean-only ternaries.
 
 - `{equalityOperators: string[]}`: operators checked for comparisons against `true` or `false`. Default: `["==", "===", "!=", "!=="]`.
 
-#### bad
+#### do / don't
 
-```js
-return isReady === true ? true : false;
-```
-
-#### good
-
-```js
-return isReady;
+```diff
+- return isReady === true ? true : false;
++ return isReady;
 ```
 
 ---
+
+<a id="no-redundant-nullish-fallback"></a>
 
 ### `legibility/no-redundant-nullish-fallback()`
 
 Avoid `?? undefined` fallbacks.
 
-#### bad
+#### do / don't
 
-```js
-const value = maybeValue ?? undefined;
-```
-
-#### good
-
-```js
-const value = maybeValue;
+```diff
+- const value = maybeValue ?? undefined;
++ const value = maybeValue;
 ```
 
 ---
+
+<a id="no-repeated-collection-search"></a>
 
 ### `legibility/no-repeated-collection-search({options})`
 
@@ -428,42 +427,36 @@ Flag repeated searches over the same collection in one scope.
 
 - `{searchMethods: string[]}`: methods treated as collection searches.
 
-#### bad
+#### do / don't
 
-```js
-const owner = users.find((user) => user.id === ownerId);
-const reviewer = users.find((user) => user.id === reviewerId);
-```
-
-#### good
-
-```js
-const usersById = new Map(users.map((user) => [user.id, user]));
-const owner = usersById.get(ownerId);
-const reviewer = usersById.get(reviewerId);
+```diff
+- const owner = users.find((user) => user.id === ownerId);
+- const reviewer = users.find((user) => user.id === reviewerId);
++ const usersById = new Map(users.map((user) => [user.id, user]));
++ const owner = usersById.get(ownerId);
++ const reviewer = usersById.get(reviewerId);
 ```
 
 ---
+
+<a id="no-single-use-renaming-alias"></a>
 
 ### `legibility/no-single-use-renaming-alias()`
 
 Avoid aliases that only rename another value for one use.
 
-#### bad
+#### do / don't
 
-```js
-const userData = user;
-
-return userData.name;
-```
-
-#### good
-
-```js
-return user.name;
+```diff
+- const userData = user;
+-
+- return userData.name;
++ return user.name;
 ```
 
 ---
+
+<a id="no-standalone-array-mutations"></a>
 
 ### `legibility/no-standalone-array-mutations({options})`
 
@@ -474,151 +467,130 @@ Prefer explicit returned array composition over standalone array mutation statem
 - `{arrayMutatingMethods: string[]}`: array methods reported when used as standalone mutations.
 - `{mutatingMethods: string[]}`: mutation methods used to identify fresh mutation targets.
 
-#### bad
+#### do / don't
 
-```js
-items.push(nextItem);
-
-return items;
-```
-
-#### good
-
-```js
-return items.concat(nextItem);
+```diff
+- items.push(nextItem);
+-
+- return items;
++ return items.concat(nextItem);
 ```
 
 ---
+
+<a id="no-trivial-wrapper-functions"></a>
 
 ### `legibility/no-trivial-wrapper-functions()`
 
 Avoid wrappers that only forward their parameters to another call.
 
-#### bad
+#### do / don't
 
-```js
-const getUser = (userId) => fetchUser(userId);
-```
-
-#### good
-
-```js
-const getActiveUser = (userId) => fetchUser(userId).then(requireActiveUser);
+```diff
+- const getUser = (userId) => fetchUser(userId);
++ const getActiveUser = (userId) => fetchUser(userId).then(requireActiveUser);
 ```
 
 ---
+
+<a id="no-unnecessary-block-callback"></a>
 
 ### `legibility/no-unnecessary-block-callback()`
 
 Prefer expression-bodied arrow callbacks when the callback block only returns.
 
-#### bad
+#### do / don't
 
-```js
-const ids = users.map((user) => {
-  return user.id;
-});
-```
-
-#### good
-
-```js
-const ids = users.map((user) => user.id);
+```diff
+- const ids = users.map((user) => {
+-   return user.id;
+- });
++ const ids = users.map((user) => user.id);
 ```
 
 ---
+
+<a id="prefer-concat-object-assign"></a>
 
 ### `legibility/prefer-concat-object-assign()`
 
 Prefer `concat` and `Object.assign` over spread composition.
 
-#### bad
+#### do / don't
 
-```js
-const nextItems = [...items, nextItem];
-const options = { ...defaults, ...overrides };
-```
-
-#### good
-
-```js
-const nextItems = items.concat(nextItem);
-const options = Object.assign({}, defaults, overrides);
+```diff
+- const nextItems = [...items, nextItem];
+- const options = { ...defaults, ...overrides };
++ const nextItems = items.concat(nextItem);
++ const options = Object.assign({}, defaults, overrides);
 ```
 
 ---
+
+<a id="prefer-early-return"></a>
 
 ### `legibility/prefer-early-return()`
 
 Avoid `else` branches after an `if` branch already exits.
 
-#### bad
+#### do / don't
 
-```js
-if (!user) {
-  return null;
-} else {
-  return user.name;
-}
-```
-
-#### good
-
-```js
-if (!user) {
-  return null;
-}
-
-return user.name;
+```diff
+- if (!user) {
+-   return null;
+- } else {
+-   return user.name;
+- }
++ if (!user) {
++   return null;
++ }
++
++ return user.name;
 ```
 
 ---
+
+<a id="prefer-flat-map"></a>
 
 ### `legibility/prefer-flat-map()`
 
 Prefer `flatMap` over `map(...).flat()`.
 
-#### bad
+#### do / don't
 
-```js
-const permissions = users.map((user) => user.permissions).flat();
-```
-
-#### good
-
-```js
-const permissions = users.flatMap((user) => user.permissions);
+```diff
+- const permissions = users.map((user) => user.permissions).flat();
++ const permissions = users.flatMap((user) => user.permissions);
 ```
 
 ---
+
+<a id="prefer-guard-clauses"></a>
 
 ### `legibility/prefer-guard-clauses()`
 
 Prefer guard clauses over wrapping a whole function body in one branch.
 
-#### bad
+#### do / don't
 
-```js
-function sendInvite(user) {
-  if (user) {
-    const email = buildEmail(user);
-    deliver(email);
-  }
-}
-```
-
-#### good
-
-```js
-function sendInvite(user) {
-  if (!user) return;
-
-  const email = buildEmail(user);
-  deliver(email);
-}
+```diff
+- function sendInvite(user) {
+-   if (user) {
+-     const email = buildEmail(user);
+-     deliver(email);
+-   }
+- }
++ function sendInvite(user) {
++   if (!user) return;
++
++   const email = buildEmail(user);
++   deliver(email);
++ }
 ```
 
 ---
+
+<a id="prefer-object-lookup"></a>
 
 ### `legibility/prefer-object-lookup({options})`
 
@@ -629,20 +601,17 @@ Prefer `Set`, `Map`, or object lookups over long equality `||` chains.
 - `{min: number}`: equality checks required before reporting. Default: `3`.
 - `{operators: string[]}`: equality operators that count. Default: `["==", "==="]`.
 
-#### bad
+#### do / don't
 
-```js
-const isSupported = type === "page" || type === "post" || type === "asset";
-```
-
-#### good
-
-```js
-const supportedTypes = new Set(["page", "post", "asset"]);
-const isSupported = supportedTypes.has(type);
+```diff
+- const isSupported = type === "page" || type === "post" || type === "asset";
++ const supportedTypes = new Set(["page", "post", "asset"]);
++ const isSupported = supportedTypes.has(type);
 ```
 
 ---
+
+<a id="prefer-positive-condition-names"></a>
 
 ### `legibility/prefer-positive-condition-names({options})`
 
@@ -652,27 +621,24 @@ Prefer positive boolean names over names like `isNotReady`.
 
 - `{booleanOperators: string[]}`: binary operators that mark an initializer as boolean-like.
 
-#### bad
+#### do / don't
 
-```js
-const isNotReady = status !== "ready";
-
-if (!isNotReady) {
-  run();
-}
-```
-
-#### good
-
-```js
-const isReady = status === "ready";
-
-if (isReady) {
-  run();
-}
+```diff
+- const isNotReady = status !== "ready";
+-
+- if (!isNotReady) {
+-   run();
+- }
++ const isReady = status === "ready";
++
++ if (isReady) {
++   run();
++ }
 ```
 
 ---
+
+<a id="require-executable-shebang"></a>
 
 ### `legibility/require-executable-shebang({options})`
 
@@ -683,18 +649,13 @@ Require configured CLI entry source files to include a Node or Bun shebang.
 - `{files: string[]}`: source files expected to be executable entries.
 - `{runtimes: string[]}`: accepted shebang runtimes. Default: `["bun", "node"]`.
 
-#### bad
+#### do / don't
 
-```js
-console.log("hello");
-```
-
-#### good
-
-```js
-#!/usr/bin/env node
-
-console.log("hello");
+```diff
+- console.log("hello");
++#!/usr/bin/env node
++
++ console.log("hello");
 ```
 
 ---
