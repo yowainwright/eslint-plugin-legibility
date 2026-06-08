@@ -1,16 +1,31 @@
-# eslint-plugin-legibility
+# eslint plugin legibility
 
-ESLint and Oxlint-compatible rules for readable, explicit, performance-conscious JavaScript and TypeScript.
+## Why was this written?
 
-The package exports an ESLint-compatible plugin object. ESLint can load it as a normal plugin, and Oxlint can load the same package through JavaScript plugin support.
+> Working with LLM's for the majority of my work, I find the way that I code and read code has changed. This project contains rules I find useful for keeping Typescript and/or JavaScript more readable when written mainly by LLMs's. 
 
-## Install
+## TLDR;
+
+We review thousands of lines of code a day. It is very hard to do but this is our responsibility: ensuring code works as expected and is maintenance. 
+
+The goal of rules in this package are to make code readable for reviewing lots of code and avoiding things that have a high probability of complexity or confusion. 
+
+---
+
+## How to use
+
+This project provides ESLint and Oxlint-compatible rules for readable, explicit, performance-conscious JavaScript and TypeScript.
+
+The package exports an ESLint-compatible plugin object. ESLint can load it as a normal plugin, and Oxlint can load the same package through JavaScript plugin support. 
+
+### Install
 
 ```sh
+# npm, pnpm, bun
 pnpm add -D eslint-plugin-legibility
 ```
 
-## Use With ESLint
+### Using With ESLint
 
 Flat config:
 
@@ -52,7 +67,7 @@ module.exports = {
 };
 ```
 
-## Use With Oxlint
+### Usage With Oxlint
 
 Oxlint JavaScript plugins use the same ESLint-compatible rule API.
 
@@ -72,6 +87,8 @@ Oxlint JavaScript plugins use the same ESLint-compatible rule API.
 }
 ```
 
+---
+
 ## Configs
 
 | Config | Format | Behavior |
@@ -80,6 +97,8 @@ Oxlint JavaScript plugins use the same ESLint-compatible rule API.
 | `strict` | ESLint legacy | Every rule as an error. |
 | `flat/recommended` | ESLint flat config | High-signal rules as warnings. |
 | `flat/strict` | ESLint flat config | Every rule as an error. |
+
+---
 
 ## API
 
@@ -123,30 +142,30 @@ Rules marked `recommended + strict` are enabled by `recommended` as `warn` and b
 
 | Rule | Preset configuration | Options |
 | --- | --- | --- |
-| [`legibility/hoist-if-operators`](#hoist-if-operators) | `recommended + strict` | `{max: 0, operators: ["&&", "\|\|", "??", "?:"], complexity}` |
-| [`legibility/max-array-chain-depth`](#max-array-chain-depth) | `recommended + strict` | `{max: 2, iterationMethods}` |
-| [`legibility/max-control-flow-depth`](#max-control-flow-depth) | `recommended + strict` | `{max: 3}` |
-| [`legibility/max-expression-operators`](#max-expression-operators) | `recommended + strict` | `{max: 4, operators, complexity}` |
-| [`legibility/no-complex-ternaries`](#no-complex-ternaries) | `recommended + strict` | `{max: 2, operators, complexity}` |
-| [`legibility/no-computed-values`](#no-computed-values) | `recommended + strict` | `{max: 1, operators, complexity}` |
-| [`legibility/no-direct-node-bin-smoke`](#no-direct-node-bin-smoke) | `recommended + strict` | `{entryPatterns}` |
-| [`legibility/no-hidden-side-effects`](#no-hidden-side-effects) | `recommended + strict` | `{mutatingMethods, sideEffectFreeIterationMethods}` |
-| [`legibility/no-identity-array-callback`](#no-identity-array-callback) | `recommended + strict` | none |
-| [`legibility/no-quadratic-patterns`](#no-quadratic-patterns) | `recommended + strict` | `{iterationMethods, searchMethods}` |
-| [`legibility/no-redundant-boolean-logic`](#no-redundant-boolean-logic) | `recommended + strict` | `{equalityOperators: ["==", "===", "!=", "!=="]}` |
-| [`legibility/no-redundant-nullish-fallback`](#no-redundant-nullish-fallback) | `recommended + strict` | none |
-| [`legibility/no-repeated-collection-search`](#no-repeated-collection-search) | `strict only` | `{searchMethods}` |
-| [`legibility/no-single-use-renaming-alias`](#no-single-use-renaming-alias) | `strict only` | none |
-| [`legibility/no-standalone-array-mutations`](#no-standalone-array-mutations) | `recommended + strict` | `{arrayMutatingMethods, mutatingMethods}` |
-| [`legibility/no-trivial-wrapper-functions`](#no-trivial-wrapper-functions) | `recommended + strict` | none |
-| [`legibility/no-unnecessary-block-callback`](#no-unnecessary-block-callback) | `recommended + strict` | none |
-| [`legibility/prefer-concat-object-assign`](#prefer-concat-object-assign) | `recommended + strict` | none |
-| [`legibility/prefer-early-return`](#prefer-early-return) | `recommended + strict` | none |
-| [`legibility/prefer-flat-map`](#prefer-flat-map) | `recommended + strict` | none |
-| [`legibility/prefer-guard-clauses`](#prefer-guard-clauses) | `recommended + strict` | none |
-| [`legibility/prefer-object-lookup`](#prefer-object-lookup) | `recommended + strict` | `{min: 3, operators: ["==", "==="]}` |
-| [`legibility/prefer-positive-condition-names`](#prefer-positive-condition-names) | `strict only` | `{booleanOperators}` |
-| [`legibility/require-executable-shebang`](#require-executable-shebang) | `recommended + strict` | `{files, runtimes: ["bun", "node"]}` |
+| [legibility/hoist-if-operators](#hoist-if-operators) | recommended + strict | `{max: 0, operators: ["&&", "\|\|", "??", "?:"], complexity}` |
+| [legibility/max-array-chain-depth](#max-array-chain-depth) | recommended + strict | `{max: 2, iterationMethods}` |
+| [legibility/max-control-flow-depth](#max-control-flow-depth) | recommended + strict | `{max: 3}` |
+| [legibility/max-expression-operators](#max-expression-operators) | recommended + strict | `{max: 4, operators, complexity}` |
+| [legibility/no-complex-ternaries](#no-complex-ternaries) | recommended + strict | `{max: 2, operators, complexity}` |
+| [legibility/no-computed-values](#no-computed-values) | recommended + strict | `{max: 1, operators, complexity}` |
+| [legibility/no-direct-node-bin-smoke](#no-direct-node-bin-smoke) | `recommended + strict` | `{entryPatterns}` |
+| [legibility/no-hidden-side-effects](#no-hidden-side-effects) | recommended + strict | `{mutatingMethods, sideEffectFreeIterationMethods}` |
+| [legibility/no-identity-array-callback](#no-identity-array-callback) | recommended + strict | none |
+| [legibility/no-quadratic-patterns](#no-quadratic-patterns) | recommended + strict | `{iterationMethods, searchMethods}` |
+| [legibility/no-redundant-boolean-logic](#no-redundant-boolean-logic) | recommended + strict | `{equalityOperators: ["==", "===", "!=", "!=="]}` |
+| [legibility/no-redundant-nullish-fallback](#no-redundant-nullish-fallback) | recommended + strict | none |
+| [legibility/no-repeated-collection-search](#no-repeated-collection-search) | strict only | `{searchMethods}` |
+| [legibility/no-single-use-renaming-alias](#no-single-use-renaming-alias) | strict only | none |
+| [legibility/no-standalone-array-mutations](#no-standalone-array-mutations) | recommended + strict | `{arrayMutatingMethods, mutatingMethods}` |
+| [legibility/no-trivial-wrapper-functions](#no-trivial-wrapper-functions) | recommended + strict | none |
+| [legibility/no-unnecessary-block-callback](#no-unnecessary-block-callback) | recommended + strict | none |
+| [legibility/prefer-concat-object-assign](#prefer-concat-object-assign) | recommended + strict | none |
+| [legibility/prefer-early-return](#prefer-early-return) | recommended + strict | none |
+| [legibility/prefer-flat-map](#prefer-flat-map) | recommended + strict | none |
+| [legibility/prefer-guard-clauses](#prefer-guard-clauses) | recommended + strict | none |
+| [legibility/prefer-object-lookup](#prefer-object-lookup) | recommended + strict | `{min: 3, operators: ["==", "==="]}` |
+| [legibility/prefer-positive-condition-names](#prefer-positive-condition-names) | strict only | `{booleanOperators}` |
+| [legibility/require-executable-shebang](#require-executable-shebang) | recommended + strict | `{files, runtimes: ["bun", "node"]}` |
 
 ---
 
@@ -700,6 +719,8 @@ Use `max` and `min` to tune rule sensitivity.
 }
 ```
 
+---
+
 ## Security Posture
 
 - No runtime dependencies.
@@ -725,4 +746,4 @@ Before the first publish, configure the `npm-publish` GitHub environment with an
 
 ## Attribution
 
-The first rules were adapted from the Pastoralist `scripts/oxlint-plugin` rule set, then packaged for ESLint and Oxlint with additional legibility and performance rules.
+The first rules were adapted from the [Pastoralist](https://github.com/yowainwright/pastoralist) `scripts/oxlint-plugin` rule set, then packaged for ESLint and Oxlint with additional legibility and performance rules.
