@@ -727,11 +727,22 @@ Use `max` and `min` to tune rule sensitivity.
 - Published package contents are allowlisted with `files`.
 - Releases are tag-triggered and publish GitHub release assets.
 - npm trusted publishing is supported after the package exists on npm.
-- CI runs typecheck, tests, ESLint, Oxlint, and `pnpm pack`.
+- CI runs validation on Node 20, 22, 24, and 26, plus the test suite on Bun.
+
+## GitHub Secrets
+
+| Secret | Location | Used by | Required when |
+| --- | --- | --- | --- |
+| `CODECOV_TOKEN` | Repository Actions secret | `.github/workflows/codecov.yml` | Codecov uploads run on protected branches or token authentication is required in Codecov. |
+| `NPM_TOKEN` | `npm-publish` environment secret | `.github/workflows/publish.yml` | Publishing before npm trusted publishing is configured. |
+
+`GITHUB_TOKEN` is provided by GitHub Actions automatically and does not need to be added manually.
 
 ## Releases
 
 ```sh
+pnpm release:current:dry
+pnpm release:current
 pnpm release:patch:dry
 pnpm release:patch
 pnpm release:minor
@@ -740,9 +751,9 @@ pnpm release:beta
 pnpm release:alpha
 ```
 
-The release script creates the release commit locally, tags it, pushes only the tag, and restores local `main` to its starting commit. The pushed tag triggers npm publishing and GitHub release asset upload.
+Releases use `release-it`. Run release commands from a clean, up-to-date `main` branch. Use `pnpm release:current` for the first `0.1.0` publish, then use the patch, minor, major, alpha, or beta commands for later releases. `release-it` runs `pnpm validate`, bumps `package.json` when incrementing, creates the release commit, creates `v${version}`, and pushes the branch with tags. The pushed tag triggers npm publishing and GitHub release asset upload through `.github/workflows/publish.yml`.
 
-Before the first publish, configure the `npm-publish` GitHub environment with an `NPM_TOKEN` secret. After trusted publishing is configured for `.github/workflows/publish.yml`, use `pnpm release:tag:trusted` or pass `--trusted-publishing`.
+Before the first publish, configure the `npm-publish` GitHub environment with an `NPM_TOKEN` secret or configure npm trusted publishing for `.github/workflows/publish.yml`.
 
 ## Attribution
 
