@@ -93,10 +93,10 @@ Oxlint JavaScript plugins use the same ESLint-compatible rule API.
 
 | Config | Format | Behavior |
 | --- | --- | --- |
-| [recommended](#legibility-configs-flat-recommended) | ESLint legacy | High-signal rules as warnings. |
-| [strict](#legibility-configs-flat-strict) | ESLint legacy | Every rule as an error. |
-| [flat/recommended](#legibility-configs-recommended) | ESLint flat config | High-signal rules as warnings. |
-| [flat/strict](#legibility-configs-strict) | ESLint flat config | Every rule as an error. |
+| [recommended](#legibility-configs-recommended) | ESLint legacy | High-signal rules as warnings. |
+| [strict](#legibility-configs-strict) | ESLint legacy | Every rule as an error. |
+| [flat/recommended](#legibility-configs-flat-recommended) | ESLint flat config | High-signal rules as warnings. |
+| [flat/strict](#legibility-configs-flat-strict) | ESLint flat config | Every rule as an error. |
 
 ---
 

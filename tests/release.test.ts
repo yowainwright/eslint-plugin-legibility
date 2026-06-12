@@ -33,8 +33,8 @@ test("release scripts use release-it directly", () => {
   assert.equal(scripts["release:patch"], "release-it patch --ci");
   assert.equal(scripts["release:minor"], "release-it minor --ci");
   assert.equal(scripts["release:major"], "release-it major --ci");
-  assert.equal(scripts["release:beta"], "release-it prepatch --preRelease=beta --ci");
-  assert.equal(scripts["release:alpha"], "release-it prepatch --preRelease=alpha --ci");
+  assert.equal(scripts["release:beta"], "release-it --preRelease=beta --ci");
+  assert.equal(scripts["release:alpha"], "release-it --preRelease=alpha --ci");
   assert.equal(scripts["release:dry"], "release-it --dry-run");
 
   const customReleaseScripts = Object.entries(scripts).filter(
