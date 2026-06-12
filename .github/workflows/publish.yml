@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+env:
+  SOCKET_API_KEY: ${{ secrets.SOCKET_SECURITY_API_KEY || secrets.SOCKET_API_KEY }}
+  SOCKET_SECURITY_API_KEY: ${{ secrets.SOCKET_SECURITY_API_KEY }}
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -61,6 +65,8 @@ jobs:
           echo "sigstore_bundle=$SIGSTORE_BUNDLE" >> "$GITHUB_OUTPUT"
       - name: Publish npm package
         env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: ${{ secrets.NPM_CONFIG_PROVENANCE || 'true' }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           PACKAGE_NAME: eslint-plugin-legibility
           PACKAGE_VERSION: ${{ github.ref_name }}
@@ -71,8 +77,9 @@ jobs:
             exit 0
           fi
 
-          if [ -n "$NPM_TOKEN" ]; then
-            npm config set //registry.npmjs.org/:_authToken "$NPM_TOKEN"
+          AUTH_TOKEN="${NODE_AUTH_TOKEN:-$NPM_TOKEN}"
+          if [ -n "$AUTH_TOKEN" ]; then
+            npm config set //registry.npmjs.org/:_authToken "$AUTH_TOKEN"
           fi
 
           npm publish "${{ steps.pack.outputs.tarball }}" --access public --tag "${{ steps.dist-tag.outputs.tag }}"
