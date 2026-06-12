@@ -11,6 +11,9 @@ importers:
       '@eslint/js':
         specifier: ^9.0.0
         version: 9.39.4
+      '@socketsecurity/bun-security-scanner':
+        specifier: ^1.1.2
+        version: 1.1.2
       '@types/node':
         specifier: ^25.9.1
         version: 25.9.1
@@ -411,6 +414,9 @@ packages:
   '@phun-ky/typeof@2.0.3':
     resolution: {integrity: sha512-oeQJs1aa8Ghke8JIK9yuq/+KjMiaYeDZ38jx7MhkXncXlUKjqQ3wEm2X3qCKyjo+ZZofZj+WsEEiqkTtRuE2xQ==}
     engines: {node: ^20.9.0 || >=22.0.0, npm: '>=10.8.2'}
+
+  '@socketsecurity/bun-security-scanner@1.1.2':
+    resolution: {integrity: sha512-TdsAg6SMolubyZ6HfIjLWlANfHvhV6i7pdWof4OQ33zPEwXJm2ilA755levHMR618MKq22+06Ag8efiVKowxqA==}
 
   '@types/estree@1.0.9':
     resolution: {integrity: sha512-GhdPgy1el4/ImP05X05Uw4cw2/M93BCUmnEvWZNStlCzEKME4Fkk+YpoA5OiHNQmoS7Cafb8Xa3Pya8m1Qrzeg==}
@@ -1658,6 +1664,8 @@ snapshots:
     optional: true
 
   '@phun-ky/typeof@2.0.3': {}
+
+  '@socketsecurity/bun-security-scanner@1.1.2': {}
 
   '@types/estree@1.0.9': {}
 

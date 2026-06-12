@@ -1,0 +1,26 @@
+name: Documentation
+description: Report confusing, missing, or incorrect documentation.
+title: "docs: "
+labels: ["documentation"]
+body:
+  - type: textarea
+    id: location
+    attributes:
+      label: Location
+      description: Link or describe the README section, rule section, or config example.
+    validations:
+      required: true
+  - type: textarea
+    id: issue
+    attributes:
+      label: Issue
+      description: What is unclear, missing, or wrong?
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested Change
+      description: Proposed wording, example, or structure.
+    validations:
+      required: false

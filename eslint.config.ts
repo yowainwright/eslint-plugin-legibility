@@ -2,6 +2,8 @@ import js from "@eslint/js";
 import legibility from "./dist/index.js";
 import tseslint from "typescript-eslint";
 
+const strictLegibilityConfig = legibility.configs["flat/strict"];
+
 export default [
   {
     ignores: [
@@ -15,6 +17,11 @@ export default [
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  {
+    files: ["scripts/**/*.ts"],
+    plugins: strictLegibilityConfig.plugins,
+    rules: strictLegibilityConfig.rules,
+  },
   {
     languageOptions: {
       ecmaVersion: "latest",

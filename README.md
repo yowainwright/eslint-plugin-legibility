@@ -29,7 +29,7 @@ pnpm add -D eslint-plugin-legibility
 
 Flat config:
 
-```js
+```ts
 import legibility from "eslint-plugin-legibility";
 
 export default [legibility.configs["flat/recommended"]];
@@ -37,7 +37,7 @@ export default [legibility.configs["flat/recommended"]];
 
 Configure rules directly:
 
-```js
+```ts
 import legibility from "eslint-plugin-legibility";
 
 export default [
@@ -71,7 +71,7 @@ module.exports = {
 
 Oxlint JavaScript plugins use the same ESLint-compatible rule API.
 
-```jsonc
+```json
 {
   "jsPlugins": [
     {
@@ -93,10 +93,10 @@ Oxlint JavaScript plugins use the same ESLint-compatible rule API.
 
 | Config | Format | Behavior |
 | --- | --- | --- |
-| `recommended` | ESLint legacy | High-signal rules as warnings. |
-| `strict` | ESLint legacy | Every rule as an error. |
-| `flat/recommended` | ESLint flat config | High-signal rules as warnings. |
-| `flat/strict` | ESLint flat config | Every rule as an error. |
+| [recommended](#legibility-configs-recommended) | ESLint legacy | High-signal rules as warnings. |
+| [strict](#legibility-configs-strict) | ESLint legacy | Every rule as an error. |
+| [flat/recommended](#legibility-configs-flat-recommended) | ESLint flat config | High-signal rules as warnings. |
+| [flat/strict](#legibility-configs-flat-strict) | ESLint flat config | Every rule as an error. |
 
 ---
 
@@ -104,7 +104,7 @@ Oxlint JavaScript plugins use the same ESLint-compatible rule API.
 
 Rules are configured through ESLint or Oxlint `rules`.
 
-```js
+```json
 {
   rules: {
     "legibility/rule-name": ["warn", { option: "value" }]
@@ -727,11 +727,27 @@ Use `max` and `min` to tune rule sensitivity.
 - Published package contents are allowlisted with `files`.
 - Releases are tag-triggered and publish GitHub release assets.
 - npm trusted publishing is supported after the package exists on npm.
-- CI runs typecheck, tests, ESLint, Oxlint, and `pnpm pack`.
+- CI runs validation on Node 20, 22, 24, and 26, plus the test suite on Bun.
+- Bun installs are configured to use Socket.dev's security scanner.
+
+## GitHub Secrets
+
+| Secret | Location | Used by | Required when |
+| --- | --- | --- | --- |
+| `CODECOV_TOKEN` | Repository Actions secret | `.github/workflows/codecov.yml` | Codecov uploads run on protected branches or token authentication is required in Codecov. |
+| `NODE_AUTH_TOKEN` | Repository Actions secret | `.github/workflows/publish.yml` | npm publishing uses standard npm token auth. |
+| `NPM_TOKEN` | Repository Actions secret or `npm-publish` environment secret | `.github/workflows/publish.yml` | Backward-compatible npm auth fallback. |
+| `NPM_CONFIG_PROVENANCE` | Repository Actions secret | `.github/workflows/publish.yml` | npm provenance is enabled for token-based publishing. |
+| `SOCKET_SECURITY_API_KEY` | Repository Actions secret | GitHub workflows that install, analyze, test, or publish packages | Socket.dev scanning or package-manager security integration is enabled. |
+| `SOCKET_API_KEY` | Repository Actions secret | Fallback Socket token name | Existing Socket automation expects this older token name. |
+
+`GITHUB_TOKEN` is provided by GitHub Actions automatically and does not need to be added manually.
 
 ## Releases
 
 ```sh
+pnpm release:current:dry
+pnpm release:current
 pnpm release:patch:dry
 pnpm release:patch
 pnpm release:minor
@@ -740,9 +756,9 @@ pnpm release:beta
 pnpm release:alpha
 ```
 
-The release script creates the release commit locally, tags it, pushes only the tag, and restores local `main` to its starting commit. The pushed tag triggers npm publishing and GitHub release asset upload.
+Releases use `release-it`. Run release commands from a clean, up-to-date `main` branch. Use `pnpm release:current` for the first `0.1.0` publish, then use the patch, minor, major, alpha, or beta commands for later releases. `release-it` runs `pnpm validate`, bumps `package.json` when incrementing, creates the release commit, creates `v${version}`, and pushes the branch with tags. The pushed tag triggers npm publishing and GitHub release asset upload through `.github/workflows/publish.yml`.
 
-Before the first publish, configure the `npm-publish` GitHub environment with an `NPM_TOKEN` secret. After trusted publishing is configured for `.github/workflows/publish.yml`, use `pnpm release:tag:trusted` or pass `--trusted-publishing`.
+Before the first publish, configure the `npm-publish` GitHub environment with an `NPM_TOKEN` secret or configure npm trusted publishing for `.github/workflows/publish.yml`.
 
 ## Attribution
 

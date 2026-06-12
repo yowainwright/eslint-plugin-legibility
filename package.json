@@ -37,12 +37,11 @@
   "files": [
     "dist",
     "LICENSE",
-    "NOTICE.md",
     "README.md"
   ],
   "sideEffects": false,
   "engines": {
-    "node": ">=20.19"
+    "node": "^20.19.0 || ^22.13.0 || >=24.0.0"
   },
   "packageManager": "pnpm@10.12.1",
   "scripts": {
@@ -53,23 +52,25 @@
     "lint": "pnpm build:plugin && eslint .",
     "lint:oxlint": "oxlint .",
     "pack:check": "pnpm build:plugin && pnpm pack --json --pack-destination ./.npm-cache",
+    "prepare": "sh scripts/prepare.sh",
     "prepack": "pnpm build:plugin",
-    "release": "node scripts/release.ts",
-    "release:patch": "node scripts/release.ts --increment=patch",
-    "release:patch:dry": "node scripts/release.ts --increment=patch --dry-run",
-    "release:minor": "node scripts/release.ts --increment=minor",
-    "release:minor:dry": "node scripts/release.ts --increment=minor --dry-run",
-    "release:major": "node scripts/release.ts --increment=major",
-    "release:major:dry": "node scripts/release.ts --increment=major --dry-run",
-    "release:beta": "node scripts/release.ts --preRelease=beta",
-    "release:beta:dry": "node scripts/release.ts --preRelease=beta --dry-run",
-    "release:alpha": "node scripts/release.ts --preRelease=alpha",
-    "release:alpha:dry": "node scripts/release.ts --preRelease=alpha --dry-run",
-    "release:tag": "node scripts/tag-release.ts",
-    "release:tag:dry": "node scripts/tag-release.ts --dry-run",
-    "release:tag:trusted": "node scripts/tag-release.ts --trusted-publishing",
-    "release:dry": "node scripts/release.ts --dry-run",
+    "install-hooks": "jiti scripts/install-hooks.ts",
+    "release": "release-it",
+    "release:current": "release-it --no-increment --ci",
+    "release:current:dry": "release-it --no-increment --dry-run",
+    "release:patch": "release-it patch --ci",
+    "release:patch:dry": "release-it patch --dry-run",
+    "release:minor": "release-it minor --ci",
+    "release:minor:dry": "release-it minor --dry-run",
+    "release:major": "release-it major --ci",
+    "release:major:dry": "release-it major --dry-run",
+    "release:beta": "release-it --preRelease=beta --ci",
+    "release:beta:dry": "release-it --preRelease=beta --dry-run",
+    "release:alpha": "release-it --preRelease=alpha --ci",
+    "release:alpha:dry": "release-it --preRelease=alpha --dry-run",
+    "release:dry": "release-it --dry-run",
     "test": "pnpm build:plugin && node --test tests/*.test.ts",
+    "test:bun": "pnpm build:plugin && bun test tests/*.test.ts",
     "test:coverage": "pnpm build:plugin && mkdir -p coverage && node --test --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=coverage/lcov.info tests/*.test.ts && sed -e 's|^SF:dist/\\(.*\\)\\.js$|SF:src/\\1.ts|' coverage/lcov.info > coverage/src.info && mv coverage/src.info coverage/lcov.info",
     "test:compat": "pnpm build:plugin && pnpm build:runtime && node --test .build/tests/*.test.js",
     "validate": "pnpm typecheck && pnpm typecheck:strict && pnpm type-coverage && pnpm test && pnpm lint && pnpm lint:oxlint && pnpm pack:check",
@@ -79,6 +80,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
+    "@socketsecurity/bun-security-scanner": "^1.1.2",
     "@types/node": "^25.9.1",
     "eslint": "^9.0.0",
     "jiti": "^2.7.0",
@@ -92,12 +94,27 @@
     "access": "public"
   },
   "release-it": {
+    "$schema": "https://unpkg.com/release-it@20/schema/release-it.json",
+    "hooks": {
+      "before:init": "pnpm validate"
+    },
     "git": {
+      "requireBranch": "main",
+      "requireCleanWorkingDir": true,
+      "requireUpstream": true,
       "commitMessage": "chore(release): ${version}",
       "commitArgs": [
         "--no-verify"
       ],
-      "tagName": "v${version}"
+      "tagName": "v${version}",
+      "tagAnnotation": "Release ${version}",
+      "push": true,
+      "pushArgs": [
+        "--follow-tags"
+      ]
+    },
+    "github": {
+      "release": false
     },
     "npm": {
       "publish": false
