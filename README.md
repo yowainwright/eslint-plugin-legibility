@@ -726,7 +726,7 @@ Use `max` and `min` to tune rule sensitivity.
 - No runtime dependencies.
 - Published package contents are allowlisted with `files`.
 - Releases are tag-triggered and publish GitHub release assets.
-- npm trusted publishing is supported after the package exists on npm.
+- npm publishing uses GitHub Actions trusted publishing with provenance.
 - CI runs validation on Node 20, 22, 24, and 26, plus the test suite on Bun.
 - Bun installs are configured to use Socket.dev's security scanner.
 
@@ -735,13 +735,21 @@ Use `max` and `min` to tune rule sensitivity.
 | Secret | Location | Used by | Required when |
 | --- | --- | --- | --- |
 | `CODECOV_TOKEN` | Repository Actions secret | `.github/workflows/codecov.yml` | Codecov uploads run on protected branches or token authentication is required in Codecov. |
-| `NODE_AUTH_TOKEN` | Repository Actions secret | `.github/workflows/publish.yml` | npm publishing uses standard npm token auth. |
-| `NPM_TOKEN` | Repository Actions secret or `npm-publish` environment secret | `.github/workflows/publish.yml` | Backward-compatible npm auth fallback. |
-| `NPM_CONFIG_PROVENANCE` | Repository Actions secret | `.github/workflows/publish.yml` | npm provenance is enabled for token-based publishing. |
 | `SOCKET_SECURITY_API_KEY` | Repository Actions secret | GitHub workflows that install, analyze, test, or publish packages | Socket.dev scanning or package-manager security integration is enabled. |
 | `SOCKET_API_KEY` | Repository Actions secret | Fallback Socket token name | Existing Socket automation expects this older token name. |
 
 `GITHUB_TOKEN` is provided by GitHub Actions automatically and does not need to be added manually.
+
+npm publishing does not use `NPM_TOKEN` or `NODE_AUTH_TOKEN`. Configure npm trusted publishing for:
+
+| Field | Value |
+| --- | --- |
+| Provider | GitHub Actions |
+| Repository owner | `yowainwright` |
+| Repository name | `eslint-plugin-legibility` |
+| Workflow filename | `publish.yml` |
+| Environment | blank |
+| Allowed action | `npm publish` |
 
 ## Releases
 
@@ -758,7 +766,7 @@ pnpm release:alpha
 
 Releases use `release-it`. Run release commands from a clean, up-to-date `main` branch. Use `pnpm release:current` for the first `0.1.0` publish, then use the patch, minor, major, alpha, or beta commands for later releases. `release-it` runs `pnpm validate`, bumps `package.json` when incrementing, creates the release commit, creates `v${version}`, and pushes the branch with tags. The pushed tag triggers npm publishing and GitHub release asset upload through `.github/workflows/publish.yml`.
 
-Before the first publish, configure the `npm-publish` GitHub environment with an `NPM_TOKEN` secret or configure npm trusted publishing for `.github/workflows/publish.yml`.
+Before publishing, configure npm trusted publishing for `publish.yml`. Leave the environment field blank because the publish workflow does not use a GitHub environment.
 
 ## Attribution
 

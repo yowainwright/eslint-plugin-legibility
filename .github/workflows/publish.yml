@@ -15,7 +15,6 @@ env:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    environment: npm-publish
     permissions:
       id-token: write
       contents: write
@@ -74,8 +73,6 @@ jobs:
             exit 0
           fi
 
-          unset NODE_AUTH_TOKEN NPM_TOKEN
-          npm config delete //registry.npmjs.org/:_authToken || true
           npm publish "${{ steps.pack.outputs.tarball }}" --access public --tag "${{ steps.dist-tag.outputs.tag }}" --provenance
       - name: Publish GitHub release assets
         env:

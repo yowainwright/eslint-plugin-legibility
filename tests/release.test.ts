@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import manifest from "../package.json" with { type: "json" };
@@ -25,6 +26,7 @@ interface ReleaseItConfig {
 
 const scripts = manifest.scripts as ManifestScripts;
 const releaseIt = manifest["release-it"] as ReleaseItConfig;
+const publishWorkflow = readFileSync(".github/workflows/publish.yml", "utf8");
 
 test("release scripts use release-it directly", () => {
   assert.equal(scripts.release, "release-it");
@@ -58,4 +60,11 @@ test("release-it creates git releases while GitHub Actions publishes npm", () =>
   assert.equal(releaseIt.npm?.publish, false);
   assert.equal(releaseIt.github?.release, false);
   assert.equal(releaseIt.hooks?.["before:init"], "pnpm validate");
+});
+
+test("publish workflow uses npm trusted publishing", () => {
+  assert.match(publishWorkflow, /id-token: write/);
+  assert.match(publishWorkflow, /npm publish .* --provenance/);
+  assert.doesNotMatch(publishWorkflow, /environment: npm-publish/);
+  assert.doesNotMatch(publishWorkflow, /NODE_AUTH_TOKEN|NPM_TOKEN|_authToken/);
 });
