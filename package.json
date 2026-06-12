@@ -37,7 +37,6 @@
   "files": [
     "dist",
     "LICENSE",
-    "NOTICE.md",
     "README.md"
   ],
   "sideEffects": false,

@@ -1,0 +1,43 @@
+name: Rule Request
+description: Propose a new rule or a behavior change for an existing rule.
+title: "rule: "
+labels: ["enhancement", "rule"]
+body:
+  - type: input
+    id: rule
+    attributes:
+      label: Rule
+      description: Name the existing rule or propose a new rule name.
+      placeholder: legibility/prefer-example
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What readability, maintainability, or performance issue should the rule catch?
+    validations:
+      required: true
+  - type: textarea
+    id: bad
+    attributes:
+      label: Bad Example
+      description: Code that should be reported.
+      render: ts
+    validations:
+      required: true
+  - type: textarea
+    id: good
+    attributes:
+      label: Good Example
+      description: Code that should be allowed.
+      render: ts
+    validations:
+      required: true
+  - type: textarea
+    id: options
+    attributes:
+      label: Options
+      description: Describe any rule options, thresholds, or defaults.
+    validations:
+      required: false

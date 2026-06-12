@@ -1,0 +1,36 @@
+name: Bug Report
+description: Report incorrect lint behavior, crashes, or packaging problems.
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Provide the smallest code sample, config, and command that reproduces the issue.
+      render: ts
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: ESLint or Oxlint Config
+      description: Paste the relevant plugin config and rule options.
+      render: js
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Include eslint-plugin-legibility, ESLint or Oxlint, Node, pnpm, and Bun if relevant.
+      placeholder: eslint-plugin-legibility 0.1.0, ESLint 9.x, Node 24.x, pnpm 10.x
+    validations:
+      required: true
