@@ -29,13 +29,18 @@ const releaseIt = manifest["release-it"] as ReleaseItConfig;
 test("release scripts use release-it directly", () => {
   assert.equal(scripts.release, "release-it");
   assert.equal(scripts["release:current"], "release-it --no-increment --ci");
-  assert.equal(scripts["release:current:dry"], "release-it --no-increment --dry-run");
+  assert.equal(scripts["release:current:dry"], "release-it --no-increment --dry-run --ci");
   assert.equal(scripts["release:patch"], "release-it patch --ci");
+  assert.equal(scripts["release:patch:dry"], "release-it patch --dry-run --ci");
   assert.equal(scripts["release:minor"], "release-it minor --ci");
+  assert.equal(scripts["release:minor:dry"], "release-it minor --dry-run --ci");
   assert.equal(scripts["release:major"], "release-it major --ci");
+  assert.equal(scripts["release:major:dry"], "release-it major --dry-run --ci");
   assert.equal(scripts["release:beta"], "release-it --preRelease=beta --ci");
+  assert.equal(scripts["release:beta:dry"], "release-it --preRelease=beta --dry-run --ci");
   assert.equal(scripts["release:alpha"], "release-it --preRelease=alpha --ci");
-  assert.equal(scripts["release:dry"], "release-it --dry-run");
+  assert.equal(scripts["release:alpha:dry"], "release-it --preRelease=alpha --dry-run --ci");
+  assert.equal(scripts["release:dry"], "release-it --dry-run --ci");
 
   const customReleaseScripts = Object.entries(scripts).filter(
     ([name, command]) => name.startsWith("release") && command.includes("scripts/"),
