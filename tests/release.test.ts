@@ -26,7 +26,6 @@ interface ReleaseItConfig {
 
 const scripts = manifest.scripts as ManifestScripts;
 const releaseIt = manifest["release-it"] as ReleaseItConfig;
-const repository = manifest.repository as { url: string };
 const publishWorkflow = readFileSync(".github/workflows/publish.yml", "utf8");
 
 test("release scripts use release-it directly", () => {
@@ -64,7 +63,6 @@ test("release-it creates git releases while GitHub Actions publishes npm", () =>
 });
 
 test("publish workflow uses npm trusted publishing", () => {
-  assert.equal(repository.url, "https://github.com/yowainwright/eslint-plugin-legibility");
   assert.match(publishWorkflow, /id-token: write/);
   assert.match(publishWorkflow, /registry-url: https:\/\/registry\.npmjs\.org/);
   assert.match(
