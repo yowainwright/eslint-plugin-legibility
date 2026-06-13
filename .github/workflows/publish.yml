@@ -63,6 +63,8 @@ jobs:
           SIGSTORE_BUNDLE="${{ steps.pack.outputs.tarball }}.sigstore.json"
           cp "${{ steps.attest.outputs.bundle-path }}" "$SIGSTORE_BUNDLE"
           echo "sigstore_bundle=$SIGSTORE_BUNDLE" >> "$GITHUB_OUTPUT"
+      - name: Remove npm token fallback
+        run: npm config delete "//registry.npmjs.org/:_authToken"
       - name: Publish npm package
         env:
           PACKAGE_NAME: eslint-plugin-legibility

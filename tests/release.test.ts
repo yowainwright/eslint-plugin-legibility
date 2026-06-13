@@ -69,6 +69,10 @@ test("publish workflow uses npm trusted publishing", () => {
     publishWorkflow,
     /npm publish --access public --tag "\$\{\{ steps\.dist-tag\.outputs\.tag \}\}"/,
   );
+  assert.match(
+    publishWorkflow,
+    /npm config delete "\/\/registry\.npmjs\.org\/:_authToken"/,
+  );
   assert.doesNotMatch(publishWorkflow, /environment: npm-publish/);
-  assert.doesNotMatch(publishWorkflow, /NODE_AUTH_TOKEN|NPM_TOKEN|_authToken/);
+  assert.doesNotMatch(publishWorkflow, /secrets\.(NODE_AUTH_TOKEN|NPM_TOKEN)/);
 });
