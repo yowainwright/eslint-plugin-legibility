@@ -7,7 +7,7 @@
   "author": "Jeffry Wainwright",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yowainwright/eslint-plugin-legibility.git"
+    "url": "https://github.com/yowainwright/eslint-plugin-legibility"
   },
   "bugs": {
     "url": "https://github.com/yowainwright/eslint-plugin-legibility/issues"
