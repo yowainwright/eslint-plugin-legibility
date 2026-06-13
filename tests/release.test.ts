@@ -64,7 +64,11 @@ test("release-it creates git releases while GitHub Actions publishes npm", () =>
 
 test("publish workflow uses npm trusted publishing", () => {
   assert.match(publishWorkflow, /id-token: write/);
-  assert.match(publishWorkflow, /npm publish .* --provenance/);
+  assert.match(publishWorkflow, /registry-url: https:\/\/registry\.npmjs\.org/);
+  assert.match(
+    publishWorkflow,
+    /npm publish --access public --tag "\$\{\{ steps\.dist-tag\.outputs\.tag \}\}"/,
+  );
   assert.doesNotMatch(publishWorkflow, /environment: npm-publish/);
   assert.doesNotMatch(publishWorkflow, /NODE_AUTH_TOKEN|NPM_TOKEN|_authToken/);
 });
