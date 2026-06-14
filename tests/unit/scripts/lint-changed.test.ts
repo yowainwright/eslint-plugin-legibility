@@ -26,8 +26,8 @@ test('changedFiles returns null when git fails', () => {
   assert.equal(result, null);
 });
 
-test('lint-changed exits 0 with no changed files on clean branch', () => {
-  const result = spawnSync(process.execPath, [binPath], { encoding: 'utf8' });
-  const hasExpectedOutput = result.stdout.includes('No changed JS/TS files') || result.status === 1;
-  assert.ok(hasExpectedOutput);
+test('lint-changed exits 0 with no changed files against HEAD', () => {
+  const result = spawnSync(process.execPath, [binPath, 'HEAD'], { encoding: 'utf8' });
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /No changed JS\/TS files/);
 });
