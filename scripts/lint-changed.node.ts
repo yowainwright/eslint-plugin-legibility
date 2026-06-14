@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const JS_EXTENSIONS = new Set(['.js', '.ts', '.jsx', '.tsx', '.mjs', '.cjs', '.mts', '.cts']);
 const DEFAULT_BASE = 'origin/main';
@@ -37,9 +39,16 @@ function runLinter(bin: string, args: string[]): number {
   return result.status ?? 1;
 }
 
-export { isLintable, resolveExecutable, changedFiles, runLinter };
+function isDirectRun(metaUrl: string, argvPath: string | undefined): boolean {
+  if (!argvPath) return false;
 
-const isMain = process.argv[1]?.endsWith('lint-changed.js');
+  const argvUrl = pathToFileURL(resolve(argvPath)).href;
+  return argvUrl === metaUrl;
+}
+
+export { isLintable, resolveExecutable, changedFiles, runLinter, isDirectRun };
+
+const isMain = isDirectRun(import.meta.url, process.argv[1]);
 if (isMain) {
   const base = process.argv[2] || DEFAULT_BASE;
   const eslint = resolveExecutable('eslint');

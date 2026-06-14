@@ -3,10 +3,12 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
+import { pathToFileURL } from "node:url";
 
 import {
   buildTestRunPlan,
   getTestFileExtension,
+  isDirectRun,
   isTestRunMode,
   listTestFiles,
   parseTestRunMode,
@@ -51,6 +53,20 @@ test("selects extensions for source and compiled tests", () => {
   assert.equal(getTestFileExtension("bun-ts"), ".test.ts");
   assert.equal(getTestFileExtension("node-js"), ".test.js");
   assert.equal(getTestFileExtension("coverage"), ".test.js");
+});
+
+test("detects direct script execution with resolved file URLs", () => {
+  const directory = createTempDirectory();
+  const scriptPath = join(directory, "run tests.ts");
+
+  try {
+    const scriptUrl = pathToFileURL(scriptPath).href;
+    assert.equal(isDirectRun(scriptUrl, scriptPath), true);
+    assert.equal(isDirectRun(scriptUrl, undefined), false);
+    assert.equal(isDirectRun(scriptUrl, join(directory, "other.ts")), false);
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
 });
 
 test("lists matching test files recursively in sorted order", () => {

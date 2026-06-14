@@ -6,6 +6,7 @@ const JS_EXTENSIONS = new Set(['.js', '.ts', '.jsx', '.tsx', '.mjs', '.cjs', '.m
 const DEFAULT_BASE = 'origin/main';
 const NO_LINTERS_MSG = 'lint-changed: no linters found (eslint, oxlint)\n';
 const NO_FILES_MSG = 'No changed JS/TS files.\n';
+const SAFE_GIT_REF_PATTERN = /^[A-Za-z0-9_./:@-]+$/;
 
 function fileExists(path: string): boolean {
   const [, err] = os.stat(path);
@@ -27,6 +28,9 @@ function isLintable(file: string): boolean {
 }
 
 function changedFiles(filter: string, base: string): string[] | null {
+  const hasSafeBase = SAFE_GIT_REF_PATTERN.test(base);
+  if (!hasSafeBase) return null;
+
   const pipe = std.popen(`git diff --name-only --diff-filter=${filter} ${base}...HEAD`, 'r');
   if (!pipe) return null;
   const output = pipe.readAsString();

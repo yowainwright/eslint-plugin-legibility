@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import type { TestCommandRunner, TestRunMode, TestRunPlan } from "./types.ts";
 
 const testRunModes = new Set<TestRunMode>(["bun-ts", "coverage", "node-js", "node-ts"]);
@@ -110,7 +111,15 @@ export function runTests(mode: TestRunMode): number {
   return status;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+export function isDirectRun(metaUrl: string, argvPath: string | undefined): boolean {
+  if (!argvPath) return false;
+
+  const argvUrl = pathToFileURL(resolve(argvPath)).href;
+  const isDirect = argvUrl === metaUrl;
+  return isDirect;
+}
+
+if (isDirectRun(import.meta.url, process.argv[1])) {
   try {
     const mode = parseTestRunMode(process.argv.slice(2));
     process.exitCode = runTests(mode);

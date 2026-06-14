@@ -5,7 +5,7 @@ import test from 'node:test';
 import { pathToFileURL } from 'node:url';
 
 const binPath = join(process.cwd(), 'bin', 'lint-changed.js');
-const { isLintable, changedFiles } = await import(pathToFileURL(binPath).href);
+const { isLintable, changedFiles, isDirectRun } = await import(pathToFileURL(binPath).href);
 
 test('isLintable returns true for JS/TS extensions', () => {
   assert.equal(isLintable('foo.ts'), true);
@@ -24,6 +24,13 @@ test('isLintable returns false for non-JS extensions', () => {
 test('changedFiles returns null when git fails', () => {
   const result = changedFiles('A', 'nonexistent-branch-xyz');
   assert.equal(result, null);
+});
+
+test('isDirectRun compares resolved file URLs', () => {
+  const binUrl = pathToFileURL(binPath).href;
+  assert.equal(isDirectRun(binUrl, binPath), true);
+  assert.equal(isDirectRun(binUrl, undefined), false);
+  assert.equal(isDirectRun(binUrl, join(process.cwd(), 'scripts', 'lint-changed.js')), false);
 });
 
 test('lint-changed exits 0 with no changed files against HEAD', () => {
