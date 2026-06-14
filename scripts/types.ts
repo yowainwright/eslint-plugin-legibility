@@ -59,3 +59,12 @@ export interface ReleasePlan {
   tagName: string;
   version: string;
 }
+
+export type TestRunMode = "bun-ts" | "coverage" | "node-js" | "node-ts";
+
+export interface TestRunPlan {
+  command: string;
+  args: string[];
+  coverageFile?: string;
+  testDirectory: string;
+}
