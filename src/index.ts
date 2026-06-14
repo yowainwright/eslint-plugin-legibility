@@ -1,3 +1,4 @@
+import { basename, relative } from "node:path";
 import {
   ARRAY_MUTATING_METHODS,
   ARG_COMMAND_FUNCTIONS,
@@ -11,7 +12,10 @@ import {
   DEFAULT_MAX_ARRAY_CHAIN_DEPTH,
   DEFAULT_MAX_COMPUTED_VALUE_OPERATORS,
   DEFAULT_MAX_CONTROL_FLOW_DEPTH,
+  DEFAULT_ALLOWED_FILENAME_QUALIFIERS,
+  DEFAULT_ALLOWED_STANDALONE_FILENAMES,
   DEFAULT_MAX_EXPRESSION_OPERATORS,
+  DEFAULT_MIN_DIRNAME_MATCH_DEPTH,
   DEFAULT_MAX_IF_OPERATORS,
   DEFAULT_MAX_TERNARY_OPERATORS,
   DEFAULT_MIN_OBJECT_LOOKUP_CHAIN_LENGTH,
@@ -38,7 +42,9 @@ import {
   NO_REDUNDANT_BOOLEAN_LOGIC_META,
   NO_REDUNDANT_NULLISH_FALLBACK_META,
   NO_REPEATED_COLLECTION_SEARCH_META,
+  NO_MIXED_FILENAME_CASING_META,
   NO_SINGLE_USE_RENAMING_ALIAS_META,
+  REQUIRE_FILENAME_MATCHES_DIRNAME_META,
   NO_STANDALONE_ARRAY_MUTATIONS_META,
   NO_TRIVIAL_WRAPPER_FUNCTIONS_META,
   NO_UNNECESSARY_BLOCK_CALLBACK_META,
@@ -212,9 +218,10 @@ function countOperatorNode(node: AstNode, root: AstNode, complexity: OperatorCom
   const isNestedContainer = node !== root && (isExpressionContainer(node) || isJsxNode(node));
   if (isNestedContainer) return 0;
 
-  const childCount = getTraversableEntries(node).reduce((sum, [, child]) => {
-    return sum + countChildOperators(child, root, complexity);
-  }, 0);
+  const childCount = getTraversableEntries(node).reduce(
+    (sum, [, child]) => sum + countChildOperators(child, root, complexity),
+    0,
+  );
   const operatorCount = getOperatorWeight(node, complexity) + childCount;
   return operatorCount;
 }
@@ -268,8 +275,7 @@ function unwrapChainExpression(node: MaybeAstNode): MaybeAstNode {
   const isChainExpression = node.type === "ChainExpression";
   if (!isChainExpression) return node;
 
-  const unwrappedExpression = node.expression;
-  return unwrappedExpression;
+  return node.expression;
 }
 
 function getCallMemberExpression(node: MaybeAstNode): AstNode | null {
@@ -290,8 +296,7 @@ function getCallMemberExpression(node: MaybeAstNode): AstNode | null {
   const isMemberCallee = callee.type === "MemberExpression";
   if (!isMemberCallee) return null;
 
-  const memberExpression = callee;
-  return memberExpression;
+  return callee;
 }
 
 function getStaticPropertyName(member: MaybeAstNode): string | null {
@@ -302,7 +307,7 @@ function getStaticPropertyName(member: MaybeAstNode): string | null {
   const isPropertyNode = isRecord(property);
   if (!isPropertyNode) return null;
 
-  const isComputedMember = member.computed === true;
+  const isComputedMember = Boolean(member.computed);
   if (isComputedMember) {
     const isLiteralProperty = property.type === "Literal";
     if (!isLiteralProperty) return null;
@@ -442,8 +447,7 @@ function getCallbackFunction(node: MaybeAstNode): AstNode | null {
   const isCallbackFunction = isFunctionNode(callback);
   if (!isCallbackFunction) return null;
 
-  const callbackFunction = callback;
-  return callbackFunction;
+  return callback;
 }
 
 function getFunctionParamNames(node: MaybeAstNode): string[] {
@@ -526,8 +530,7 @@ function getConfiguredNumber(context: RuleContext, key: string, fallback: number
   const hasNumberValue = typeof configuredValue === "number";
   if (!hasNumberValue) return fallback;
 
-  const configuredNumber = configuredValue;
-  return configuredNumber;
+  return configuredValue;
 }
 
 function getConfiguredMax(context: RuleContext, fallback: number): number {
@@ -1092,14 +1095,6 @@ function isAssignmentSideEffect(node: AstNode): boolean {
   return isAssignment || isUpdate;
 }
 
-function isMutatingMethodCall(node: MaybeAstNode, mutatingMethods: StringSet): boolean {
-  return isMethodCall(node, mutatingMethods);
-}
-
-function isArrayMutatingMethodCall(node: MaybeAstNode, arrayMutatingMethods: StringSet): boolean {
-  return isMethodCall(node, arrayMutatingMethods);
-}
-
 function getMemberObject(node: MaybeAstNode): MaybeAstNode {
   const member = getCallMemberExpression(node);
   if (member === null) return null;
@@ -1121,7 +1116,7 @@ function isFreshMutationTarget(target: MaybeAstNode): boolean {
 }
 
 function isFreshMutatingMethodCall(node: MaybeAstNode, mutatingMethods: StringSet): boolean {
-  const isMutation = isMutatingMethodCall(node, mutatingMethods);
+  const isMutation = isMethodCall(node, mutatingMethods);
   if (!isMutation) return false;
 
   return isFreshMutationTarget(getMemberObject(node));
@@ -1137,7 +1132,7 @@ function isSideEffectNode(node: MaybeAstNode, mutatingMethods: StringSet): boole
   const isFreshMutation = isFreshMutatingMethodCall(node, mutatingMethods);
   if (isFreshMutation) return false;
 
-  return isMutatingMethodCall(node, mutatingMethods);
+  return isMethodCall(node, mutatingMethods);
 }
 
 function containsSideEffect(
@@ -1206,7 +1201,7 @@ function checkCallExpressionSideEffects(
   mutatingMethods: StringSet,
 ): void {
   checkCallbackSideEffects(context, node, sideEffectFreeIterationMethods, mutatingMethods);
-  const isMutation = isMutatingMethodCall(node, mutatingMethods);
+  const isMutation = isMethodCall(node, mutatingMethods);
   if (!isMutation) return;
 
   const isFreshMutation = isFreshMutatingMethodCall(node, mutatingMethods);
@@ -1235,7 +1230,7 @@ function checkStandaloneArrayMutation(
   arrayMutatingMethods: StringSet,
   mutatingMethods: StringSet,
 ): void {
-  const isArrayMutation = isArrayMutatingMethodCall(node, arrayMutatingMethods);
+  const isArrayMutation = isMethodCall(node, arrayMutatingMethods);
   if (!isArrayMutation) return;
 
   const isFreshMutation = isFreshMutatingMethodCall(node, mutatingMethods);
@@ -1506,17 +1501,16 @@ function isElseIf(node: AstNode): boolean {
 function createControlFlowVisitors(context: RuleContext): RuleListener {
   const max = getConfiguredMax(context, DEFAULT_MAX_CONTROL_FLOW_DEPTH);
   let depth = 0;
-  const stack: number[] = [];
-  const functionStack: FunctionDepthFrame[] = [];
+  let stack: number[] = [];
+  let functionStack: FunctionDepthFrame[] = [];
 
   const controlVisitors = Object.fromEntries(
     Array.from(CONTROL_FLOW_TYPES).flatMap((type) => [
       [
         type,
         (node: AstNode) => {
-          stack.push(depth);
-          const nextDepth = type === "IfStatement" && isElseIf(node) ? depth : depth + 1;
-          depth = nextDepth;
+          stack = stack.concat(depth);
+          depth = getNextControlFlowDepth(type, node, depth);
           const isWithinLimit = depth <= max;
           if (isWithinLimit) return;
 
@@ -1530,7 +1524,8 @@ function createControlFlowVisitors(context: RuleContext): RuleListener {
       [
         `${type}:exit`,
         () => {
-          depth = stack.pop() ?? 0;
+          depth = getLastStackNumber(stack);
+          stack = dropLastStackItem(stack);
         },
       ],
     ]),
@@ -1540,16 +1535,17 @@ function createControlFlowVisitors(context: RuleContext): RuleListener {
       [
         type,
         () => {
-          functionStack.push({ depth, stackLength: stack.length });
+          functionStack = functionStack.concat({ depth, stackLength: stack.length });
           depth = 0;
         },
       ],
       [
         `${type}:exit`,
         () => {
-          const previous = functionStack.pop();
+          const previous = getLastStackItem(functionStack);
+          functionStack = dropLastStackItem(functionStack);
           depth = previous?.depth ?? 0;
-          stack.length = previous?.stackLength ?? 0;
+          stack = stack.slice(0, previous?.stackLength ?? 0);
         },
       ],
     ]),
@@ -1557,8 +1553,30 @@ function createControlFlowVisitors(context: RuleContext): RuleListener {
   return Object.assign({}, controlVisitors, functionVisitors);
 }
 
-function createMaxControlFlowDepth(context: RuleContext): RuleListener {
-  return createControlFlowVisitors(context);
+function getNextControlFlowDepth(type: string, node: AstNode, currentDepth: number): number {
+  const isIfStatement = type === "IfStatement";
+  const isElseIfBranch = isIfStatement && isElseIf(node);
+  if (isElseIfBranch) return currentDepth;
+
+  const nextDepth = currentDepth + 1;
+  return nextDepth;
+}
+
+function getLastStackNumber(stack: readonly number[]): number {
+  const lastItem = stack[stack.length - 1];
+  if (lastItem === undefined) return 0;
+
+  return lastItem;
+}
+
+function getLastStackItem<T>(stack: readonly T[]): T | undefined {
+  const lastItem = stack[stack.length - 1];
+  return lastItem;
+}
+
+function dropLastStackItem<T>(stack: readonly T[]): T[] {
+  const nextStack = stack.slice(0, -1);
+  return nextStack;
 }
 
 function getLastStatement(block: MaybeAstNode): AstNode | null {
@@ -1710,12 +1728,12 @@ function createFunctionNodeVisitors(checkNode: (node: AstNode) => void): RuleLis
 
 function createNoRepeatedCollectionSearch(context: RuleContext): RuleListener {
   const searchMethods = getConfiguredStringSet(context, "searchMethods", SEARCH_METHODS);
-  const scopes: ScopeStack = [];
+  let scopes: ScopeStack = [];
   const enterScope = () => {
-    scopes.push(new Map());
+    scopes = scopes.concat(new Map());
   };
   const exitScope = () => {
-    scopes.pop();
+    scopes = dropLastStackItem(scopes);
   };
 
   return Object.assign({}, createScopeVisitors(enterScope, exitScope), {
@@ -2032,12 +2050,14 @@ function isReferenceIdentifier(node: AstNode): boolean {
 }
 
 function createNoSingleUseRenamingAlias(context: RuleContext): RuleListener {
-  const scopes: AliasScopeStack = [];
+  let scopes: AliasScopeStack = [];
   const enterScope = () => {
-    scopes.push(new Map());
+    scopes = scopes.concat(new Map());
   };
   const exitScope = () => {
-    reportSingleUseAliases(context, scopes.pop());
+    const currentScope = getLastStackItem(scopes);
+    scopes = dropLastStackItem(scopes);
+    reportSingleUseAliases(context, currentScope);
   };
 
   return Object.assign({}, createScopeVisitors(enterScope, exitScope), {
@@ -2344,10 +2364,85 @@ function checkObjectLookupPreference(
   });
 }
 
+function createRequireFilenameMatchesDirname(context: RuleContext): RuleListener {
+  return {
+    Program(node: AstNode) {
+      const minDepth = getConfiguredNumber(context, "minDepth", DEFAULT_MIN_DIRNAME_MATCH_DEPTH);
+      const allowedQualifiers = getConfiguredStringSet(context, "allowedQualifiers", DEFAULT_ALLOWED_FILENAME_QUALIFIERS);
+      const allowedFilenames = getConfiguredStringSet(context, "allowedFilenames", DEFAULT_ALLOWED_STANDALONE_FILENAMES);
+
+      const cwd = context.cwd;
+      const filename = context.filename;
+      if (!cwd) return;
+      if (!filename) return;
+
+      const relativePath = relative(cwd, filename);
+      const parts = relativePath.split(/[/\\]/);
+      const parentDepth = parts.length - 1;
+
+      const isTooShallow = parentDepth < minDepth;
+      if (isTooShallow) return;
+
+      const parentDirName = parts[parentDepth - 1];
+      if (!parentDirName) return;
+
+      const rawBasename = basename(filename);
+      const withoutLeadingDot = rawBasename.startsWith(".") ? rawBasename.slice(1) : rawBasename;
+      const lastDot = withoutLeadingDot.lastIndexOf(".");
+      const withoutLastExt = lastDot >= 0 ? withoutLeadingDot.slice(0, lastDot) : withoutLeadingDot;
+      const nameParts = withoutLastExt.split(".");
+      const baseName = nameParts[0];
+      if (!baseName) return;
+      const qualifiers = nameParts.slice(1);
+
+      const isAllowedFilename = allowedFilenames.has(baseName);
+      if (isAllowedFilename) return;
+
+      const matchesDirName = baseName === parentDirName;
+      if (!matchesDirName) {
+        context.report({ node, messageId: "mismatch", data: { name: withoutLastExt, dir: parentDirName } });
+        return;
+      }
+
+      const unknownQualifier = qualifiers.find((q) => !allowedQualifiers.has(q));
+      if (!unknownQualifier) return;
+
+      const allowed = Array.from(allowedQualifiers).join(", ");
+      context.report({ node, messageId: "unknownQualifier", data: { qualifier: unknownQualifier, name: withoutLastExt, allowed } });
+    },
+  };
+}
+
+function createNoMixedFilenameCasing(context: RuleContext): RuleListener {
+  return {
+    Program(node: AstNode) {
+      const filename = context.filename;
+      if (!filename) return;
+      const raw = basename(filename);
+      const stripped = raw.startsWith(".") ? raw.slice(1) : raw;
+      const name = stripped.includes(".") ? stripped.slice(0, stripped.indexOf(".")) : stripped;
+      const characterLookup = new Set(name);
+
+      const hasHyphens = characterLookup.has("-");
+      const hasUnderscores = characterLookup.has("_");
+      const hasUppercase = /[A-Z]/.test(name);
+      const hasLowercase = /[a-z]/.test(name);
+
+      const mixesHyphenWithUpper = hasHyphens && hasUppercase;
+      const mixesUnderscoreWithMixedCase = hasUnderscores && hasUppercase && hasLowercase;
+      const mixesSeparators = hasHyphens && hasUnderscores;
+      const isMixed = mixesHyphenWithUpper || mixesUnderscoreWithMixedCase || mixesSeparators;
+
+      if (!isMixed) return;
+      context.report({ node, messageId: "mixedCasing", data: { name } });
+    },
+  };
+}
+
 const rules = {
   "hoist-if-operators": defineRule(HOIST_IF_OPERATORS_META, createHoistIfOperators),
   "max-array-chain-depth": defineRule(MAX_ARRAY_CHAIN_DEPTH_META, createMaxArrayChainDepth),
-  "max-control-flow-depth": defineRule(MAX_CONTROL_FLOW_DEPTH_META, createMaxControlFlowDepth),
+  "max-control-flow-depth": defineRule(MAX_CONTROL_FLOW_DEPTH_META, createControlFlowVisitors),
   "max-expression-operators": defineRule(
     MAX_EXPRESSION_OPERATORS_META,
     createMaxExpressionOperators,
@@ -2356,6 +2451,7 @@ const rules = {
   "no-computed-values": defineRule(NO_COMPUTED_VALUES_META, createNoComputedValues),
   "no-direct-node-bin-smoke": defineRule(NO_DIRECT_NODE_BIN_SMOKE_META, createNoDirectNodeBinSmoke),
   "no-hidden-side-effects": defineRule(NO_HIDDEN_SIDE_EFFECTS_META, createNoHiddenSideEffects),
+  "no-mixed-filename-casing": defineRule(NO_MIXED_FILENAME_CASING_META, createNoMixedFilenameCasing),
   "no-identity-array-callback": defineRule(
     NO_IDENTITY_ARRAY_CALLBACK_META,
     createNoIdentityArrayCallback,
@@ -2404,6 +2500,10 @@ const rules = {
   "require-executable-shebang": defineRule(
     REQUIRE_EXECUTABLE_SHEBANG_META,
     createRequireExecutableShebang,
+  ),
+  "require-filename-matches-dirname": defineRule(
+    REQUIRE_FILENAME_MATCHES_DIRNAME_META,
+    createRequireFilenameMatchesDirname,
   ),
 };
 

@@ -1,5 +1,13 @@
 # eslint plugin legibility
 
+[![npm version](https://img.shields.io/npm/v/eslint-plugin-legibility.svg)](https://www.npmjs.com/package/eslint-plugin-legibility)
+[![npm downloads](https://img.shields.io/npm/dm/eslint-plugin-legibility.svg)](https://www.npmjs.com/package/eslint-plugin-legibility)
+[![TypeScript](https://img.shields.io/badge/TypeScript-types%20included-blue)](https://www.typescriptlang.org/)
+![CI](https://github.com/yowainwright/eslint-plugin-legibility/actions/workflows/ci.yml/badge.svg)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/yowainwright/eslint-plugin-legibility/badge)](https://scorecard.dev/viewer/?uri=github.com/yowainwright/eslint-plugin-legibility)
+[![codecov](https://codecov.io/gh/yowainwright/eslint-plugin-legibility/branch/main/graph/badge.svg)](https://codecov.io/gh/yowainwright/eslint-plugin-legibility)
+[![GitHub stars](https://img.shields.io/github/stars/yowainwright/eslint-plugin-legibility?style=social)](https://github.com/yowainwright/eslint-plugin-legibility)
+
 ## Why was this written?
 
 > Working with LLM's for the majority of my work, I find the way that I code and read code has changed. This project contains rules I find useful for keeping Typescript and/or JavaScript more readable when written mainly by LLMs's. 
@@ -764,7 +772,17 @@ pnpm release:beta
 pnpm release:alpha
 ```
 
-Releases use `release-it`. Run release commands from a clean, up-to-date `main` branch. Use `pnpm release:current` for the first `0.1.0` publish, then use the patch, minor, major, alpha, or beta commands for later releases. `release-it` runs `pnpm validate`, bumps `package.json` when incrementing, creates the release commit, creates `v${version}`, and pushes the branch with tags. The pushed tag triggers npm publishing and GitHub release asset upload through `.github/workflows/publish.yml`.
+Releases use a local release wrapper around `release-it`. Run release commands from a clean, up-to-date `main` branch. Use `pnpm release:current` for the first publish of the current package version, then use the patch, minor, major, alpha, or beta commands for later releases. The wrapper resolves the exact version, verifies local `main` matches `origin/main`, and asks for confirmation before `release-it` pushes the tag that triggers npm publishing.
+
+The publish confirmation question is:
+
+```text
+Publish eslint-plugin-legibility@<version> from GitHub Actions trusted publishing? This will push v<version> and npm <dist-tag> will update if the workflow succeeds. Continue? [y/N]
+```
+
+Answer `y` or `yes` to continue. Any other answer aborts before the release tag is pushed. For intentional noninteractive release automation, pass `--yes` to the release wrapper.
+
+After confirmation, `release-it` runs `pnpm validate`, bumps `package.json` when incrementing, creates the release commit, creates `v${version}`, and pushes the branch with tags. The pushed tag triggers npm publishing and GitHub release asset upload through `.github/workflows/publish.yml`.
 
 Before publishing, configure npm trusted publishing for `publish.yml`. Leave the environment field blank because the publish workflow does not use a GitHub environment.
 

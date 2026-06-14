@@ -18,9 +18,17 @@ export default [
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ["scripts/**/*.ts"],
+    files: ["bin/**/*.js", "scripts/**/*.ts", "src/**/*.ts"],
+    languageOptions: {
+      globals: { process: "readonly" },
+    },
     plugins: strictLegibilityConfig.plugins,
-    rules: strictLegibilityConfig.rules,
+    rules: Object.assign({}, strictLegibilityConfig.rules, {
+      "legibility/require-executable-shebang": [
+        "error",
+        { files: ["bin/lint-changed.js", "scripts/lint-changed.node.ts"] },
+      ],
+    }),
   },
   {
     languageOptions: {

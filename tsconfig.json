@@ -17,5 +17,6 @@
     "target": "ES2022",
     "types": ["node"]
   },
-  "include": ["eslint.config.ts", "scripts/**/*.ts", "src/**/*.ts", "tests/**/*.ts"]
+  "include": ["eslint.config.ts", "scripts/**/*.ts", "src/**/*.ts", "tests/**/*.ts", "tests/unit/**/*.ts"],
+  "exclude": ["scripts/lint-changed.ts"]
 }

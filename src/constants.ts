@@ -8,6 +8,24 @@ export { PACKAGE_VERSION };
 export const PLUGIN_NAME = "legibility";
 
 export const DEFAULT_MAX_EXPRESSION_OPERATORS = 4;
+export const DEFAULT_MIN_DIRNAME_MATCH_DEPTH = 3;
+
+export const DEFAULT_ALLOWED_FILENAME_QUALIFIERS = new Set([
+  "constants",
+  "helpers",
+  "spec",
+  "styles",
+  "test",
+  "types",
+  "utils",
+]);
+
+export const DEFAULT_ALLOWED_STANDALONE_FILENAMES = new Set([
+  "constants",
+  "index",
+  "types",
+  "utils",
+]);
 export const DEFAULT_MAX_IF_OPERATORS = 0;
 export const DEFAULT_MAX_TERNARY_OPERATORS = 2;
 export const DEFAULT_MAX_COMPUTED_VALUE_OPERATORS = 1;
@@ -221,6 +239,7 @@ export const RECOMMENDED_RULE_NAMES = [
   "no-complex-ternaries",
   "no-computed-values",
   "no-direct-node-bin-smoke",
+  "no-mixed-filename-casing",
   "no-hidden-side-effects",
   "no-identity-array-callback",
   "no-quadratic-patterns",
@@ -235,6 +254,7 @@ export const RECOMMENDED_RULE_NAMES = [
   "prefer-guard-clauses",
   "prefer-object-lookup",
   "require-executable-shebang",
+  "require-filename-matches-dirname",
 ];
 
 const STRING_ARRAY_SCHEMA = { type: "array", items: { type: "string" } };
@@ -253,10 +273,7 @@ function maxOperatorRuleSchema(minimum: number): RuleMeta["schema"] {
   return [
     {
       type: "object",
-      properties: {
-        max: { type: "number", minimum },
-        ...OPERATOR_OPTIONS_SCHEMA,
-      },
+      properties: Object.assign({}, { max: { type: "number", minimum } }, OPERATOR_OPTIONS_SCHEMA),
       additionalProperties: false,
     },
   ];
@@ -686,5 +703,43 @@ export const PREFER_OBJECT_LOOKUP_META = defineMeta("prefer-object-lookup", {
   messages: {
     preferLookup:
       "Replace repeated {{name}} equality checks with a Set or lookup object.",
+  },
+});
+
+export const REQUIRE_FILENAME_MATCHES_DIRNAME_META = defineMeta("require-filename-matches-dirname", {
+  type: "suggestion",
+  docs: {
+    description: "Require files in named subdirectories to match the directory name.",
+    recommended: true,
+  },
+  schema: [
+    {
+      type: "object",
+      properties: {
+        minDepth: { type: "integer", minimum: 1 },
+        allowedQualifiers: STRING_ARRAY_SCHEMA,
+        allowedFilenames: STRING_ARRAY_SCHEMA,
+      },
+      additionalProperties: false,
+    },
+  ],
+  messages: {
+    mismatch:
+      "Filename \"{{name}}\" does not match parent directory \"{{dir}}\". Use {{dir}}.ts, {{dir}}.{qualifier}.ts, or a known filename (index, types, constants, utils).",
+    unknownQualifier:
+      "Qualifier \"{{qualifier}}\" in \"{{name}}\" is not in the allowed list: {{allowed}}.",
+  },
+});
+
+export const NO_MIXED_FILENAME_CASING_META = defineMeta("no-mixed-filename-casing", {
+  type: "suggestion",
+  docs: {
+    description: "Flag filenames that mix casing conventions.",
+    recommended: true,
+  },
+  schema: [],
+  messages: {
+    mixedCasing:
+      "Filename \"{{name}}\" mixes casing conventions. Use one: kebab-case, camelCase, PascalCase, or snake_case.",
   },
 });
