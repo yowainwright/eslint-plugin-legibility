@@ -54,7 +54,7 @@ export function buildTestRunPlan(mode: TestRunMode): TestRunPlan {
         `--test-reporter-destination=${coverageFile}`,
       ],
       coverageFile,
-      testDirectory: "tests/unit",
+      testDirectory: ".build/tests/unit",
     };
   }
 
@@ -69,7 +69,8 @@ export function remapCoverageSources(path: string): void {
 
 export function runTests(mode: TestRunMode): number {
   const plan = buildTestRunPlan(mode);
-  const extension = mode === "node-js" ? ".test.js" : ".test.ts";
+  const usesCompiledTests = mode === "coverage" || mode === "node-js";
+  const extension = usesCompiledTests ? ".test.js" : ".test.ts";
   const testFiles = listTestFiles(plan.testDirectory, extension);
   if (testFiles.length === 0) {
     throw new Error(`No ${extension} files found in ${plan.testDirectory}`);
