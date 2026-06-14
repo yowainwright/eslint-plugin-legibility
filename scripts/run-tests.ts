@@ -1,10 +1,12 @@
 import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import type { TestRunMode, TestRunPlan } from "./types.ts";
+import { dirname, join } from "node:path";
+import type { TestCommandRunner, TestRunMode, TestRunPlan } from "./types.ts";
 
 const testRunModes = new Set<TestRunMode>(["bun-ts", "coverage", "node-js", "node-ts"]);
 const coverageFile = "coverage/lcov.info";
+const runTestCommand: TestCommandRunner = (command, args) =>
+  spawnSync(command, Array.from(args), { stdio: "inherit" });
 
 export function isTestRunMode(value: string | undefined): value is TestRunMode {
   if (value === undefined) return false;
@@ -63,32 +65,48 @@ export function buildTestRunPlan(mode: TestRunMode): TestRunPlan {
 
 export function remapCoverageSources(path: string): void {
   const coverage = readFileSync(path, "utf8");
-  const remappedCoverage = coverage.replace(/^SF:dist\/(.*)\.js$/gm, "SF:src/$1.ts");
+  const remappedCoverage = coverage
+    .replace(/^SF:dist\/(.*)\.js$/gm, "SF:src/$1.ts")
+    .replace(/^SF:\.build\/scripts\/(.*)\.js$/gm, "SF:scripts/$1.ts");
   writeFileSync(path, remappedCoverage);
 }
 
-export function runTests(mode: TestRunMode): number {
-  const plan = buildTestRunPlan(mode);
+export function getTestFileExtension(mode: TestRunMode): ".test.js" | ".test.ts" {
   const usesCompiledTests = mode === "coverage" || mode === "node-js";
   const extension = usesCompiledTests ? ".test.js" : ".test.ts";
+  return extension;
+}
+
+export function runTestPlan(
+  plan: TestRunPlan,
+  extension: ".test.js" | ".test.ts",
+  commandRunner: TestCommandRunner = runTestCommand,
+): number {
   const testFiles = listTestFiles(plan.testDirectory, extension);
   if (testFiles.length === 0) {
     throw new Error(`No ${extension} files found in ${plan.testDirectory}`);
   }
 
-  if (plan.coverageFile) {
-    mkdirSync("coverage", { recursive: true });
+  const coveragePath = plan.coverageFile;
+  if (coveragePath) {
+    mkdirSync(dirname(coveragePath), { recursive: true });
   }
 
-  const result = spawnSync(plan.command, plan.args.concat(testFiles), { stdio: "inherit" });
+  const result = commandRunner(plan.command, plan.args.concat(testFiles));
   const status = result.status ?? 1;
   const passed = status === 0;
-  const coveragePath = plan.coverageFile;
   const shouldRemapCoverage = passed && coveragePath !== undefined;
   if (shouldRemapCoverage) {
     remapCoverageSources(coveragePath);
   }
 
+  return status;
+}
+
+export function runTests(mode: TestRunMode): number {
+  const plan = buildTestRunPlan(mode);
+  const extension = getTestFileExtension(mode);
+  const status = runTestPlan(plan, extension);
   return status;
 }
 

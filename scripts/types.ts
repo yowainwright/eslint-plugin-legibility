@@ -68,3 +68,12 @@ export interface TestRunPlan {
   coverageFile?: string;
   testDirectory: string;
 }
+
+export interface TestCommandResult {
+  status: number | null;
+}
+
+export type TestCommandRunner = (
+  command: string,
+  args: readonly string[],
+) => TestCommandResult;
