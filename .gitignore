@@ -151,6 +151,7 @@ vite.config.ts.timestamp-*
 .claude/
 CLAUDE.md
 .beads/
+bin/
 dist/
 build/
 .next/

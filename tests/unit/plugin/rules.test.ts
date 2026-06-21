@@ -5,7 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
 
-import manifest from "../package.json" with { type: "json" };
+import manifest from "../../../package.json" with { type: "json" };
 
 const require = createRequire(import.meta.url);
 const plugin = (await import(pathToFileURL(join(process.cwd(), "dist", "index.js")).href))
@@ -158,6 +158,121 @@ test("exports an ESLint and Oxlint compatible plugin shape", () => {
   assert.equal(plugin.configs.recommended.plugins[0], "legibility");
   assert.equal(requiredPlugin, plugin);
   assert.equal(requiredPlugin.meta.name, "legibility");
+});
+
+test("require-filename-matches-dirname reports filename unrelated to parent dir", () => {
+  const { visitor, reports } = createRule("require-filename-matches-dirname", [{ minDepth: 2 }], {
+    filename: "/repo/src/components/foo/useAuth.ts",
+    cwd: "/repo",
+  });
+  visitor.Program({ type: "Program" });
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].messageId, "mismatch");
+});
+
+test("require-filename-matches-dirname reports unknown qualifier", () => {
+  const { visitor, reports } = createRule("require-filename-matches-dirname", [{ minDepth: 2 }], {
+    filename: "/repo/src/components/foo/foo.effect.ts",
+    cwd: "/repo",
+  });
+  visitor.Program({ type: "Program" });
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].messageId, "unknownQualifier");
+});
+
+test("require-filename-matches-dirname allows filename matching dir", () => {
+  const { visitor, reports } = createRule("require-filename-matches-dirname", [{ minDepth: 2 }], {
+    filename: "/repo/src/components/foo/foo.ts",
+    cwd: "/repo",
+  });
+  visitor.Program({ type: "Program" });
+  assert.equal(reports.length, 0);
+});
+
+test("require-filename-matches-dirname allows approved qualifier", () => {
+  const { visitor, reports } = createRule("require-filename-matches-dirname", [{ minDepth: 2 }], {
+    filename: "/repo/src/components/foo/foo.utils.ts",
+    cwd: "/repo",
+  });
+  visitor.Program({ type: "Program" });
+  assert.equal(reports.length, 0);
+});
+
+test("require-filename-matches-dirname allows standalone allowlist filenames", () => {
+  const { visitor, reports } = createRule("require-filename-matches-dirname", [{ minDepth: 2 }], {
+    filename: "/repo/src/components/foo/index.ts",
+    cwd: "/repo",
+  });
+  visitor.Program({ type: "Program" });
+  assert.equal(reports.length, 0);
+});
+
+test("require-filename-matches-dirname exempts files below minDepth", () => {
+  const { visitor, reports } = createRule("require-filename-matches-dirname", [{ minDepth: 3 }], {
+    filename: "/repo/src/hooks/useAuth.ts",
+    cwd: "/repo",
+  });
+  visitor.Program({ type: "Program" });
+  assert.equal(reports.length, 0);
+});
+
+test("require-filename-matches-dirname allows custom qualifier via config", () => {
+  const { visitor, reports } = createRule(
+    "require-filename-matches-dirname",
+    [{ minDepth: 2, allowedQualifiers: ["utils", "types", "effect"] }],
+    { filename: "/repo/src/components/foo/foo.effect.ts", cwd: "/repo" },
+  );
+  visitor.Program({ type: "Program" });
+  assert.equal(reports.length, 0);
+});
+
+test("no-mixed-filename-casing reports hyphen mixed with uppercase", () => {
+  const { visitor, reports } = createRule("no-mixed-filename-casing", [], { filename: "/repo/src/my-File.ts" });
+  visitor.Program({ type: "Program" });
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].messageId, "mixedCasing");
+});
+
+test("no-mixed-filename-casing reports camelCase mixed with hyphens", () => {
+  const { visitor, reports } = createRule("no-mixed-filename-casing", [], { filename: "/repo/src/myFile-helper.ts" });
+  visitor.Program({ type: "Program" });
+  assert.equal(reports.length, 1);
+});
+
+test("no-mixed-filename-casing reports mixed separators", () => {
+  const { visitor, reports } = createRule("no-mixed-filename-casing", [], { filename: "/repo/src/my-file_helper.ts" });
+  visitor.Program({ type: "Program" });
+  assert.equal(reports.length, 1);
+});
+
+test("no-mixed-filename-casing allows kebab-case", () => {
+  const { visitor, reports } = createRule("no-mixed-filename-casing", [], { filename: "/repo/src/my-file.ts" });
+  visitor.Program({ type: "Program" });
+  assert.equal(reports.length, 0);
+});
+
+test("no-mixed-filename-casing allows camelCase", () => {
+  const { visitor, reports } = createRule("no-mixed-filename-casing", [], { filename: "/repo/src/myFile.ts" });
+  visitor.Program({ type: "Program" });
+  assert.equal(reports.length, 0);
+});
+
+test("no-mixed-filename-casing allows PascalCase", () => {
+  const { visitor, reports } = createRule("no-mixed-filename-casing", [], { filename: "/repo/src/MyFile.ts" });
+  visitor.Program({ type: "Program" });
+  assert.equal(reports.length, 0);
+});
+
+test("no-mixed-filename-casing allows snake_case", () => {
+  const { visitor, reports } = createRule("no-mixed-filename-casing", [], { filename: "/repo/src/my_file.ts" });
+  visitor.Program({ type: "Program" });
+  assert.equal(reports.length, 0);
+});
+
+test("no-mixed-filename-casing allows dotfile names", () => {
+  const { visitor, reports } = createRule("no-mixed-filename-casing", [], { filename: "/repo/.eslintrc.js" });
+  visitor.Program({ type: "Program" });
+  assert.equal(reports.length, 0);
 });
 
 test("max-expression-operators reports operator-heavy expressions", () => {

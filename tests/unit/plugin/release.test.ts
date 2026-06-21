@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import manifest from "../package.json" with { type: "json" };
+import manifest from "../../../package.json" with { type: "json" };
 
 type ManifestScripts = Record<string, string>;
 
@@ -28,26 +28,21 @@ const scripts = manifest.scripts as ManifestScripts;
 const releaseIt = manifest["release-it"] as ReleaseItConfig;
 const publishWorkflow = readFileSync(".github/workflows/publish.yml", "utf8");
 
-test("release scripts use release-it directly", () => {
-  assert.equal(scripts.release, "release-it");
-  assert.equal(scripts["release:current"], "release-it --no-increment --ci");
-  assert.equal(scripts["release:current:dry"], "release-it --no-increment --dry-run --ci");
-  assert.equal(scripts["release:patch"], "release-it patch --ci");
-  assert.equal(scripts["release:patch:dry"], "release-it patch --dry-run --ci");
-  assert.equal(scripts["release:minor"], "release-it minor --ci");
-  assert.equal(scripts["release:minor:dry"], "release-it minor --dry-run --ci");
-  assert.equal(scripts["release:major"], "release-it major --ci");
-  assert.equal(scripts["release:major:dry"], "release-it major --dry-run --ci");
-  assert.equal(scripts["release:beta"], "release-it --preRelease=beta --ci");
-  assert.equal(scripts["release:beta:dry"], "release-it --preRelease=beta --dry-run --ci");
-  assert.equal(scripts["release:alpha"], "release-it --preRelease=alpha --ci");
-  assert.equal(scripts["release:alpha:dry"], "release-it --preRelease=alpha --dry-run --ci");
-  assert.equal(scripts["release:dry"], "release-it --dry-run --ci");
-
-  const customReleaseScripts = Object.entries(scripts).filter(
-    ([name, command]) => name.startsWith("release") && command.includes("scripts/"),
-  );
-  assert.deepEqual(customReleaseScripts, []);
+test("release scripts use the publish confirmation wrapper", () => {
+  assert.equal(scripts.release, "jiti scripts/release.ts");
+  assert.equal(scripts["release:current"], "jiti scripts/release.ts --current");
+  assert.equal(scripts["release:current:dry"], "jiti scripts/release.ts --current --dry-run");
+  assert.equal(scripts["release:patch"], "jiti scripts/release.ts patch");
+  assert.equal(scripts["release:patch:dry"], "jiti scripts/release.ts patch --dry-run");
+  assert.equal(scripts["release:minor"], "jiti scripts/release.ts minor");
+  assert.equal(scripts["release:minor:dry"], "jiti scripts/release.ts minor --dry-run");
+  assert.equal(scripts["release:major"], "jiti scripts/release.ts major");
+  assert.equal(scripts["release:major:dry"], "jiti scripts/release.ts major --dry-run");
+  assert.equal(scripts["release:beta"], "jiti scripts/release.ts --preRelease=beta");
+  assert.equal(scripts["release:beta:dry"], "jiti scripts/release.ts --preRelease=beta --dry-run");
+  assert.equal(scripts["release:alpha"], "jiti scripts/release.ts --preRelease=alpha");
+  assert.equal(scripts["release:alpha:dry"], "jiti scripts/release.ts --preRelease=alpha --dry-run");
+  assert.equal(scripts["release:dry"], "jiti scripts/release.ts patch --dry-run");
 });
 
 test("release-it creates git releases while GitHub Actions publishes npm", () => {

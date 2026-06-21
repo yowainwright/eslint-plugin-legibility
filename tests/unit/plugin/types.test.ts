@@ -8,7 +8,7 @@ import type {
   RuleOptions,
   RuleReport,
   RuleSchema,
-} from "../src/types.ts";
+} from "../../../src/types.ts";
 
 const literalNode = {
   __text: '"ready"',

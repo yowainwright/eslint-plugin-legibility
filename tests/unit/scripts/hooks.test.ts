@@ -14,7 +14,7 @@ import {
   managedHookMarker,
   planHookInstall,
   shouldRefreshDependencies,
-} from "../scripts/install-hooks.ts";
+} from "../../../scripts/install-hooks.ts";
 
 function createTempRepository(): string {
   const directory = mkdtempSync(join(tmpdir(), "legibility-hooks-"));
