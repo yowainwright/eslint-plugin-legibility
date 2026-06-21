@@ -91,7 +91,7 @@
     "eslint": "^9.0.0",
     "jiti": "^2.7.0",
     "oxlint": "^1.0.0",
-    "release-it": "20.1.0",
+    "release-it": "20.2.0",
     "type-coverage": "^2.29.7",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.60.1"
