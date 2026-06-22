@@ -3,8 +3,34 @@ updates:
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+      time: "09:00"
+      timezone: "America/Los_Angeles"
+    open-pull-requests-limit: 1
+    groups:
+      npm-security-updates:
+        applies-to: "security-updates"
+        patterns:
+          - "*"
+      npm-dev-tooling:
+        applies-to: "version-updates"
+        dependency-type: "development"
+        patterns:
+          - "*"
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+      time: "09:30"
+      timezone: "America/Los_Angeles"
+    open-pull-requests-limit: 1
+    groups:
+      github-actions-security-updates:
+        applies-to: "security-updates"
+        patterns:
+          - "*"
+      github-actions-tooling:
+        applies-to: "version-updates"
+        patterns:
+          - "*"

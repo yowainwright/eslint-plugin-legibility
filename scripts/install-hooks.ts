@@ -52,7 +52,7 @@ export function createPreCommitHook(): string {
 
 set -eu
 
-pnpm validate
+pnpm_config_verify_deps_before_run=false pnpm validate
 `;
 }
 
@@ -67,7 +67,7 @@ changed_files="$(git diff-tree -r --name-only --no-commit-id ORIG_HEAD HEAD || t
 case "$changed_files" in
   *package.json*|*pnpm-lock.yaml*)
     echo "Dependencies changed; running pnpm install --frozen-lockfile"
-    pnpm install --frozen-lockfile
+    CI=true pnpm install --frozen-lockfile
     ;;
 esac
 `;

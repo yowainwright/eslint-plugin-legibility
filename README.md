@@ -737,6 +737,23 @@ Use `max` and `min` to tune rule sensitivity.
 - npm publishing uses GitHub Actions trusted publishing with provenance.
 - CI runs validation on Node 20, 22, 24, and 26, plus the test suite on Bun.
 - Bun installs are configured to use Socket.dev's security scanner.
+- Dependabot version updates are monthly, grouped by ecosystem, and capped at one
+  open PR per ecosystem.
+- Pastoralist runs OSV-backed dependency security checks in CI and can generate
+  pnpm overrides for patched transitive dependencies.
+- Codependence is configured for minor-line dependency maintenance so dependency
+  refreshes can happen in a single deliberate update instead of one PR per
+  package.
+
+Dependency maintenance commands:
+
+```sh
+pnpm deps:policy
+pnpm deps:update
+pnpm deps:security
+pnpm deps:security:fix
+pnpm deps:overrides
+```
 
 ## GitHub Secrets
 

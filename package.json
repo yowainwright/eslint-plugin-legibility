@@ -81,6 +81,11 @@
     "test:compat": "pnpm build && jiti scripts/run-tests.ts node-js",
     "validate": "pnpm typecheck && pnpm typecheck:strict && pnpm type-coverage && pnpm test && pnpm lint && pnpm lint:oxlint && pnpm pack:check",
     "validate:compat": "pnpm typecheck && pnpm typecheck:strict && pnpm type-coverage && pnpm test:compat && pnpm lint && pnpm lint:oxlint && pnpm pack:check",
+    "deps:policy": "codependence --dryRun --level minor",
+    "deps:update": "codependence --update --level minor",
+    "deps:overrides": "pastoralist --remove-unused --summary",
+    "deps:security": "pastoralist --checkSecurity --securityProvider osv --hasWorkspaceSecurityChecks --summary --strict",
+    "deps:security:fix": "pastoralist --checkSecurity --securityProvider osv --hasWorkspaceSecurityChecks --forceSecurityRefactor --summary",
     "typecheck:strict": "tsc -p tsconfig.build.json --noEmit --strict --noImplicitAny --noUncheckedIndexedAccess",
     "type-coverage": "type-coverage --strict --at-least 99.5 -- src/index.ts src/constants.ts src/types.ts"
   },
@@ -88,13 +93,44 @@
     "@eslint/js": "^9.0.0",
     "@socketsecurity/bun-security-scanner": "^1.1.2",
     "@types/node": "^25.9.1",
+    "codependence": "^1.0.0",
     "eslint": "^9.0.0",
     "jiti": "^2.7.0",
-    "oxlint": "^1.0.0",
-    "release-it": "20.1.0",
+    "oxlint": "^1.70.0",
+    "pastoralist": "^1.12.5",
+    "release-it": "20.2.0",
     "type-coverage": "^2.29.7",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.60.1"
+    "typescript-eslint": "^8.61.1"
+  },
+  "codependence": {
+    "files": [
+      "package.json"
+    ],
+    "codependencies": [
+      "@eslint/js",
+      "@socketsecurity/bun-security-scanner",
+      "@types/node",
+      "codependence",
+      "eslint",
+      "jiti",
+      "oxlint",
+      "pastoralist",
+      "release-it",
+      "type-coverage",
+      "typescript",
+      "typescript-eslint"
+    ]
+  },
+  "pastoralist": {
+    "depPaths": [
+      "package.json"
+    ],
+    "security": {
+      "provider": "osv",
+      "severityThreshold": "medium",
+      "hasWorkspaceSecurityChecks": true
+    }
   },
   "publishConfig": {
     "access": "public"
