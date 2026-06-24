@@ -4,7 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { TestCommandRunner, TestRunMode, TestRunPlan } from "./types.ts";
 
-const testRunModes = new Set<TestRunMode>(["bun-ts", "coverage", "node-js", "node-ts"]);
+const testRunModes = new Set<TestRunMode>(["bun-ts", "coverage", "deno-ts", "node-js", "node-ts"]);
 const coverageFile = "coverage/lcov.info";
 const runTestCommand: TestCommandRunner = (command, args) =>
   spawnSync(command, Array.from(args), { stdio: "inherit" });
@@ -41,6 +41,14 @@ export function listTestFiles(directory: string, extension: string): string[] {
 export function buildTestRunPlan(mode: TestRunMode): TestRunPlan {
   if (mode === "bun-ts") {
     return { command: "bun", args: ["test"], testDirectory: "tests/unit" };
+  }
+
+  if (mode === "deno-ts") {
+    return {
+      command: "deno",
+      args: ["test", "--no-config", "--no-check", "--no-remote"],
+      testDirectory: "tests/compat",
+    };
   }
 
   if (mode === "node-js") {

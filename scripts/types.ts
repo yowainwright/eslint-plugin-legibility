@@ -60,7 +60,7 @@ export interface ReleasePlan {
   version: string;
 }
 
-export type TestRunMode = "bun-ts" | "coverage" | "node-js" | "node-ts";
+export type TestRunMode = "bun-ts" | "coverage" | "deno-ts" | "node-js" | "node-ts";
 
 export interface TestRunPlan {
   command: string;

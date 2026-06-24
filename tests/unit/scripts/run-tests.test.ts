@@ -27,6 +27,7 @@ test("parses known test run modes", () => {
   assert.equal(isTestRunMode("node-js"), true);
   assert.equal(isTestRunMode("coverage"), true);
   assert.equal(isTestRunMode("bun-ts"), true);
+  assert.equal(isTestRunMode("deno-ts"), true);
   assert.equal(isTestRunMode("unknown"), false);
   assert.equal(parseTestRunMode(["coverage"]), "coverage");
   assert.throws(() => parseTestRunMode([]), /Invalid test run mode/);
@@ -36,6 +37,7 @@ test("builds test run plans for each runtime", () => {
   const nodeTsPlan = buildTestRunPlan("node-ts");
   const nodeJsPlan = buildTestRunPlan("node-js");
   const bunPlan = buildTestRunPlan("bun-ts");
+  const denoPlan = buildTestRunPlan("deno-ts");
   const coveragePlan = buildTestRunPlan("coverage");
 
   assert.equal(nodeTsPlan.command, process.execPath);
@@ -44,6 +46,9 @@ test("builds test run plans for each runtime", () => {
   assert.equal(nodeJsPlan.testDirectory, ".build/tests/unit");
   assert.equal(bunPlan.command, "bun");
   assert.deepEqual(bunPlan.args, ["test"]);
+  assert.equal(denoPlan.command, "deno");
+  assert.deepEqual(denoPlan.args, ["test", "--no-config", "--no-check", "--no-remote"]);
+  assert.equal(denoPlan.testDirectory, "tests/compat");
   assert.equal(coveragePlan.testDirectory, ".build/tests/unit");
   assert.equal(coveragePlan.coverageFile, "coverage/lcov.info");
 });
@@ -51,6 +56,7 @@ test("builds test run plans for each runtime", () => {
 test("selects extensions for source and compiled tests", () => {
   assert.equal(getTestFileExtension("node-ts"), ".test.ts");
   assert.equal(getTestFileExtension("bun-ts"), ".test.ts");
+  assert.equal(getTestFileExtension("deno-ts"), ".test.ts");
   assert.equal(getTestFileExtension("node-js"), ".test.js");
   assert.equal(getTestFileExtension("coverage"), ".test.js");
 });

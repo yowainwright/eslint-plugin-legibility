@@ -26,6 +26,7 @@ interface ReleaseItConfig {
 
 const scripts = manifest.scripts as ManifestScripts;
 const releaseIt = manifest["release-it"] as ReleaseItConfig;
+const ciWorkflow = readFileSync(".github/workflows/ci.yml", "utf8");
 const publishWorkflow = readFileSync(".github/workflows/publish.yml", "utf8");
 
 test("release scripts use the publish confirmation wrapper", () => {
@@ -70,4 +71,12 @@ test("publish workflow uses npm trusted publishing", () => {
   );
   assert.doesNotMatch(publishWorkflow, /environment: npm-publish/);
   assert.doesNotMatch(publishWorkflow, /secrets\.(NODE_AUTH_TOKEN|NPM_TOKEN)/);
+});
+
+test("ci workflow runs Bun and Deno compatibility suites", () => {
+  assert.match(ciWorkflow, /name: bun/);
+  assert.match(ciWorkflow, /pnpm test:bun/);
+  assert.match(ciWorkflow, /name: deno/);
+  assert.match(ciWorkflow, /denoland\/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282/);
+  assert.match(ciWorkflow, /pnpm test:deno/);
 });
