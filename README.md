@@ -148,6 +148,7 @@ Legacy ESLint config with every rule enabled as an error.
 
 Rules marked `recommended + strict` are enabled by `recommended` as `warn` and by `strict` as `error`. Rules marked `strict only` are enabled by `strict` as `error` and can be enabled directly at any severity.
 
+<!-- rule presets and option summaries from src/constants.ts -->
 | Rule | Preset configuration | Options |
 | --- | --- | --- |
 | [legibility/hoist-if-operators](#hoist-if-operators) | recommended + strict | `{max: 0, operators: ["&&", "\|\|", "??", "?:"], complexity}` |
@@ -173,7 +174,7 @@ Rules marked `recommended + strict` are enabled by `recommended` as `warn` and b
 | [legibility/prefer-guard-clauses](#prefer-guard-clauses) | recommended + strict | none |
 | [legibility/prefer-object-lookup](#prefer-object-lookup) | recommended + strict | `{min: 3, operators: ["==", "==="]}` |
 | [legibility/prefer-positive-condition-names](#prefer-positive-condition-names) | strict only | `{booleanOperators}` |
-| [legibility/require-executable-shebang](#require-executable-shebang) | recommended + strict | `{files, runtimes: ["bun", "node"]}` |
+| [legibility/require-executable-shebang](#require-executable-shebang) | recommended + strict | `{files, runtimes: ["bun", "deno", "node"]}` |
 
 ---
 
@@ -669,12 +670,13 @@ Prefer positive boolean names over names like `isNotReady`.
 
 ### `legibility/require-executable-shebang({options})`
 
-Require configured CLI entry source files to include a Node or Bun shebang.
+<!-- require-executable-shebang runtime defaults from src/constants.ts -->
+Require configured CLI entry source files to include a Node, Bun, or Deno shebang.
 
 #### options
 
 - `{files: string[]}`: source files expected to be executable entries.
-- `{runtimes: string[]}`: accepted shebang runtimes. Default: `["bun", "node"]`.
+- `{runtimes: string[]}`: accepted shebang runtimes. Default: `["bun", "deno", "node"]`.
 
 #### do / don't
 
@@ -735,7 +737,8 @@ Use `max` and `min` to tune rule sensitivity.
 - Published package contents are allowlisted with `files`.
 - Releases are tag-triggered and publish GitHub release assets.
 - npm publishing uses GitHub Actions trusted publishing with provenance.
-- CI runs validation on Node 20, 22, 24, and 26, plus the test suite on Bun.
+<!-- runtime compatibility coverage from .github/workflows/ci.yml -->
+- CI runs validation on Node 20, 22, 24, and 26, plus compatibility suites on Bun and Deno.
 - Bun installs are configured to use Socket.dev's security scanner.
 
 ## GitHub Secrets

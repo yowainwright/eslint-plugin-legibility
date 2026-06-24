@@ -208,7 +208,7 @@ export const DEFAULT_EXECUTABLE_ENTRY_PATTERNS = [
   "src/cli/index.ts",
 ];
 
-export const DEFAULT_EXECUTABLE_RUNTIMES = ["bun", "node"];
+export const DEFAULT_EXECUTABLE_RUNTIMES = ["bun", "deno", "node"];
 
 export const DEFAULT_DIRECT_BIN_ENTRY_PATTERNS = [
   "app/*/index.js",
@@ -448,7 +448,7 @@ export const REQUIRE_EXECUTABLE_SHEBANG_META = defineMeta("require-executable-sh
   ],
   messages: {
     missingShebang:
-      "{{file}} is configured as an executable entry source but has no Node/Bun shebang.",
+      "{{file}} is configured as an executable entry source but has no Node/Bun/Deno shebang.",
   },
 });
 

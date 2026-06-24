@@ -399,6 +399,19 @@ test("require-executable-shebang reports configured executable sources without s
   assert.equal(reports[0].messageId, "missingShebang");
 });
 
+test("require-executable-shebang accepts Deno shebangs by default", () => {
+  const { visitor, reports } = createRule("require-executable-shebang", [], {
+    sourceCode: {
+      text: "#!/usr/bin/env deno run --allow-read\nconsole.log('ok');\n",
+      getText: () => "",
+    },
+  });
+
+  visitor.Program({ type: "Program" });
+
+  assert.equal(reports.length, 0);
+});
+
 test("no-direct-node-bin-smoke reports direct node smoke tests", () => {
   const { visitor, reports } = createRule("no-direct-node-bin-smoke");
   const execSync = call(id("execSync"), [literal("node src/index.js --help")]);
