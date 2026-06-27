@@ -412,9 +412,32 @@ test("require-executable-shebang accepts Deno shebangs by default", () => {
   assert.equal(reports.length, 0);
 });
 
+test("require-executable-shebang matches configured wildcard paths", () => {
+  const { visitor, reports } = createRule(
+    "require-executable-shebang",
+    [{ files: ["packages/*/src/index.ts"] }],
+    { filename: "/repo/packages/cli/src/index.ts", cwd: "/repo" },
+  );
+
+  visitor.Program({ type: "Program" });
+
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].messageId, "missingShebang");
+});
+
 test("no-direct-node-bin-smoke reports direct node smoke tests", () => {
   const { visitor, reports } = createRule("no-direct-node-bin-smoke");
   const execSync = call(id("execSync"), [literal("node src/index.js --help")]);
+
+  visitor.CallExpression(execSync);
+
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].messageId, "directNodeBin");
+});
+
+test("no-direct-node-bin-smoke matches nested wildcard bin paths", () => {
+  const { visitor, reports } = createRule("no-direct-node-bin-smoke");
+  const execSync = call(id("execSync"), [literal("node packages/cli/dist/index.js --help")]);
 
   visitor.CallExpression(execSync);
 

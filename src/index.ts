@@ -665,25 +665,75 @@ function getRelativeFilename(context: RuleContext): string {
   return relativeFilename;
 }
 
-function escapeRegex(value: string): string {
-  const escapedValue = value.replace(/[|\\{}()[\]^$+*?.]/g, "\\$&");
-  return escapedValue;
+function splitPathSegments(path: string): string[] {
+  const segments = path.split("/").filter(Boolean);
+  return segments;
 }
 
-function patternToRegex(pattern: string): RegExp {
-  const normalized = normalizePath(pattern);
-  const source = escapeRegex(normalized)
-    .replace(/\\\*\\\*/g, ".*")
-    .replace(/\\\*/g, "[^/]*");
-  const regex = new RegExp(`(^|/)${source}$`);
-  return regex;
+function matchesWildcardSegment(segment: string, pattern: string): boolean {
+  const parts = pattern.split("*");
+  const hasWildcard = parts.length > 1;
+  if (!hasWildcard) return segment === pattern;
+
+  const startsWithWildcard = pattern.startsWith("*");
+  const endsWithWildcard = pattern.endsWith("*");
+  const firstPart = parts[0] ?? "";
+  const lastPart = parts.at(-1) ?? "";
+  const hasValidStart = startsWithWildcard || segment.startsWith(firstPart);
+  const hasValidEnd = endsWithWildcard || segment.endsWith(lastPart);
+  const hasValidBounds = hasValidStart && hasValidEnd;
+  const hasInvalidBounds = !hasValidBounds;
+  if (hasInvalidBounds) return false;
+
+  return matchesWildcardParts(segment, parts);
+}
+
+function matchesWildcardParts(segment: string, parts: readonly string[]): boolean {
+  const positions = parts.reduce(
+    (position, part) => {
+      if (position < 0) return -1;
+      if (!part) return position;
+
+      const nextPosition = segment.indexOf(part, position);
+      const isMissingPart = nextPosition < 0;
+      if (isMissingPart) return -1;
+
+      const afterPart = nextPosition + part.length;
+      return afterPart;
+    },
+    0,
+  );
+  return positions >= 0;
+}
+
+function matchesPathSegments(pathSegments: readonly string[], patternSegments: readonly string[]): boolean {
+  const [patternSegment, ...remainingPatterns] = patternSegments;
+  if (patternSegment === undefined) return pathSegments.length === 0;
+
+  if (patternSegment === "**") {
+    const startIndexes = Array.from({ length: pathSegments.length + 1 }, (_, index) => index);
+    return startIndexes.some((index) => matchesPathSegments(pathSegments.slice(index), remainingPatterns));
+  }
+
+  const [pathSegment, ...remainingPath] = pathSegments;
+  if (pathSegment === undefined) return false;
+  if (!matchesWildcardSegment(pathSegment, patternSegment)) return false;
+
+  return matchesPathSegments(remainingPath, remainingPatterns);
+}
+
+function matchesWildcardPath(path: string, pattern: string): boolean {
+  const pathSegments = splitPathSegments(path);
+  const patternSegments = splitPathSegments(pattern);
+  const startIndexes = Array.from({ length: pathSegments.length + 1 }, (_, index) => index);
+  return startIndexes.some((index) => matchesPathSegments(pathSegments.slice(index), patternSegments));
 }
 
 function matchesPathPattern(path: string, pattern: string): boolean {
   const normalizedPath = normalizePath(path);
   const normalizedPattern = normalizePath(pattern);
   const hasWildcard = normalizedPattern.includes("*");
-  if (hasWildcard) return patternToRegex(normalizedPattern).test(normalizedPath);
+  if (hasWildcard) return matchesWildcardPath(normalizedPath, normalizedPattern);
 
   const isExactMatch = normalizedPath === normalizedPattern;
   const isNestedMatch = normalizedPath.endsWith(`/${normalizedPattern}`);
