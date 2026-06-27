@@ -8,6 +8,7 @@ export default [
   {
     ignores: [
       ".build/**",
+      "bin/**",
       "coverage/**",
       "dist/**",
       "node_modules/**",
@@ -18,7 +19,7 @@ export default [
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ["bin/**/*.js", "scripts/**/*.ts", "src/**/*.ts"],
+    files: ["scripts/**/*.ts", "src/**/*.ts"],
     languageOptions: {
       globals: { process: "readonly" },
     },
@@ -26,7 +27,7 @@ export default [
     rules: Object.assign({}, strictLegibilityConfig.rules, {
       "legibility/require-executable-shebang": [
         "error",
-        { files: ["bin/lint-changed.js", "scripts/lint-changed.node.ts"] },
+        { files: ["scripts/lint-changed.node.ts"] },
       ],
     }),
   },
