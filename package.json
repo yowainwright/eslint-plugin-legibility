@@ -35,12 +35,14 @@
     "./package.json": "./package.json"
   },
   "bin": {
+    "eslint-plugin-legibility-install-skill": "./bin/agent/install.js",
     "lint-changed": "./bin/lint-changed.js"
   },
   "files": [
     "agents",
     "bin",
     "dist",
+    "skills",
     "LICENSE",
     "README.md"
   ],
@@ -50,8 +52,9 @@
   },
   "packageManager": "pnpm@10.12.1",
   "scripts": {
-    "build": "pnpm build:plugin && pnpm build:bin",
-    "build:bin": "pnpm build:runtime && mkdir -p bin && cp .build/scripts/lint-changed.node.js bin/lint-changed.js && chmod +x bin/lint-changed.js",
+    "build": "pnpm build:agent && pnpm build:plugin && pnpm build:bin",
+    "build:agent": "jiti scripts/agent/build.ts",
+    "build:bin": "pnpm build:runtime && jiti scripts/build-bin.ts",
     "build:plugin": "tsc -p tsconfig.build.json",
     "build:runtime": "tsc -p tsconfig.json --noEmit false --declaration false --outDir .build --rootDir .",
     "typecheck": "pnpm build:plugin && tsc -p tsconfig.json",
@@ -59,7 +62,7 @@
     "lint:oxlint": "oxlint .",
     "pack:check": "pnpm build:plugin && pnpm pack --json --pack-destination ./.npm-cache",
     "prepare": "sh scripts/prepare.sh",
-    "prepack": "pnpm build:plugin && pnpm build:bin",
+    "prepack": "pnpm build",
     "install-hooks": "jiti scripts/install-hooks.ts",
     "release": "jiti scripts/release.ts",
     "release:current": "jiti scripts/release.ts --current",

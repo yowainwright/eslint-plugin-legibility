@@ -95,6 +95,23 @@ Oxlint JavaScript plugins use the same ESLint-compatible rule API.
 }
 ```
 
+### Agent Skill
+
+<!-- agent skill install command from package.json bin and scripts/agent/constants.ts -->
+
+Install the packaged agent skill after installing the npm package:
+
+```sh
+npx eslint-plugin-legibility-install-skill
+```
+
+Install for a specific agent target:
+
+```sh
+npx eslint-plugin-legibility-install-skill --target codex
+npx eslint-plugin-legibility-install-skill --target claude
+```
+
 ---
 
 ## Configs

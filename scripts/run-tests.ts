@@ -40,19 +40,23 @@ export function listTestFiles(directory: string, extension: string): string[] {
 
 export function buildTestRunPlan(mode: TestRunMode): TestRunPlan {
   if (mode === "bun-ts") {
-    return { command: "bun", args: ["test"], testDirectory: "tests/unit" };
+    return { command: "bun", args: ["test"], testDirectories: ["tests/unit", "tests/scripts"] };
   }
 
   if (mode === "deno-ts") {
     return {
       command: "deno",
       args: ["test", "--no-config", "--no-check", "--no-remote"],
-      testDirectory: "tests/compat",
+      testDirectories: ["tests/compat"],
     };
   }
 
   if (mode === "node-js") {
-    return { command: process.execPath, args: ["--test"], testDirectory: ".build/tests/unit" };
+    return {
+      command: process.execPath,
+      args: ["--test"],
+      testDirectories: [".build/tests/unit", ".build/tests/scripts"],
+    };
   }
 
   if (mode === "coverage") {
@@ -65,11 +69,15 @@ export function buildTestRunPlan(mode: TestRunMode): TestRunPlan {
         `--test-reporter-destination=${coverageFile}`,
       ],
       coverageFile,
-      testDirectory: ".build/tests/unit",
+      testDirectories: [".build/tests/unit", ".build/tests/scripts"],
     };
   }
 
-  return { command: process.execPath, args: ["--test"], testDirectory: "tests/unit" };
+  return {
+    command: process.execPath,
+    args: ["--test"],
+    testDirectories: ["tests/unit", "tests/scripts"],
+  };
 }
 
 export function remapCoverageSources(path: string): void {
@@ -91,9 +99,9 @@ export function runTestPlan(
   extension: ".test.js" | ".test.ts",
   commandRunner: TestCommandRunner = runTestCommand,
 ): number {
-  const testFiles = listTestFiles(plan.testDirectory, extension);
+  const testFiles = plan.testDirectories.flatMap((directory) => listTestFiles(directory, extension));
   if (testFiles.length === 0) {
-    throw new Error(`No ${extension} files found in ${plan.testDirectory}`);
+    throw new Error(`No ${extension} files found in ${plan.testDirectories.join(", ")}`);
   }
 
   const coveragePath = plan.coverageFile;

@@ -42,14 +42,14 @@ test("builds test run plans for each runtime", () => {
 
   assert.equal(nodeTsPlan.command, process.execPath);
   assert.deepEqual(nodeTsPlan.args, ["--test"]);
-  assert.equal(nodeTsPlan.testDirectory, "tests/unit");
-  assert.equal(nodeJsPlan.testDirectory, ".build/tests/unit");
+  assert.deepEqual(nodeTsPlan.testDirectories, ["tests/unit", "tests/scripts"]);
+  assert.deepEqual(nodeJsPlan.testDirectories, [".build/tests/unit", ".build/tests/scripts"]);
   assert.equal(bunPlan.command, "bun");
   assert.deepEqual(bunPlan.args, ["test"]);
   assert.equal(denoPlan.command, "deno");
   assert.deepEqual(denoPlan.args, ["test", "--no-config", "--no-check", "--no-remote"]);
-  assert.equal(denoPlan.testDirectory, "tests/compat");
-  assert.equal(coveragePlan.testDirectory, ".build/tests/unit");
+  assert.deepEqual(denoPlan.testDirectories, ["tests/compat"]);
+  assert.deepEqual(coveragePlan.testDirectories, [".build/tests/unit", ".build/tests/scripts"]);
   assert.equal(coveragePlan.coverageFile, "coverage/lcov.info");
 });
 
@@ -124,7 +124,7 @@ test("runs a test plan with sorted files and remaps passing coverage", () => {
     args: ["--test"],
     command: "node",
     coverageFile: coveragePath,
-    testDirectory,
+    testDirectories: [testDirectory],
   };
 
   try {
@@ -150,7 +150,7 @@ test("fails when a test plan has no matching files", () => {
   const plan: TestRunPlan = {
     args: ["--test"],
     command: "node",
-    testDirectory: directory,
+    testDirectories: [directory],
   };
 
   try {

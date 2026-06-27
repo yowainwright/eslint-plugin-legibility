@@ -66,7 +66,7 @@ export interface TestRunPlan {
   command: string;
   args: string[];
   coverageFile?: string;
-  testDirectory: string;
+  testDirectories: string[];
 }
 
 export interface TestCommandResult {
