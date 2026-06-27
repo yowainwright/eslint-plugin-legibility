@@ -425,6 +425,56 @@ test("require-executable-shebang matches configured wildcard paths", () => {
   assert.equal(reports[0].messageId, "missingShebang");
 });
 
+test("require-executable-shebang accepts bounded wildcard path segments", () => {
+  const { visitor, reports } = createRule(
+    "require-executable-shebang",
+    [{ files: ["packages/cli-*/src/index.ts"] }],
+    { filename: "/repo/packages/cli-tool/src/index.ts", cwd: "/repo" },
+  );
+
+  visitor.Program({ type: "Program" });
+
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].messageId, "missingShebang");
+});
+
+test("require-executable-shebang ignores wildcard path segment mismatches", () => {
+  const { visitor, reports } = createRule(
+    "require-executable-shebang",
+    [{ files: ["packages/cli-*/src/index.ts"] }],
+    { filename: "/repo/packages/web/src/index.ts", cwd: "/repo" },
+  );
+
+  visitor.Program({ type: "Program" });
+
+  assert.equal(reports.length, 0);
+});
+
+test("require-executable-shebang matches recursive wildcard paths", () => {
+  const { visitor, reports } = createRule(
+    "require-executable-shebang",
+    [{ files: ["packages/**/src/index.ts"] }],
+    { filename: "/repo/packages/tools/cli/src/index.ts", cwd: "/repo" },
+  );
+
+  visitor.Program({ type: "Program" });
+
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].messageId, "missingShebang");
+});
+
+test("require-executable-shebang ignores wildcard patterns longer than the path", () => {
+  const { visitor, reports } = createRule(
+    "require-executable-shebang",
+    [{ files: ["packages/*/src/index.ts"] }],
+    { filename: "/repo/packages/src/index.ts", cwd: "/repo" },
+  );
+
+  visitor.Program({ type: "Program" });
+
+  assert.equal(reports.length, 0);
+});
+
 test("no-direct-node-bin-smoke reports direct node smoke tests", () => {
   const { visitor, reports } = createRule("no-direct-node-bin-smoke");
   const execSync = call(id("execSync"), [literal("node src/index.js --help")]);
