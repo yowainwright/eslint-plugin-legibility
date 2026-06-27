@@ -10,25 +10,27 @@ const lintChangedDestination = join(binRoot, "lint-changed.js");
 export function buildBin(): void {
   mkdirSync(agentBinRoot, { recursive: true });
   copyFileSync(lintChangedSource, lintChangedDestination);
-  copyAgentScripts();
-  makeExecutable(lintChangedDestination);
-  makeExecutable(join(agentBinRoot, "build.js"));
-  makeExecutable(join(agentBinRoot, "install.js"));
+  const agentScriptPaths = copyAgentScripts();
+  const executablePaths = [lintChangedDestination].concat(agentScriptPaths);
+
+  executablePaths.forEach(makeExecutable);
 }
 
-function copyAgentScripts(): void {
+function copyAgentScripts(): string[] {
   const files = readdirSync(compiledAgentRoot);
-  files.filter(isJavaScriptFile).forEach(copyAgentScript);
+  const javaScriptFiles = files.filter(isJavaScriptFile);
+  return javaScriptFiles.map(copyAgentScript);
 }
 
 function isJavaScriptFile(file: string): boolean {
   return file.endsWith(".js");
 }
 
-function copyAgentScript(file: string): void {
+function copyAgentScript(file: string): string {
   const source = join(compiledAgentRoot, file);
   const destination = join(agentBinRoot, file);
   copyFileSync(source, destination);
+  return destination;
 }
 
 function makeExecutable(path: string): void {

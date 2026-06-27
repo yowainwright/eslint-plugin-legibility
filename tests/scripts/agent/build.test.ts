@@ -28,6 +28,8 @@ test("parses build targets", () => {
   assert.deepEqual(parseBuildTargets(["--target", "codex,claude"], {}), ["codex", "claude"]);
   assert.deepEqual(parseBuildTargets(["--target=all"], {}), ["package", "agents", "codex", "claude"]);
   assert.deepEqual(parseBuildTargets(["--target=auto"], { CODEX_HOME: "/tmp/codex" }), ["codex"]);
+  assert.deepEqual(parseBuildTargets(["codex"], {}), ["package"]);
+  assert.deepEqual(parseBuildTargets(["--target=auto"], { CODEX_HOME: "" }), ["package"]);
   assert.throws(() => parseBuildTargets(["--target=unknown"], {}), /Unknown agent build target/);
 });
 

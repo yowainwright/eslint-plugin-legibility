@@ -67,7 +67,7 @@ export function parseBuildTargets(args: readonly string[], env: NodeJS.ProcessEn
 }
 
 export function detectBuildTarget(env: NodeJS.ProcessEnv): AgentBuildTarget | null {
-  const isCodexEnvironment = env.CODEX_HOME !== undefined;
+  const isCodexEnvironment = Boolean(env.CODEX_HOME);
   if (isCodexEnvironment) return codexBuildTarget;
 
   const isClaudeEnvironment = Boolean(env.CLAUDECODE || env.CLAUDE_CODE);
@@ -125,6 +125,9 @@ function getTargetArg(args: readonly string[]): string | undefined {
   if (hasEqualsArg) return equalsArg.slice("--target=".length);
 
   const index = args.indexOf("--target");
+  const isTargetArgMissing = index === -1;
+  if (isTargetArgMissing) return undefined;
+
   const value = args[index + 1];
   const isMissingValue = !value;
   if (isMissingValue) return undefined;

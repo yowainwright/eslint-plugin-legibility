@@ -89,6 +89,9 @@ function getArgValue(args: readonly string[], name: string): string | undefined 
   if (hasEqualsArg) return equalsArg.slice(equalsPrefix.length);
 
   const index = args.indexOf(name);
+  const isArgMissing = index === -1;
+  if (isArgMissing) return undefined;
+
   const value = args[index + 1];
   const isMissingValue = !value;
   if (isMissingValue) return undefined;

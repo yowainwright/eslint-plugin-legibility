@@ -17,10 +17,13 @@ function createTempDirectory(): string {
 
 test("parses install options", () => {
   const options = parseInstallOptions(["--target=codex", "--path", "/tmp/skills", "--force"]);
+  const positionalOptions = parseInstallOptions(["codex", "/tmp/skills"]);
 
   assert.equal(options.target, "codex");
   assert.equal(options.path, "/tmp/skills");
   assert.equal(options.force, true);
+  assert.equal(positionalOptions.target, undefined);
+  assert.equal(positionalOptions.path, undefined);
 });
 
 test("resolves default install roots", () => {

@@ -153,6 +153,5 @@ CLAUDE.md
 .beads/
 bin/
 dist/
-skills/
 build/
 .next/
