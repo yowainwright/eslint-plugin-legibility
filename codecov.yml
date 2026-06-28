@@ -6,7 +6,7 @@ coverage:
         threshold: 1%
     patch:
       default:
-        target: auto
+        target: 60%
         threshold: 1%
   ignore:
     - "src/types.ts"
