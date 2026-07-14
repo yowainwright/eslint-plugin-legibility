@@ -172,6 +172,7 @@ Rules marked `recommended + strict` are enabled by `recommended` as `warn` and b
 | [legibility/max-array-chain-depth](#max-array-chain-depth) | recommended + strict | `{max: 2, iterationMethods}` |
 | [legibility/max-control-flow-depth](#max-control-flow-depth) | recommended + strict | `{max: 3}` |
 | [legibility/max-expression-operators](#max-expression-operators) | recommended + strict | `{max: 4, operators, complexity}` |
+| [legibility/no-automated-comment-attribution](#no-automated-comment-attribution) | recommended + strict | `{identifiers}` |
 | [legibility/no-complex-ternaries](#no-complex-ternaries) | recommended + strict | `{max: 2, operators, complexity}` |
 | [legibility/no-computed-values](#no-computed-values) | recommended + strict | `{max: 1, operators, complexity}` |
 | [legibility/no-direct-node-bin-smoke](#no-direct-node-bin-smoke) | `recommended + strict` | `{entryPatterns}` |
@@ -184,6 +185,7 @@ Rules marked `recommended + strict` are enabled by `recommended` as `warn` and b
 | [legibility/no-single-use-renaming-alias](#no-single-use-renaming-alias) | strict only | none |
 | [legibility/no-standalone-array-mutations](#no-standalone-array-mutations) | recommended + strict | `{arrayMutatingMethods, mutatingMethods}` |
 | [legibility/no-trivial-wrapper-functions](#no-trivial-wrapper-functions) | recommended + strict | none |
+| [legibility/no-unmatched-comments](#no-unmatched-comments) | recommended + strict | `{matchers: [], prefixIdentifiers: [], suffixIdentifiers: []}` |
 | [legibility/no-unnecessary-block-callback](#no-unnecessary-block-callback) | recommended + strict | none |
 | [legibility/prefer-concat-object-assign](#prefer-concat-object-assign) | recommended + strict | none |
 | [legibility/prefer-early-return](#prefer-early-return) | recommended + strict | none |
@@ -192,6 +194,7 @@ Rules marked `recommended + strict` are enabled by `recommended` as `warn` and b
 | [legibility/prefer-object-lookup](#prefer-object-lookup) | recommended + strict | `{min: 3, operators: ["==", "==="]}` |
 | [legibility/prefer-positive-condition-names](#prefer-positive-condition-names) | strict only | `{booleanOperators}` |
 | [legibility/require-executable-shebang](#require-executable-shebang) | recommended + strict | `{files, runtimes: ["bun", "deno", "node"]}` |
+| [legibility/require-jsdoc-multiline-comments](#require-jsdoc-multiline-comments) | recommended + strict | none |
 
 ---
 
@@ -538,6 +541,323 @@ Avoid wrappers that only forward their parameters to another call.
 
 ---
 
+### Comment rules
+
+<!-- comment rule responsibilities from rule metadata in src/constants.ts -->
+
+The comment rules form one policy stack. No ownership marker is preferred by the package; repositories configure the convention that fits their workflow.
+
+| Rule | Responsibility |
+| --- | --- |
+| [`legibility/no-unmatched-comments`](#no-unmatched-comments) | Reject comments without an explicitly configured matcher, prefix, or suffix. |
+| [`legibility/no-automated-comment-attribution`](#no-automated-comment-attribution) | Reject explicit automated attribution signatures. |
+| [`legibility/require-jsdoc-multiline-comments`](#require-jsdoc-multiline-comments) | Require JSDoc syntax for multiline block comments. |
+
+<a id="no-unmatched-comments"></a>
+
+#### `legibility/no-unmatched-comments({options})`
+
+<!-- no-unmatched-comments defaults and matching behavior from src/constants.ts and src/index.ts -->
+
+Reject every comment that lacks an explicitly configured regular-expression matcher, prefix identifier, or suffix identifier.
+
+A comment is accepted when any configured `matchers`, `prefixIdentifiers`, or `suffixIdentifiers` entry matches. The rule reports unmatched comments without modifying them.
+
+No matcher or identifier is configured by default. Enabling the rule without options rejects all line and block comments.
+
+##### options
+
+| Option | Type | Default | Behavior |
+| --- | --- | --- | --- |
+| `matchers` | `string[]` | `[]` | Case-insensitive regular-expression sources matched anywhere in the raw comment body. |
+| `prefixIdentifiers` | `string[]` | `[]` | Case-insensitive literal identifiers matched at the start of the normalized comment body. |
+| `suffixIdentifiers` | `string[]` | `[]` | Case-insensitive literal identifiers matched at the end of the normalized comment body. |
+
+The arrays are independent allow paths. Set all three explicitly when the configuration should make the entire comment policy visible.
+
+##### choose a convention
+
+The marker names below are examples, not package defaults.
+
+| Convention | Option | Accepted example |
+| --- | --- | --- |
+| Project pattern | `matchers: ["\\bENG-\\d+\\b"]` | `// ENG-482: preserve the retry order.` |
+| Leading marker | `prefixIdentifiers: ["HUMAN"]` | `// HUMAN: Safari 15 requires this fallback.` |
+| Trailing marker | `suffixIdentifiers: ["@owned"]` | `// Preserve the retry order. @owned` |
+
+##### prefix and suffix identifiers
+
+Use literal identifiers when a project prefers short ownership markers:
+
+```js
+{
+  "legibility/no-unmatched-comments": [
+    "error",
+    {
+      matchers: [],
+      prefixIdentifiers: ["HUMAN", "LEGAL"],
+      suffixIdentifiers: ["@owned", "[preserve]"],
+    },
+  ],
+}
+```
+
+```js
+// HUMAN: Safari 15 requires this fallback.
+// LEGAL: Copyright 2026 Example Corporation.
+// Keep this in sync with the mobile client. @owned
+// This wording was approved by counsel. [preserve]
+```
+
+Prefix and suffix identifiers are literal strings, not regular expressions. Configured identifiers and comment bodies are trimmed and compared case-insensitively.
+
+##### prefix-only policy
+
+Require every allowed comment to begin with an approved prefix:
+
+```js
+{
+  "legibility/no-unmatched-comments": [
+    "error",
+    {
+      matchers: [],
+      prefixIdentifiers: ["HUMAN", "SECURITY", "LEGAL"],
+    },
+  ],
+}
+```
+
+```diff
+- // Explain why this branch exists.
+- // HUMANIZED: This is not an identifier boundary.
++ // HUMAN: The legacy client omits this field.
++ // SECURITY: Keep comparison timing-independent.
++ // LEGAL: Do not alter the approved wording.
+```
+
+##### suffix-only policy
+
+Require an approved identifier at the very end of every comment:
+
+```js
+{
+  "legibility/no-unmatched-comments": [
+    "error",
+    {
+      matchers: [],
+      suffixIdentifiers: ["@human", "@owned"],
+    },
+  ],
+}
+```
+
+```diff
+- // Preserve the order. @owned.
+- // Preserve the order. not@owned
++ // Preserve the order. @owned
++ // The audit export depends on this exact order. @human
+```
+
+The marker must be the final normalized text. Punctuation after a suffix does not match unless that punctuation is part of the configured identifier.
+
+##### custom regular-expression matchers
+
+`matchers` entries are regular-expression source strings. The rule supplies the case-insensitive Unicode flags, so configure each pattern without `/.../` delimiters or flags.
+
+```js
+{
+  "legibility/no-unmatched-comments": [
+    "error",
+    {
+      matchers: [
+        "\\b(ENG|OPS)-\\d+\\b",
+        "^\\s*eslint-(disable|enable)(-next-line|-line){0,1}\\b",
+        "^\\s*(c8|istanbul)\\s+ignore\\b",
+      ],
+      prefixIdentifiers: [],
+      suffixIdentifiers: [],
+    },
+  ],
+}
+```
+
+This configuration accepts examples such as:
+
+```js
+// Retry behavior is tracked in ENG-482.
+// eslint-disable-next-line no-await-in-loop -- The provider requires ordered requests.
+/* c8 ignore next -- The runtime feature check is deterministic in CI. */
+```
+
+Broad matchers weaken a strict human-ownership policy because anyone can write matching text. Keep only the comment classes the repository intends to preserve.
+
+##### combine all marker types
+
+Each array is an allow path. A comment only needs to match one entry from one array.
+
+```js
+{
+  "legibility/no-unmatched-comments": [
+    "error",
+    {
+      matchers: [
+        "\\bARCH-\\d+\\b",
+      ],
+      prefixIdentifiers: ["HUMAN", "DECISION"],
+      suffixIdentifiers: ["@owned", "@preserve"],
+    },
+  ],
+}
+```
+
+##### ban all comments
+
+Enable the rule without options, or set every allow path to an empty array, for a complete comment ban:
+
+```js
+{
+  "legibility/no-unmatched-comments": "error",
+}
+```
+
+```js
+{
+  "legibility/no-unmatched-comments": [
+    "error",
+    {
+      matchers: [],
+      prefixIdentifiers: [],
+      suffixIdentifiers: [],
+    },
+  ],
+}
+```
+
+##### identifier boundaries
+
+Prefix and suffix identifiers use ASCII letter, number, and underscore boundaries. This prevents an identifier from matching as part of a larger word.
+
+| Configuration | Comment | Result |
+| --- | --- | --- |
+| Prefix `HUMAN` | `// HUMAN: preserve this` | accepted |
+| Prefix `HUMAN` | `// human — preserve this` | accepted |
+| Prefix `HUMAN` | `// HUMANIZED: generated` | rejected |
+| Prefix `HUMAN` | `// HUMAN_value` | rejected |
+| Suffix `@owned` | `// preserve this @owned` | accepted |
+| Suffix `@owned` | `// preserve this not@owned` | rejected |
+| Suffix `@owned` | `// preserve this @owned.` | rejected |
+
+For JSDoc comments, leading whitespace and `*` line prefixes are ignored before prefix and suffix matching:
+
+```js
+/**
+ * HUMAN: This payload shape is part of the public contract.
+ */
+
+/**
+ * This payload shape is part of the public contract.
+ * @owned
+ */
+```
+
+##### Oxlint configuration
+
+The same options work when the package is loaded as an Oxlint JavaScript plugin:
+
+```json
+{
+  "jsPlugins": [
+    {
+      "name": "legibility",
+      "specifier": "eslint-plugin-legibility"
+    }
+  ],
+  "rules": {
+    "legibility/no-unmatched-comments": [
+      "error",
+      {
+        "matchers": [],
+        "prefixIdentifiers": ["HUMAN", "LEGAL"],
+        "suffixIdentifiers": ["@owned"]
+      }
+    ]
+  }
+}
+```
+
+##### matching details
+
+- Line comments, inline comments, trailing comments, and block comments are checked.
+- Executable shebang tokens are ignored.
+- Regular-expression matchers run against the comment body without the `//`, `/*`, or `*/` delimiters.
+- Regular-expression matchers are compiled with the `i` and `u` flags.
+- Invalid regular expressions are ignored. If no other allow path matches, the comment is rejected.
+- Empty or whitespace-only prefix and suffix identifiers never match.
+- The rule has no autofix.
+
+---
+
+<a id="no-automated-comment-attribution"></a>
+
+#### `legibility/no-automated-comment-attribution({options})`
+
+<!-- no-automated-comment-attribution defaults and signatures from src/constants.ts and src/index.ts -->
+
+Reject explicit automated authorship and generation signatures in comments.
+
+Static linting cannot determine how unmarked prose was produced. This rule only detects configured identifiers in structured attribution tags and phrases equivalent to `generated by <identifier>` or `<identifier>-generated`.
+
+##### options
+
+- `{identifiers: string[]}`: case-insensitive names treated as automated sources. Default: `ai`, `chatgpt`, `claude`, `codex`, `copilot`, `gemini`, `gpt`, `llm`, and `openai`.
+
+##### examples
+
+| Comment content | Result |
+| --- | --- |
+| `Generated by <configured identifier>` | rejected |
+| `<configured identifier>-generated` | rejected |
+| `Send a request to <configured identifier>` | accepted |
+| Unmarked prose | not classified |
+
+Use custom identifiers when a repository has additional automated tools:
+
+```js
+{
+  "legibility/no-automated-comment-attribution": [
+    "error",
+    {
+      identifiers: ["assistant", "robot"],
+    },
+  ],
+}
+```
+
+---
+
+<a id="require-jsdoc-multiline-comments"></a>
+
+#### `legibility/require-jsdoc-multiline-comments()`
+
+<!-- require-jsdoc-multiline-comments behavior from src/constants.ts and src/index.ts -->
+
+Require block comments spanning multiple lines to use `/** ... */` JSDoc syntax. Line comments and single-line block comments are unchanged.
+
+```diff
+- /*
+-  * The provider can return a stale token during regional failover.
+-  * Preserve the retry order. @owned
+-  */
++ /**
++  * The provider can return a stale token during regional failover.
++  * Preserve the retry order. @owned
++  */
+```
+
+This rule has no options and no autofix.
+
+---
+
 <a id="no-unnecessary-block-callback"></a>
 
 ### `legibility/no-unnecessary-block-callback()`
@@ -809,3 +1129,117 @@ Before publishing, configure npm trusted publishing for `publish.yml`. Leave the
 ## Attribution
 
 The first rules were adapted from the [Pastoralist](https://github.com/yowainwright/pastoralist) `scripts/oxlint-plugin` rule set, then packaged for ESLint and Oxlint with additional legibility and performance rules.
+
+---
+
+## Recipes
+
+<!-- comment rule recipe options and agent commands from src/constants.ts, src/index.ts, and package.json -->
+
+The recipes use `YOUR_HUMAN_PREFIX` as a placeholder. Replace it with a repository convention, or use a regular-expression matcher or suffix identifier instead.
+
+### During agent sessions
+
+Use all three comment rules as errors and give the agent an explicit ownership policy:
+
+```js
+import legibility from "eslint-plugin-legibility";
+
+const matchers = [];
+const prefixIdentifiers = ["YOUR_HUMAN_PREFIX"];
+const suffixIdentifiers = [];
+const ownershipOptions = { matchers, prefixIdentifiers, suffixIdentifiers };
+const ownershipRule = ["error", ownershipOptions];
+const plugins = { legibility };
+const rules = {
+  "legibility/no-automated-comment-attribution": "error",
+  "legibility/no-unmatched-comments": ownershipRule,
+  "legibility/require-jsdoc-multiline-comments": "error",
+};
+const config = { plugins, rules };
+
+export default [config];
+```
+
+Install the packaged skill for the active agent:
+
+```sh
+npx eslint-plugin-legibility-install-skill --target codex
+```
+
+The session policy is:
+
+- Agents must not add source comments, matcher text, prefix identifiers, or suffix identifiers.
+- Matching comments are human-owned and must not be removed or rewritten unless explicitly requested.
+- Agents remove their own unmatched comments instead of granting them a marker.
+- Pre-existing unmatched comments remain unchanged unless the task includes comment cleanup.
+
+Run changed-file linting during the session:
+
+```sh
+npx lint-changed
+```
+
+### Human coding
+
+Use a warning while actively writing so unmatched comments remain visible without blocking the editor. Keep multiline formatting and automated attribution checks as errors.
+
+```js
+const matchers = [];
+const prefixIdentifiers = ["YOUR_HUMAN_PREFIX"];
+const suffixIdentifiers = [];
+const ownershipOptions = { matchers, prefixIdentifiers, suffixIdentifiers };
+const ownershipRule = ["warn", ownershipOptions];
+const rules = {
+  "legibility/no-automated-comment-attribution": "error",
+  "legibility/no-unmatched-comments": ownershipRule,
+  "legibility/require-jsdoc-multiline-comments": "error",
+};
+```
+
+Add the configured marker when a comment should be preserved:
+
+```js
+// YOUR_HUMAN_PREFIX: Safari 15 requires this fallback.
+
+const timeout = 5_000; // YOUR_HUMAN_PREFIX: Keep this aligned with the worker timeout.
+
+/**
+ * YOUR_HUMAN_PREFIX: The payload shape is part of the public contract.
+ */
+function sendPayload() {}
+```
+
+Human-written markers establish ownership for later agent sessions. Marker choice remains repository-specific.
+
+### Pre-commit
+
+Promote unmatched comments to errors in the configuration used by the commit gate:
+
+```js
+const matchers = [];
+const prefixIdentifiers = ["YOUR_HUMAN_PREFIX"];
+const suffixIdentifiers = [];
+const ownershipOptions = { matchers, prefixIdentifiers, suffixIdentifiers };
+const ownershipRule = ["error", ownershipOptions];
+const rules = {
+  "legibility/no-automated-comment-attribution": "error",
+  "legibility/no-unmatched-comments": ownershipRule,
+  "legibility/require-jsdoc-multiline-comments": "error",
+};
+```
+
+A dependency-free Git pre-commit hook can run the configured ESLint rules directly:
+
+```sh
+#!/bin/sh
+set -eu
+
+pnpm exec eslint --max-warnings 0 .
+```
+
+This repository can install its managed hook, which runs the complete validation suite:
+
+```sh
+pnpm install-hooks
+```

@@ -40,6 +40,23 @@ function createRule(name: string, options: any[] = [], overrides: any = {}) {
   };
 }
 
+function createCommentRule(name: string, comments: any[], options: any[] = []) {
+  return createRule(name, options, {
+    sourceCode: {
+      text: "",
+      getAllComments: () => comments,
+      getText(node) {
+        if (!node) return "";
+        return typeof node.__text === "string" ? node.__text : "";
+      },
+    },
+  });
+}
+
+function comment(type: "Block" | "Line", value: string, text: string): any {
+  return { type, value, __text: text };
+}
+
 function call(callee: any, args: any[] = []): any {
   const node: any = {
     type: "CallExpression",
@@ -153,11 +170,180 @@ test("exports an ESLint and Oxlint compatible plugin shape", () => {
   assert.equal(plugin.meta.name, "legibility");
   assert.equal(plugin.meta.version, manifest.version);
   assert.ok(plugin.rules["max-expression-operators"]);
+  assert.ok(plugin.rules["no-automated-comment-attribution"]);
   assert.ok(plugin.rules["prefer-early-return"]);
+  assert.ok(plugin.rules["no-unmatched-comments"]);
+  assert.ok(plugin.rules["require-jsdoc-multiline-comments"]);
   assert.ok(plugin.configs["flat/recommended"].plugins.legibility);
+  assert.equal(
+    plugin.configs["flat/recommended"].rules[
+      "legibility/no-automated-comment-attribution"
+    ],
+    "warn",
+  );
+  assert.equal(
+    plugin.configs["flat/recommended"].rules["legibility/no-unmatched-comments"],
+    "warn",
+  );
+  assert.equal(
+    plugin.configs["flat/recommended"].rules["legibility/require-jsdoc-multiline-comments"],
+    "warn",
+  );
   assert.equal(plugin.configs.recommended.plugins[0], "legibility");
   assert.equal(requiredPlugin, plugin);
   assert.equal(requiredPlugin.meta.name, "legibility");
+});
+
+test("no-unmatched-comments bans comments by default and ignores shebangs", () => {
+  const comments = [
+    comment("Line", " Explain the branch.", "// Explain the branch."),
+    comment("Block", "*\n * Explain the API.\n ", "/**\n * Explain the API.\n */"),
+    { type: "Shebang", value: "/usr/bin/env node", __text: "#!/usr/bin/env node" },
+  ];
+  const { visitor, reports } = createCommentRule("no-unmatched-comments", comments);
+
+  visitor.Program({ type: "Program" });
+
+  assert.equal(reports.length, 2);
+  assert.equal(reports[0].messageId, "unmatched");
+  assert.equal(reports[1].messageId, "unmatched");
+});
+
+test("no-unmatched-comments accepts configured line and JSDoc matcher values", () => {
+  const comments = [
+    comment("Line", " Preserve this. KEEP-42", "// Preserve this. KEEP-42"),
+    comment(
+      "Block",
+      "*\n * Explain the API.\n * KEEP-73\n ",
+      "/**\n * Explain the API.\n * KEEP-73\n */",
+    ),
+  ];
+  const options = [{ matchers: ["\\bKEEP-\\d+\\b"] }];
+  const { visitor, reports } = createCommentRule("no-unmatched-comments", comments, options);
+
+  visitor.Program({ type: "Program" });
+
+  assert.equal(reports.length, 0);
+});
+
+test("no-unmatched-comments supports custom and empty matcher lists", () => {
+  const comments = [comment("Line", " TODO #42", "// TODO #42")];
+  const customRule = createCommentRule("no-unmatched-comments", comments, [
+    { matchers: ["TODO\\s+#\\d+"] },
+  ]);
+  const banAllRule = createCommentRule("no-unmatched-comments", comments, [{ matchers: [] }]);
+  const invalidRule = createCommentRule("no-unmatched-comments", comments, [
+    { matchers: ["["] },
+  ]);
+
+  customRule.visitor.Program({ type: "Program" });
+  banAllRule.visitor.Program({ type: "Program" });
+  invalidRule.visitor.Program({ type: "Program" });
+
+  assert.equal(customRule.reports.length, 0);
+  assert.equal(banAllRule.reports.length, 1);
+  assert.equal(invalidRule.reports.length, 1);
+});
+
+test("no-unmatched-comments accepts bounded prefix and suffix identifiers", () => {
+  const allowedComments = [
+    comment("Line", " HUMAN: preserve this", "// HUMAN: preserve this"),
+    comment("Line", " preserve this @owned", "// preserve this @owned"),
+    comment("Block", "*\n * preserve this\n * @owned\n ", "/** comment */"),
+  ];
+  const rejectedComments = [
+    comment("Line", " HUMANIZED: generated", "// HUMANIZED: generated"),
+    comment("Line", " preserve this not@owned", "// preserve this not@owned"),
+  ];
+  const options = [
+    {
+      matchers: [],
+      prefixIdentifiers: ["human"],
+      suffixIdentifiers: ["@owned"],
+    },
+  ];
+  const allowedRule = createCommentRule("no-unmatched-comments", allowedComments, options);
+  const rejectedRule = createCommentRule("no-unmatched-comments", rejectedComments, options);
+
+  allowedRule.visitor.Program({ type: "Program" });
+  rejectedRule.visitor.Program({ type: "Program" });
+
+  assert.equal(allowedRule.reports.length, 0);
+  assert.equal(rejectedRule.reports.length, 2);
+});
+
+test("require-jsdoc-multiline-comments reports ordinary multiline blocks", () => {
+  const comments = [
+    comment(
+      "Block",
+      "\n * HUMAN: Explain the API.\n ",
+      "/*\n * HUMAN: Explain the API.\n */",
+    ),
+    comment(
+      "Block",
+      "*\n * HUMAN: Explain the API.\n ",
+      "/**\n * HUMAN: Explain the API.\n */",
+    ),
+    comment("Block", " HUMAN: Explain the API. ", "/* HUMAN: Explain the API. */"),
+  ];
+  const { visitor, reports } = createCommentRule(
+    "require-jsdoc-multiline-comments",
+    comments,
+  );
+
+  visitor.Program({ type: "Program" });
+
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].messageId, "useJsdoc");
+});
+
+test("no-automated-comment-attribution reports signatures and prohibited authors", () => {
+  const firstIdentifier = ["chat", "gpt"].join("");
+  const secondIdentifier = ["cl", "aude"].join("");
+  const generatedBy = ["Generated by", firstIdentifier].join(" ");
+  const prohibitedAuthor = ["@author", secondIdentifier].join(" ");
+  const comments = [
+    comment("Line", ` ${generatedBy}.`, `// ${generatedBy}.`),
+    comment("Block", `*\n * ${prohibitedAuthor}\n `, `/**\n * ${prohibitedAuthor}\n */`),
+  ];
+  const { visitor, reports } = createCommentRule(
+    "no-automated-comment-attribution",
+    comments,
+  );
+
+  visitor.Program({ type: "Program" });
+
+  assert.equal(reports.length, 2);
+  assert.equal(reports[0].data.identifier, firstIdentifier);
+  assert.equal(reports[1].data.identifier, secondIdentifier);
+});
+
+test("no-automated-comment-attribution ignores ordinary technology references", () => {
+  const identifier = ["chat", "gpt"].join("");
+  const value = ` Send a request to ${identifier}. @author Jeff`;
+  const comments = [comment("Line", value, "// request")];
+  const { visitor, reports } = createCommentRule(
+    "no-automated-comment-attribution",
+    comments,
+  );
+
+  visitor.Program({ type: "Program" });
+
+  assert.equal(reports.length, 0);
+});
+
+test("no-automated-comment-attribution supports custom identifiers", () => {
+  const comments = [comment("Line", " @author robot", "// @author robot")];
+  const { visitor, reports } = createCommentRule(
+    "no-automated-comment-attribution",
+    comments,
+    [{ identifiers: ["robot"] }],
+  );
+
+  visitor.Program({ type: "Program" });
+
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].data.identifier, "robot");
 });
 
 test("require-filename-matches-dirname reports filename unrelated to parent dir", () => {
@@ -985,6 +1171,55 @@ test("flat config works through ESLint Linter when ESLint is installed", async (
   assert.equal(messages[0].ruleId, "legibility/hoist-if-operators");
 });
 
+test("comment rules work through ESLint Linter when ESLint is installed", async (t) => {
+  let Linter;
+  try {
+    ({ Linter } = await import("eslint"));
+  } catch {
+    t.skip("ESLint is not installed");
+    return;
+  }
+
+  const identifier = ["chat", "gpt"].join("");
+  const attribution = ["Generated by", identifier].join(" ");
+  const invalidSource = ["/*", ` * ${attribution}.`, " */", "const value = true;"].join(
+    "\n",
+  );
+  const linter = new Linter({ configType: "flat" });
+  const config = [
+    {
+      plugins: { legibility: plugin },
+      languageOptions: { ecmaVersion: 2022, sourceType: "script" },
+      rules: {
+        "legibility/no-automated-comment-attribution": "error",
+        "legibility/no-unmatched-comments": [
+          "error",
+          { matchers: [], prefixIdentifiers: ["HUMAN"] },
+        ],
+        "legibility/require-jsdoc-multiline-comments": "error",
+      },
+    },
+  ];
+  const invalidMessages = linter.verify(invalidSource, config, { filename: "src/check.js" });
+  const invalidRuleIds = invalidMessages.map((message) => message.ruleId).sort();
+
+  assert.deepEqual(invalidRuleIds, [
+    "legibility/no-automated-comment-attribution",
+    "legibility/no-unmatched-comments",
+    "legibility/require-jsdoc-multiline-comments",
+  ]);
+
+  const validSource = [
+    "/**",
+    " * HUMAN: Explain the value.",
+    " */",
+    "const value = true;",
+  ].join("\n");
+  const validMessages = linter.verify(validSource, config, { filename: "src/check.js" });
+
+  assert.equal(validMessages.length, 0);
+});
+
 test("oxlint can load the package as a JS plugin when oxlint is installed", (t) => {
   const result = spawnSync(
     process.platform === "win32" ? "pnpm.cmd" : "pnpm",
@@ -1012,4 +1247,5 @@ test("oxlint can load the package as a JS plugin when oxlint is installed", (t) 
 
   assert.notEqual(result.status, 0);
   assert.match(output, /legibility(?:\/|\()prefer-early-return/);
+  assert.match(output, /legibility(?:\/|\()no-unmatched-comments/);
 });

@@ -29,7 +29,8 @@ export type RuleListener = Record<string, RuleVisitor>;
 
 export interface SourceCodeLike {
   text?: string;
-  getText(node?: AstNode): string;
+  getAllComments?(): AstNode[];
+  getText?(node?: AstNode): string;
 }
 
 export interface RuleReport {

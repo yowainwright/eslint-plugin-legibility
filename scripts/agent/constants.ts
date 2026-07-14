@@ -45,6 +45,17 @@ const compatibilityHeading = "## Agent Compatibility";
 const compatibilityBody =
   "Use this as the shared workflow for Codex, Claude, and generic agent skill roots. Keep tool-specific rule files as generated pointers or thin wrappers over this content.";
 
+const commentOwnershipHeading = "## Comment Ownership";
+const commentOwnershipIntro =
+  "Use `legibility/no-unmatched-comments` in agent hooks as a human-ownership gate.";
+const commentOwnershipRules = [
+  "- Agents must not add source comments, matcher text, or prefix/suffix identifiers.",
+  "- Treat comments accepted by a configured matcher or identifier as human-owned. Do not remove or rewrite them unless the user explicitly requests it.",
+  "- Remove an unmatched comment introduced by the agent instead of adding a matcher.",
+  "- Preserve pre-existing unmatched comments unless the task explicitly includes comment cleanup.",
+].join("\n");
+const commentOwnershipBody = [commentOwnershipIntro, commentOwnershipRules].join("\n\n");
+
 const installHeading = "## Package Install";
 const installBody = [
   "The npm package ships this skill, but does not install it automatically. After installing the package, install the skill explicitly:",
@@ -108,6 +119,8 @@ export const agentSkillBody = [
   purposeBody,
   compatibilityHeading,
   compatibilityBody,
+  commentOwnershipHeading,
+  commentOwnershipBody,
   installHeading,
   installBody,
   cleanupHeading,

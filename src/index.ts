@@ -4,6 +4,10 @@ import {
   ARG_COMMAND_FUNCTIONS,
   COMPARISON_OPERATORS,
   CONTROL_FLOW_TYPES,
+  DEFAULT_AI_COMMENT_IDENTIFIERS,
+  DEFAULT_COMMENT_MATCHERS,
+  DEFAULT_COMMENT_PREFIX_IDENTIFIERS,
+  DEFAULT_COMMENT_SUFFIX_IDENTIFIERS,
   DEFAULT_COMPUTED_VALUE_OPERATOR_COMPLEXITY,
   DEFAULT_DIRECT_BIN_ENTRY_PATTERNS,
   DEFAULT_EXECUTABLE_ENTRY_PATTERNS,
@@ -33,6 +37,7 @@ import {
   MAX_EXPRESSION_OPERATORS_META,
   MUTATING_METHODS,
   NEGATIVE_CONDITION_NAME_PATTERN,
+  NO_AUTOMATED_COMMENT_ATTRIBUTION_META,
   NO_COMPLEX_TERNARIES_META,
   NO_COMPUTED_VALUES_META,
   NO_DIRECT_NODE_BIN_SMOKE_META,
@@ -47,6 +52,7 @@ import {
   REQUIRE_FILENAME_MATCHES_DIRNAME_META,
   NO_STANDALONE_ARRAY_MUTATIONS_META,
   NO_TRIVIAL_WRAPPER_FUNCTIONS_META,
+  NO_UNMATCHED_COMMENTS_META,
   NO_UNNECESSARY_BLOCK_CALLBACK_META,
   OBJECT_LOOKUP_OPERATORS,
   PACKAGE_VERSION,
@@ -59,6 +65,7 @@ import {
   PREFER_POSITIVE_CONDITION_NAMES_META,
   RECOMMENDED_RULE_NAMES,
   REQUIRE_EXECUTABLE_SHEBANG_META,
+  REQUIRE_JSDOC_MULTILINE_COMMENTS_META,
   SEARCH_METHODS,
   SIDE_EFFECT_FREE_ITERATION_METHODS,
   SHELL_COMMAND_FUNCTIONS,
@@ -379,11 +386,12 @@ function getNodeText(context: RuleContext, node: MaybeAstNode): string {
   if (hasInlineText) return inlineText;
 
   const sourceCode = getSourceCode(context);
-  const canReadSourceText = sourceCode && typeof sourceCode.getText === "function";
+  const getText = sourceCode?.getText;
+  const canReadSourceText = typeof getText === "function";
   if (!canReadSourceText) return "";
 
   try {
-    const nodeText = sourceCode.getText(node);
+    const nodeText = getText.call(sourceCode, node);
     return nodeText;
   } catch {
     return "";
@@ -750,7 +758,9 @@ function getSourceCode(context: RuleContext): SourceCodeLike | null {
   const directSourceCode = context.sourceCode;
   const hasDirectSourceCode = Boolean(directSourceCode);
   const canReadDirectSourceCode = typeof directSourceCode?.getText === "function";
-  const shouldUseDirectSourceCode = hasDirectSourceCode && canReadDirectSourceCode;
+  const canReadDirectComments = typeof directSourceCode?.getAllComments === "function";
+  const canUseDirectSourceCode = canReadDirectSourceCode || canReadDirectComments;
+  const shouldUseDirectSourceCode = hasDirectSourceCode && canUseDirectSourceCode;
   if (shouldUseDirectSourceCode) {
     return directSourceCode;
   }
@@ -762,7 +772,10 @@ function getSourceCode(context: RuleContext): SourceCodeLike | null {
   try {
     const sourceCode = getContextSourceCode();
     const hasGetText = typeof sourceCode.getText === "function";
-    return hasGetText ? sourceCode : null;
+    const hasGetAllComments = typeof sourceCode.getAllComments === "function";
+    const canUseSourceCode = hasGetText || hasGetAllComments;
+    if (!canUseSourceCode) return null;
+    return sourceCode;
   } catch {
     return null;
   }
@@ -776,14 +789,255 @@ function getSourceText(context: RuleContext): string {
   const hasText = typeof sourceText === "string";
   if (hasText) return sourceText;
 
-  const canGetText = typeof sourceCode.getText === "function";
+  const getText = sourceCode.getText;
+  const canGetText = typeof getText === "function";
   if (!canGetText) return "";
 
   try {
-    return sourceCode.getText();
+    return getText.call(sourceCode);
   } catch {
     return "";
   }
+}
+
+function isSourceComment(value: unknown): value is AstNode {
+  const isNode = isRecord(value);
+  if (!isNode) return false;
+
+  const isLineComment = value.type === "Line";
+  const isBlockComment = value.type === "Block";
+  return isLineComment || isBlockComment;
+}
+
+function getAllComments(context: RuleContext): AstNode[] {
+  const sourceCode = getSourceCode(context);
+  if (sourceCode === null) return [];
+
+  const getAllComments = sourceCode.getAllComments;
+  const canGetComments = typeof getAllComments === "function";
+  if (!canGetComments) return [];
+
+  try {
+    return getAllComments.call(sourceCode).filter(isSourceComment);
+  } catch {
+    return [];
+  }
+}
+
+function getCommentValue(comment: AstNode): string {
+  const value = comment.value;
+  const hasStringValue = typeof value === "string";
+  if (!hasStringValue) return "";
+  return value;
+}
+
+function getCommentAuthorValues(comment: AstNode): string[] {
+  const lines = getCommentValue(comment).split(/\r?\n/);
+  const normalizedLines = lines.map((line) => line.replace(/^\s*\*\s?/, ""));
+  const authorValues = normalizedLines
+    .map((line) => line.match(/(?:^|\s)@author\b\s*:?\s*(\S.*?)\s*$/i)?.[1] ?? "")
+    .filter(Boolean);
+  return authorValues;
+}
+
+function normalizeAttributionText(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function containsWholePhrase(value: string, phrase: string): boolean {
+  const paddedValue = ` ${value} `;
+  const paddedPhrase = ` ${phrase} `;
+  return paddedValue.includes(paddedPhrase);
+}
+
+function findIdentifier(value: string, identifiers: readonly string[]): string | null {
+  const normalizedValue = normalizeAttributionText(value);
+  const identifier = identifiers.find((candidate) => {
+    const normalizedCandidate = normalizeAttributionText(candidate);
+    if (!normalizedCandidate) return false;
+    return containsWholePhrase(normalizedValue, normalizedCandidate);
+  });
+  return identifier ?? null;
+}
+
+function hasGenerationSignature(value: string, identifier: string): boolean {
+  const normalizedValue = normalizeAttributionText(value);
+  const normalizedIdentifier = normalizeAttributionText(identifier);
+  if (!normalizedIdentifier) return false;
+
+  const verbs = ["authored", "created", "generated", "produced", "written"];
+  const hasSignature = verbs.some((verb) =>
+    hasGenerationVerbSignature(normalizedValue, normalizedIdentifier, verb),
+  );
+  return hasSignature;
+}
+
+function hasGenerationVerbSignature(value: string, identifier: string, verb: string): boolean {
+  const phrases = [
+    `${identifier} ${verb}`,
+    `${verb} by ${identifier}`,
+    `${verb} by a ${identifier}`,
+    `${verb} by an ${identifier}`,
+  ];
+  return phrases.some((phrase) => containsWholePhrase(value, phrase));
+}
+
+function findProhibitedAttribution(
+  comment: AstNode,
+  identifiers: readonly string[],
+): string | null {
+  const authorValues = getCommentAuthorValues(comment);
+  const authorIdentifier = authorValues
+    .map((value) => findIdentifier(value, identifiers))
+    .find(Boolean);
+  if (authorIdentifier) return authorIdentifier;
+
+  const commentValue = getCommentValue(comment);
+  const generatedIdentifier = identifiers.find((identifier) =>
+    hasGenerationSignature(commentValue, identifier),
+  );
+  return generatedIdentifier ?? null;
+}
+
+function createNoAutomatedCommentAttribution(context: RuleContext): RuleListener {
+  const identifiers = getConfiguredStringArray(
+    context,
+    "identifiers",
+    DEFAULT_AI_COMMENT_IDENTIFIERS,
+  );
+  return {
+    Program() {
+      getAllComments(context).forEach((comment) => {
+        const identifier = findProhibitedAttribution(comment, identifiers);
+        if (!identifier) return;
+        context.report({
+          node: comment,
+          messageId: "prohibitedAttribution",
+          data: { identifier },
+        });
+      });
+    },
+  };
+}
+
+function compileCommentMatcher(source: string): RegExp | null {
+  try {
+    return new RegExp(source, "iu");
+  } catch {
+    return null;
+  }
+}
+
+function matchesCommentMatcher(value: string, matchers: readonly RegExp[]): boolean {
+  return matchers.some((matcher) => matcher.test(value));
+}
+
+function normalizeCommentBoundary(value: string): string {
+  const lines = value.split(/\r?\n/);
+  const normalizedLines = lines.map((line) => line.replace(/^\s*\*\s?/, ""));
+  return normalizedLines.join("\n").trim().toLowerCase();
+}
+
+function isIdentifierBoundary(value: string, index: number): boolean {
+  const character = value[index];
+  if (character === undefined) return true;
+  return !/[a-z0-9_]/i.test(character);
+}
+
+function matchesPrefixIdentifier(value: string, identifiers: readonly string[]): boolean {
+  return identifiers.some((identifier) => {
+    const normalizedIdentifier = identifier.trim().toLowerCase();
+    if (!normalizedIdentifier) return false;
+
+    const hasPrefix = value.startsWith(normalizedIdentifier);
+    if (!hasPrefix) return false;
+    return isIdentifierBoundary(value, normalizedIdentifier.length);
+  });
+}
+
+function matchesSuffixIdentifier(value: string, identifiers: readonly string[]): boolean {
+  return identifiers.some((identifier) => {
+    const normalizedIdentifier = identifier.trim().toLowerCase();
+    if (!normalizedIdentifier) return false;
+
+    const hasSuffix = value.endsWith(normalizedIdentifier);
+    if (!hasSuffix) return false;
+    const identifierStart = value.length - normalizedIdentifier.length;
+    return isIdentifierBoundary(value, identifierStart - 1);
+  });
+}
+
+function isAllowedComment(
+  value: string,
+  matchers: readonly RegExp[],
+  prefixIdentifiers: readonly string[],
+  suffixIdentifiers: readonly string[],
+): boolean {
+  const matchesPattern = matchesCommentMatcher(value, matchers);
+  if (matchesPattern) return true;
+
+  const normalizedValue = normalizeCommentBoundary(value);
+  const matchesPrefix = matchesPrefixIdentifier(normalizedValue, prefixIdentifiers);
+  if (matchesPrefix) return true;
+  return matchesSuffixIdentifier(normalizedValue, suffixIdentifiers);
+}
+
+function createNoUnmatchedComments(context: RuleContext): RuleListener {
+  const matcherSources = getConfiguredStringArray(context, "matchers", DEFAULT_COMMENT_MATCHERS);
+  const matchers = matcherSources.map(compileCommentMatcher).filter((matcher) => matcher !== null);
+  const prefixIdentifiers = getConfiguredStringArray(
+    context,
+    "prefixIdentifiers",
+    DEFAULT_COMMENT_PREFIX_IDENTIFIERS,
+  );
+  const suffixIdentifiers = getConfiguredStringArray(
+    context,
+    "suffixIdentifiers",
+    DEFAULT_COMMENT_SUFFIX_IDENTIFIERS,
+  );
+  return {
+    Program() {
+      getAllComments(context).forEach((comment) => {
+        const commentValue = getCommentValue(comment);
+        const isAllowed = isAllowedComment(
+          commentValue,
+          matchers,
+          prefixIdentifiers,
+          suffixIdentifiers,
+        );
+        if (isAllowed) return;
+        context.report({ node: comment, messageId: "unmatched" });
+      });
+    },
+  };
+}
+
+function isMultilineBlockComment(comment: AstNode): boolean {
+  const isBlockComment = comment.type === "Block";
+  const spansLines = /\r?\n/.test(getCommentValue(comment));
+  return isBlockComment && spansLines;
+}
+
+function isJsdocComment(context: RuleContext, comment: AstNode): boolean {
+  const commentText = getNodeText(context, comment).trimStart();
+  if (commentText) return commentText.startsWith("/**");
+
+  return getCommentValue(comment).startsWith("*");
+}
+
+function createRequireJsdocMultilineComments(context: RuleContext): RuleListener {
+  return {
+    Program() {
+      getAllComments(context).forEach((comment) => {
+        const needsJsdoc = isMultilineBlockComment(comment);
+        if (!needsJsdoc) return;
+
+        const hasJsdocSyntax = isJsdocComment(context, comment);
+        if (hasJsdocSyntax) return;
+        context.report({ node: comment, messageId: "useJsdoc" });
+      });
+    },
+  };
 }
 
 function getFirstLine(text: string): string {
@@ -2497,6 +2751,10 @@ const rules = {
     MAX_EXPRESSION_OPERATORS_META,
     createMaxExpressionOperators,
   ),
+  "no-automated-comment-attribution": defineRule(
+    NO_AUTOMATED_COMMENT_ATTRIBUTION_META,
+    createNoAutomatedCommentAttribution,
+  ),
   "no-complex-ternaries": defineRule(NO_COMPLEX_TERNARIES_META, createNoComplexTernaries),
   "no-computed-values": defineRule(NO_COMPUTED_VALUES_META, createNoComputedValues),
   "no-direct-node-bin-smoke": defineRule(NO_DIRECT_NODE_BIN_SMOKE_META, createNoDirectNodeBinSmoke),
@@ -2522,6 +2780,10 @@ const rules = {
   "no-trivial-wrapper-functions": defineRule(
     NO_TRIVIAL_WRAPPER_FUNCTIONS_META,
     createNoTrivialWrapperFunctions,
+  ),
+  "no-unmatched-comments": defineRule(
+    NO_UNMATCHED_COMMENTS_META,
+    createNoUnmatchedComments,
   ),
   "no-unnecessary-block-callback": defineRule(
     NO_UNNECESSARY_BLOCK_CALLBACK_META,
@@ -2554,6 +2816,10 @@ const rules = {
   "require-filename-matches-dirname": defineRule(
     REQUIRE_FILENAME_MATCHES_DIRNAME_META,
     createRequireFilenameMatchesDirname,
+  ),
+  "require-jsdoc-multiline-comments": defineRule(
+    REQUIRE_JSDOC_MULTILINE_COMMENTS_META,
+    createRequireJsdocMultilineComments,
   ),
 };
 

@@ -6,6 +6,7 @@
     }
   ],
   "rules": {
-    "legibility/prefer-early-return": "error"
+    "legibility/prefer-early-return": "error",
+    "legibility/no-unmatched-comments": "error"
   }
 }
