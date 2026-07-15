@@ -754,31 +754,49 @@ function matchesAnyPathPattern(path: string, patterns: readonly string[]): boole
   return matchesPattern;
 }
 
-function getSourceCode(context: RuleContext): SourceCodeLike | null {
-  const directSourceCode = context.sourceCode;
-  const hasDirectSourceCode = Boolean(directSourceCode);
-  const canReadDirectSourceCode = typeof directSourceCode?.getText === "function";
-  const canReadDirectComments = typeof directSourceCode?.getAllComments === "function";
-  const canUseDirectSourceCode = canReadDirectSourceCode || canReadDirectComments;
-  const shouldUseDirectSourceCode = hasDirectSourceCode && canUseDirectSourceCode;
-  if (shouldUseDirectSourceCode) {
-    return directSourceCode;
-  }
-
+function getLegacySourceCode(context: RuleContext): SourceCodeLike | null {
   const getContextSourceCode = context.getSourceCode;
   const canGetSourceCode = typeof getContextSourceCode === "function";
   if (!canGetSourceCode) return null;
 
   try {
-    const sourceCode = getContextSourceCode();
-    const hasGetText = typeof sourceCode.getText === "function";
-    const hasGetAllComments = typeof sourceCode.getAllComments === "function";
-    const canUseSourceCode = hasGetText || hasGetAllComments;
-    if (!canUseSourceCode) return null;
-    return sourceCode;
+    return getContextSourceCode();
   } catch {
     return null;
   }
+}
+
+function canReadSourceCode(
+  sourceCode: SourceCodeLike | null | undefined,
+): sourceCode is SourceCodeLike {
+  const hasText = typeof sourceCode?.text === "string";
+  const hasGetText = typeof sourceCode?.getText === "function";
+  return hasText || hasGetText;
+}
+
+function canReadComments(
+  sourceCode: SourceCodeLike | null | undefined,
+): sourceCode is SourceCodeLike {
+  const canGetComments = typeof sourceCode?.getAllComments === "function";
+  return canGetComments;
+}
+
+function getCommentSourceCode(context: RuleContext): SourceCodeLike | null {
+  const directSourceCode = context.sourceCode;
+  if (canReadComments(directSourceCode)) return directSourceCode;
+
+  const legacySourceCode = getLegacySourceCode(context);
+  if (!canReadComments(legacySourceCode)) return null;
+  return legacySourceCode;
+}
+
+function getSourceCode(context: RuleContext): SourceCodeLike | null {
+  const directSourceCode = context.sourceCode;
+  if (canReadSourceCode(directSourceCode)) return directSourceCode;
+
+  const legacySourceCode = getLegacySourceCode(context);
+  if (!canReadSourceCode(legacySourceCode)) return null;
+  return legacySourceCode;
 }
 
 function getSourceText(context: RuleContext): string {
@@ -810,7 +828,7 @@ function isSourceComment(value: unknown): value is AstNode {
 }
 
 function getAllComments(context: RuleContext): AstNode[] {
-  const sourceCode = getSourceCode(context);
+  const sourceCode = getCommentSourceCode(context);
   if (sourceCode === null) return [];
 
   const getAllComments = sourceCode.getAllComments;
@@ -932,10 +950,10 @@ function matchesCommentMatcher(value: string, matchers: readonly RegExp[]): bool
   return matchers.some((matcher) => matcher.test(value));
 }
 
-function normalizeCommentBoundary(value: string): string {
+function normalizeCommentValue(value: string): string {
   const lines = value.split(/\r?\n/);
   const normalizedLines = lines.map((line) => line.replace(/^\s*\*\s?/, ""));
-  return normalizedLines.join("\n").trim().toLowerCase();
+  return normalizedLines.join("\n").trim();
 }
 
 function isIdentifierBoundary(value: string, index: number): boolean {
@@ -973,13 +991,14 @@ function isAllowedComment(
   prefixIdentifiers: readonly string[],
   suffixIdentifiers: readonly string[],
 ): boolean {
-  const matchesPattern = matchesCommentMatcher(value, matchers);
+  const normalizedValue = normalizeCommentValue(value);
+  const matchesPattern = matchesCommentMatcher(normalizedValue, matchers);
   if (matchesPattern) return true;
 
-  const normalizedValue = normalizeCommentBoundary(value);
-  const matchesPrefix = matchesPrefixIdentifier(normalizedValue, prefixIdentifiers);
+  const normalizedBoundary = normalizedValue.toLowerCase();
+  const matchesPrefix = matchesPrefixIdentifier(normalizedBoundary, prefixIdentifiers);
   if (matchesPrefix) return true;
-  return matchesSuffixIdentifier(normalizedValue, suffixIdentifiers);
+  return matchesSuffixIdentifier(normalizedBoundary, suffixIdentifiers);
 }
 
 function createNoUnmatchedComments(context: RuleContext): RuleListener {

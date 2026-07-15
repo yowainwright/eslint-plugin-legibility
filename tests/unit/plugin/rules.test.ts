@@ -211,14 +211,14 @@ test("no-unmatched-comments bans comments by default and ignores shebangs", () =
 
 test("no-unmatched-comments accepts configured line and JSDoc matcher values", () => {
   const comments = [
-    comment("Line", " Preserve this. KEEP-42", "// Preserve this. KEEP-42"),
+    comment("Line", " KEEP-42: Preserve this.", "// KEEP-42: Preserve this."),
     comment(
       "Block",
-      "*\n * Explain the API.\n * KEEP-73\n ",
-      "/**\n * Explain the API.\n * KEEP-73\n */",
+      "*\n * KEEP-73: Explain the API.\n ",
+      "/**\n * KEEP-73: Explain the API.\n */",
     ),
   ];
-  const options = [{ matchers: ["\\bKEEP-\\d+\\b"] }];
+  const options = [{ matchers: ["^KEEP-\\d+\\b"] }];
   const { visitor, reports } = createCommentRule("no-unmatched-comments", comments, options);
 
   visitor.Program({ type: "Program" });
@@ -243,6 +243,17 @@ test("no-unmatched-comments supports custom and empty matcher lists", () => {
   assert.equal(customRule.reports.length, 0);
   assert.equal(banAllRule.reports.length, 1);
   assert.equal(invalidRule.reports.length, 1);
+});
+
+test("comment rules accept direct sources without text readers", () => {
+  const comments = [comment("Line", " HUMAN: preserve this", "// HUMAN: preserve this")];
+  const sourceCode = { getAllComments: () => comments };
+  const options = [{ prefixIdentifiers: ["HUMAN"] }];
+  const { visitor, reports } = createRule("no-unmatched-comments", options, { sourceCode });
+
+  visitor.Program({ type: "Program" });
+
+  assert.equal(reports.length, 0);
 });
 
 test("no-unmatched-comments accepts bounded prefix and suffix identifiers", () => {
@@ -592,6 +603,18 @@ test("require-executable-shebang accepts Deno shebangs by default", () => {
       getText: () => "",
     },
   });
+
+  visitor.Program({ type: "Program" });
+
+  assert.equal(reports.length, 0);
+});
+
+test("text rules use readable fallbacks for comment-only direct sources", () => {
+  const sourceText = "#!/usr/bin/env node\nconsole.log('ok');\n";
+  const sourceCode = { getAllComments: () => [] };
+  const getSourceCode = () => ({ getText: () => sourceText });
+  const overrides = { sourceCode, getSourceCode };
+  const { visitor, reports } = createRule("require-executable-shebang", [], overrides);
 
   visitor.Program({ type: "Program" });
 

@@ -569,7 +569,7 @@ No matcher or identifier is configured by default. Enabling the rule without opt
 
 | Option | Type | Default | Behavior |
 | --- | --- | --- | --- |
-| `matchers` | `string[]` | `[]` | Case-insensitive regular-expression sources matched anywhere in the raw comment body. |
+| `matchers` | `string[]` | `[]` | Case-insensitive regular-expression sources matched against the normalized comment body. |
 | `prefixIdentifiers` | `string[]` | `[]` | Case-insensitive literal identifiers matched at the start of the normalized comment body. |
 | `suffixIdentifiers` | `string[]` | `[]` | Case-insensitive literal identifiers matched at the end of the normalized comment body. |
 
@@ -664,12 +664,15 @@ The marker must be the final normalized text. Punctuation after a suffix does no
 
 `matchers` entries are regular-expression source strings. The rule supplies the case-insensitive Unicode flags, so configure each pattern without `/.../` delimiters or flags.
 
+Before matching, the rule trims surrounding whitespace and removes leading JSDoc `*` prefixes. Anchored patterns therefore behave consistently for line, block, and JSDoc comments.
+
 ```js
 {
   "legibility/no-unmatched-comments": [
     "error",
     {
       matchers: [
+        "^ENG-\\d+\\b",
         "\\b(ENG|OPS)-\\d+\\b",
         "^\\s*eslint-(disable|enable)(-next-line|-line){0,1}\\b",
         "^\\s*(c8|istanbul)\\s+ignore\\b",
@@ -685,8 +688,12 @@ This configuration accepts examples such as:
 
 ```js
 // Retry behavior is tracked in ENG-482.
+// ENG-482: Preserve the provider retry order.
 // eslint-disable-next-line no-await-in-loop -- The provider requires ordered requests.
 /* c8 ignore next -- The runtime feature check is deterministic in CI. */
+/**
+ * ENG-483: Preserve this public compatibility note.
+ */
 ```
 
 Broad matchers weaken a strict human-ownership policy because anyone can write matching text. Keep only the comment classes the repository intends to preserve.
@@ -789,7 +796,7 @@ The same options work when the package is loaded as an Oxlint JavaScript plugin:
 
 - Line comments, inline comments, trailing comments, and block comments are checked.
 - Executable shebang tokens are ignored.
-- Regular-expression matchers run against the comment body without the `//`, `/*`, or `*/` delimiters.
+- Regular-expression matchers run against the trimmed comment body without delimiters or leading JSDoc `*` prefixes.
 - Regular-expression matchers are compiled with the `i` and `u` flags.
 - Invalid regular expressions are ignored. If no other allow path matches, the comment is rejected.
 - Empty or whitespace-only prefix and suffix identifiers never match.
