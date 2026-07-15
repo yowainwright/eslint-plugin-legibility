@@ -21,6 +21,8 @@ test("renders a Codex-compatible skill", () => {
   assert.match(skill, /^---\nname: eslint-plugin-legibility/m);
   assert.match(skill, /description: >/);
   assert.match(skill, /npx lint-changed/);
+  assert.match(skill, /Agents must not add source comments, matcher text, or prefix\/suffix identifiers/);
+  assert.match(skill, /comments accepted by a configured matcher or identifier as human-owned/);
 });
 
 test("parses build targets", () => {

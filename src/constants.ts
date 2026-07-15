@@ -33,6 +33,21 @@ export const DEFAULT_MAX_CONTROL_FLOW_DEPTH = 3;
 export const DEFAULT_MAX_ARRAY_CHAIN_DEPTH = 2;
 export const DEFAULT_MIN_OBJECT_LOOKUP_CHAIN_LENGTH = 3;
 
+export const DEFAULT_AI_COMMENT_IDENTIFIERS = [
+  "ai",
+  "chatgpt",
+  "claude",
+  "codex",
+  "copilot",
+  "gemini",
+  "gpt",
+  "llm",
+  "openai",
+];
+export const DEFAULT_COMMENT_MATCHERS: string[] = [];
+export const DEFAULT_COMMENT_PREFIX_IDENTIFIERS: string[] = [];
+export const DEFAULT_COMMENT_SUFFIX_IDENTIFIERS: string[] = [];
+
 export const SKIP_KEYS = new Set(["parent", "loc", "range", "tokens", "comments"]);
 
 export const FUNCTION_NODE_TYPES = new Set([
@@ -236,6 +251,7 @@ export const RECOMMENDED_RULE_NAMES = [
   "max-array-chain-depth",
   "max-control-flow-depth",
   "max-expression-operators",
+  "no-automated-comment-attribution",
   "no-complex-ternaries",
   "no-computed-values",
   "no-direct-node-bin-smoke",
@@ -247,6 +263,7 @@ export const RECOMMENDED_RULE_NAMES = [
   "no-redundant-nullish-fallback",
   "no-standalone-array-mutations",
   "no-trivial-wrapper-functions",
+  "no-unmatched-comments",
   "no-unnecessary-block-callback",
   "prefer-concat-object-assign",
   "prefer-early-return",
@@ -255,6 +272,7 @@ export const RECOMMENDED_RULE_NAMES = [
   "prefer-object-lookup",
   "require-executable-shebang",
   "require-filename-matches-dirname",
+  "require-jsdoc-multiline-comments",
 ];
 
 const STRING_ARRAY_SCHEMA = { type: "array", items: { type: "string" } };
@@ -338,6 +356,29 @@ export const HOIST_IF_OPERATORS_META = defineMeta("hoist-if-operators", {
       "If condition has {{count}} readability operators (max {{max}}). Hoist it into a named boolean.",
   },
 });
+
+export const NO_AUTOMATED_COMMENT_ATTRIBUTION_META = defineMeta(
+  "no-automated-comment-attribution",
+  {
+    type: "problem",
+    docs: {
+      description: "Flag comments that contain prohibited authorship signatures.",
+      recommended: true,
+    },
+    schema: [
+      {
+        type: "object",
+        properties: {
+          identifiers: STRING_ARRAY_SCHEMA,
+        },
+        additionalProperties: false,
+      },
+    ],
+    messages: {
+      prohibitedAttribution: "Comment contains the prohibited attribution \"{{identifier}}\".",
+    },
+  },
+);
 
 export const NO_HIDDEN_SIDE_EFFECTS_META = defineMeta("no-hidden-side-effects", {
   type: "suggestion",
@@ -451,6 +492,21 @@ export const REQUIRE_EXECUTABLE_SHEBANG_META = defineMeta("require-executable-sh
       "{{file}} is configured as an executable entry source but has no Node/Bun/Deno shebang.",
   },
 });
+
+export const REQUIRE_JSDOC_MULTILINE_COMMENTS_META = defineMeta(
+  "require-jsdoc-multiline-comments",
+  {
+    type: "layout",
+    docs: {
+      description: "Require multiline block comments to use JSDoc syntax.",
+      recommended: true,
+    },
+    schema: [],
+    messages: {
+      useJsdoc: "Multiline block comments must use JSDoc syntax (`/** ... */`).",
+    },
+  },
+);
 
 export const NO_DIRECT_NODE_BIN_SMOKE_META = defineMeta("no-direct-node-bin-smoke", {
   type: "problem",
@@ -668,6 +724,28 @@ export const NO_IDENTITY_ARRAY_CALLBACK_META = defineMeta("no-identity-array-cal
   messages: {
     identityMap: "Avoid .map() callbacks that return the item unchanged.",
     alwaysTrueFilter: "Avoid .filter() callbacks that always keep every item.",
+  },
+});
+
+export const NO_UNMATCHED_COMMENTS_META = defineMeta("no-unmatched-comments", {
+  type: "problem",
+  docs: {
+    description: "Reject comments without an allowed matcher or boundary identifier.",
+    recommended: true,
+  },
+  schema: [
+    {
+      type: "object",
+      properties: {
+        matchers: STRING_ARRAY_SCHEMA,
+        prefixIdentifiers: STRING_ARRAY_SCHEMA,
+        suffixIdentifiers: STRING_ARRAY_SCHEMA,
+      },
+      additionalProperties: false,
+    },
+  ],
+  messages: {
+    unmatched: "Comment does not match an allowed matcher or boundary identifier.",
   },
 });
 

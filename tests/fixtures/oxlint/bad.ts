@@ -1,3 +1,4 @@
+// Explain the check.
 function check(value) {
   if (!value) {
     return false;

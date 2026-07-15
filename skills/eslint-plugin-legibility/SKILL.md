@@ -12,6 +12,15 @@ Use `eslint-plugin-legibility` with ESLint or Oxlint to keep JavaScript and Type
 
 Use this as the shared workflow for Codex, Claude, and generic agent skill roots. Keep tool-specific rule files as generated pointers or thin wrappers over this content.
 
+## Comment Ownership
+
+Use `legibility/no-unmatched-comments` in agent hooks as a human-ownership gate.
+
+- Agents must not add source comments, matcher text, or prefix/suffix identifiers.
+- Treat comments accepted by a configured matcher or identifier as human-owned. Do not remove or rewrite them unless the user explicitly requests it.
+- Remove an unmatched comment introduced by the agent instead of adding a matcher.
+- Preserve pre-existing unmatched comments unless the task explicitly includes comment cleanup.
+
 ## Package Install
 
 The npm package ships this skill, but does not install it automatically. After installing the package, install the skill explicitly:
