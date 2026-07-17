@@ -129,6 +129,39 @@ function literal(value: any): any {
   };
 }
 
+function objectProperty(name: string): any {
+  const key = id(name);
+  const value = id(name);
+  const node: any = {
+    type: "Property",
+    key,
+    value,
+    computed: false,
+    kind: "init",
+    method: false,
+    shorthand: true,
+  };
+  key.parent = node;
+  value.parent = node;
+  return node;
+}
+
+function objectPattern(names: string[]): any {
+  const properties = names.map(objectProperty);
+  const node: any = { type: "ObjectPattern", properties };
+  properties.forEach((property) => {
+    property.parent = node;
+  });
+  return node;
+}
+
+function assignmentPattern(left: any, right: any): any {
+  const node: any = { type: "AssignmentPattern", left, right };
+  left.parent = node;
+  right.parent = node;
+  return node;
+}
+
 function binary(left: any, operator: string, right: any): any {
   const node: any = {
     type: "BinaryExpression",
@@ -170,28 +203,90 @@ test("exports an ESLint and Oxlint compatible plugin shape", () => {
   assert.equal(plugin.meta.name, "legibility");
   assert.equal(plugin.meta.version, manifest.version);
   assert.ok(plugin.rules["max-expression-operators"]);
+  assert.ok(plugin.rules["max-function-parameters"]);
   assert.ok(plugin.rules["no-automated-comment-attribution"]);
   assert.ok(plugin.rules["prefer-early-return"]);
   assert.ok(plugin.rules["no-unmatched-comments"]);
   assert.ok(plugin.rules["require-jsdoc-multiline-comments"]);
   assert.ok(plugin.configs["flat/recommended"].plugins.legibility);
   assert.equal(
-    plugin.configs["flat/recommended"].rules[
-      "legibility/no-automated-comment-attribution"
-    ],
+    plugin.configs["flat/recommended"].rules["legibility/max-function-parameters"],
     "warn",
   );
   assert.equal(
-    plugin.configs["flat/recommended"].rules["legibility/no-unmatched-comments"],
-    "warn",
+    plugin.configs["flat/strict"].rules["legibility/max-function-parameters"],
+    "error",
   );
-  assert.equal(
-    plugin.configs["flat/recommended"].rules["legibility/require-jsdoc-multiline-comments"],
-    "warn",
-  );
+  const commentRuleNames = [
+    "no-automated-comment-attribution",
+    "no-unmatched-comments",
+    "require-jsdoc-multiline-comments",
+  ];
+  commentRuleNames.forEach((ruleName) => {
+    const ruleId = `legibility/${ruleName}`;
+    assert.equal(plugin.rules[ruleName].meta.docs.recommended, false);
+    assert.equal(plugin.configs["flat/recommended"].rules[ruleId], undefined);
+    assert.equal(plugin.configs["flat/strict"].rules[ruleId], undefined);
+  });
   assert.equal(plugin.configs.recommended.plugins[0], "legibility");
   assert.equal(requiredPlugin, plugin);
   assert.equal(requiredPlugin.meta.name, "legibility");
+});
+
+test("max-function-parameters reports functions with too many positional parameters", () => {
+  const { visitor, reports } = createRule("max-function-parameters");
+  const params = ["first", "second", "third", "fourth", "fifth"].map(id);
+  const node = {
+    type: "FunctionDeclaration",
+    id: id("sendRequest"),
+    params,
+    body: block(),
+  };
+
+  visitor.FunctionDeclaration(node);
+
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].messageId, "tooManyParameters");
+  assert.deepEqual(reports[0].data, { name: "sendRequest", count: 5, max: 4 });
+});
+
+test("max-function-parameters reports oversized object parameters", () => {
+  const names = ["a", "b", "c", "d", "e", "f", "g", "h", "i"];
+  const pattern = objectPattern(names);
+  const defaultValue = { type: "ObjectExpression", properties: [] };
+  const node = arrow([assignmentPattern(pattern, defaultValue)], block());
+  const { visitor, reports } = createRule("max-function-parameters");
+
+  visitor.ArrowFunctionExpression(node);
+
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].messageId, "tooManyObjectProperties");
+  assert.deepEqual(reports[0].data, { name: "Function", count: 9, max: 8 });
+});
+
+test("max-function-parameters supports independent limits", () => {
+  const options = [{ max: 1, maxObjectProperties: 2 }];
+  const objectParameter = objectPattern(["first", "second", "third"]);
+  const node = arrow([objectParameter, id("extra")], block());
+  const { visitor, reports } = createRule("max-function-parameters", options);
+
+  visitor.ArrowFunctionExpression(node);
+
+  assert.deepEqual(
+    reports.map((report) => report.messageId),
+    ["tooManyParameters", "tooManyObjectProperties"],
+  );
+});
+
+test("max-function-parameters accepts inputs at both limits", () => {
+  const names = ["a", "b", "c", "d", "e", "f", "g", "h"];
+  const params = [objectPattern(names), id("second"), id("third"), id("fourth")];
+  const node = arrow(params, block());
+  const { visitor, reports } = createRule("max-function-parameters");
+
+  visitor.ArrowFunctionExpression(node);
+
+  assert.equal(reports.length, 0);
 });
 
 test("no-unmatched-comments bans comments by default and ignores shebangs", () => {

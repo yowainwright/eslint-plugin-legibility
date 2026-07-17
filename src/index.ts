@@ -2,6 +2,7 @@ import { basename, relative } from "node:path";
 import {
   ARRAY_MUTATING_METHODS,
   ARG_COMMAND_FUNCTIONS,
+  COMMENT_RULE_NAMES,
   COMPARISON_OPERATORS,
   CONTROL_FLOW_TYPES,
   DEFAULT_AI_COMMENT_IDENTIFIERS,
@@ -19,8 +20,10 @@ import {
   DEFAULT_ALLOWED_FILENAME_QUALIFIERS,
   DEFAULT_ALLOWED_STANDALONE_FILENAMES,
   DEFAULT_MAX_EXPRESSION_OPERATORS,
+  DEFAULT_MAX_FUNCTION_PARAMETERS,
   DEFAULT_MIN_DIRNAME_MATCH_DEPTH,
   DEFAULT_MAX_IF_OPERATORS,
+  DEFAULT_MAX_OBJECT_PARAMETER_PROPERTIES,
   DEFAULT_MAX_TERNARY_OPERATORS,
   DEFAULT_MIN_OBJECT_LOOKUP_CHAIN_LENGTH,
   DEFAULT_READABILITY_OPERATOR_COMPLEXITY,
@@ -35,6 +38,7 @@ import {
   MAX_ARRAY_CHAIN_DEPTH_META,
   MAX_CONTROL_FLOW_DEPTH_META,
   MAX_EXPRESSION_OPERATORS_META,
+  MAX_FUNCTION_PARAMETERS_META,
   MUTATING_METHODS,
   NEGATIVE_CONDITION_NAME_PATTERN,
   NO_AUTOMATED_COMMENT_ATTRIBUTION_META,
@@ -473,6 +477,25 @@ function getFunctionParamNames(node: MaybeAstNode): string[] {
 
   const paramNames = params.map((param) => String(param.name));
   return paramNames;
+}
+
+function getFunctionParams(node: MaybeAstNode): AstNode[] {
+  const isFunction = isFunctionNode(node);
+  if (!isFunction) return [];
+
+  return getNodeArray(node.params);
+}
+
+function getObjectParameterPattern(parameter: MaybeAstNode): AstNode | null {
+  const isParameterNode = isRecord(parameter);
+  if (!isParameterNode) return null;
+
+  const isObjectPattern = parameter.type === "ObjectPattern";
+  if (isObjectPattern) return parameter;
+
+  const isDefaultParameter = parameter.type === "AssignmentPattern";
+  if (!isDefaultParameter) return null;
+  return getObjectParameterPattern(parameter.left);
 }
 
 function isBooleanLiteral(node: MaybeAstNode, value?: boolean): boolean {
@@ -1356,6 +1379,61 @@ function createMaxExpressionOperators(context: RuleContext): RuleListener {
   };
 }
 
+function reportFunctionParameterCount(context: RuleContext, node: AstNode, max: number): void {
+  const count = getFunctionParams(node).length;
+  const hasTooManyParameters = count > max;
+  if (!hasTooManyParameters) return;
+
+  const name = getFunctionName(node);
+  context.report({ node, messageId: "tooManyParameters", data: { name, count, max } });
+}
+
+function reportObjectParameterProperties(
+  context: RuleContext,
+  node: AstNode,
+  max: number,
+): void {
+  const name = getFunctionName(node);
+  const objectParameters = getFunctionParams(node)
+    .map(getObjectParameterPattern)
+    .filter((parameter): parameter is AstNode => parameter !== null);
+  objectParameters.forEach((parameter) => {
+    const count = getNodeArray(parameter.properties).length;
+    const hasTooManyProperties = count > max;
+    if (!hasTooManyProperties) return;
+    context.report({
+      node: parameter,
+      messageId: "tooManyObjectProperties",
+      data: { name, count, max },
+    });
+  });
+}
+
+function checkFunctionParameters(
+  context: RuleContext,
+  node: AstNode,
+  max: number,
+  maxObjectProperties: number,
+): void {
+  reportFunctionParameterCount(context, node, max);
+  reportObjectParameterProperties(context, node, maxObjectProperties);
+}
+
+function createMaxFunctionParameters(context: RuleContext): RuleListener {
+  const max = getConfiguredMax(context, DEFAULT_MAX_FUNCTION_PARAMETERS);
+  const maxObjectProperties = getConfiguredNumber(
+    context,
+    "maxObjectProperties",
+    DEFAULT_MAX_OBJECT_PARAMETER_PROPERTIES,
+  );
+  const check = (node: AstNode) => checkFunctionParameters(context, node, max, maxObjectProperties);
+  return {
+    ArrowFunctionExpression: check,
+    FunctionDeclaration: check,
+    FunctionExpression: check,
+  };
+}
+
 function createHoistIfOperators(context: RuleContext): RuleListener {
   const max = getConfiguredMax(context, DEFAULT_MAX_IF_OPERATORS);
   const complexity = getConfiguredOperatorComplexity(
@@ -1569,21 +1647,21 @@ function checkStandaloneArrayMutation(
   });
 }
 
-function reportComputedValue(
+function createComputedValueReporter(
   context: RuleContext,
-  node: MaybeAstNode,
-  messageId: string,
   max: number,
   complexity: OperatorComplexity,
-): void {
-  const isNode = isRecord(node);
-  if (!isNode) return;
+): (node: MaybeAstNode, messageId: string) => void {
+  return (node, messageId) => {
+    const isNode = isRecord(node);
+    if (!isNode) return;
 
-  const count = countComputedValueOperators(node, complexity);
-  const isWithinLimit = count <= max;
-  if (isWithinLimit) return;
+    const count = countComputedValueOperators(node, complexity);
+    const isWithinLimit = count <= max;
+    if (isWithinLimit) return;
 
-  context.report({ node, messageId, data: { count, max } });
+    context.report({ node, messageId, data: { count, max } });
+  };
 }
 
 function isComputedReturnSkipped(argument: MaybeAstNode): boolean {
@@ -1605,6 +1683,7 @@ function createNoComputedValues(context: RuleContext): RuleListener {
     context,
     DEFAULT_COMPUTED_VALUE_OPERATOR_COMPLEXITY,
   );
+  const reportComputedValue = createComputedValueReporter(context, max, complexity);
   return {
     Property(node) {
       const value = node.value;
@@ -1617,14 +1696,14 @@ function createNoComputedValues(context: RuleContext): RuleListener {
       const isJsxValue = isJsxNode(value);
       if (isJsxValue) return;
 
-      reportComputedValue(context, value, "computedObjectValue", max, complexity);
+      reportComputedValue(value, "computedObjectValue");
     },
     ReturnStatement(node) {
       const argument = node.argument;
       const shouldSkipReturn = isComputedReturnSkipped(argument);
       if (shouldSkipReturn) return;
 
-      reportComputedValue(context, argument, "computedReturn", max, complexity);
+      reportComputedValue(argument, "computedReturn");
     },
   };
 }
@@ -2770,6 +2849,10 @@ const rules = {
     MAX_EXPRESSION_OPERATORS_META,
     createMaxExpressionOperators,
   ),
+  "max-function-parameters": defineRule(
+    MAX_FUNCTION_PARAMETERS_META,
+    createMaxFunctionParameters,
+  ),
   "no-automated-comment-attribution": defineRule(
     NO_AUTOMATED_COMMENT_ATTRIBUTION_META,
     createNoAutomatedCommentAttribution,
@@ -2850,7 +2933,8 @@ function buildRuleConfig(
 }
 
 const recommendedRules = buildRuleConfig(RECOMMENDED_RULE_NAMES, "warn");
-const strictRules = buildRuleConfig(Object.keys(rules), "error");
+const strictRuleNames = Object.keys(rules).filter((ruleName) => !COMMENT_RULE_NAMES.has(ruleName));
+const strictRules = buildRuleConfig(strictRuleNames, "error");
 
 const plugin: LegibilityPlugin = {
   meta: {
