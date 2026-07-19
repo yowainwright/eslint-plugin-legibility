@@ -20,148 +20,20 @@ The goal of rules in this package are to make code readable for reviewing lots o
 
 ---
 
-## How to use
+## Install
 
 This project provides ESLint and Oxlint-compatible rules for readable, explicit, performance-conscious JavaScript and TypeScript.
 
 The package exports an ESLint-compatible plugin object. ESLint can load it as a normal plugin, and Oxlint can load the same package through JavaScript plugin support. 
-
-### Install
 
 ```sh
 # npm, pnpm, bun
 pnpm add -D eslint-plugin-legibility
 ```
 
-### Using With ESLint
-
-Flat config:
-
-```ts
-import legibility from "eslint-plugin-legibility";
-
-export default [legibility.configs["flat/recommended"]];
-```
-
-Configure rules directly:
-
-```ts
-import legibility from "eslint-plugin-legibility";
-
-export default [
-  {
-    plugins: { legibility },
-    rules: {
-      "legibility/max-array-chain-depth": ["warn", { max: 2 }],
-      "legibility/max-expression-operators": ["warn", { max: 4 }],
-      "legibility/no-quadratic-patterns": "warn",
-    },
-  },
-];
-```
-
-CommonJS compatibility:
-
-```js
-const legibility = require("eslint-plugin-legibility");
-```
-
-Legacy config:
-
-```js
-module.exports = {
-  plugins: ["legibility"],
-  extends: ["plugin:legibility/recommended"],
-};
-```
-
-### Usage With Oxlint
-
-Oxlint JavaScript plugins use the same ESLint-compatible rule API.
-
-```json
-{
-  "jsPlugins": [
-    {
-      "name": "legibility",
-      "specifier": "eslint-plugin-legibility"
-    }
-  ],
-  "rules": {
-    "legibility/max-array-chain-depth": ["warn", { "max": 2 }],
-    "legibility/max-expression-operators": ["warn", { "max": 4 }],
-    "legibility/no-quadratic-patterns": "warn"
-  }
-}
-```
-
-### Agent Skill
-
-<!-- agent skill install command from package.json bin and scripts/agent/constants.ts -->
-
-Install the packaged agent skill after installing the npm package:
-
-```sh
-npx eslint-plugin-legibility-install-skill
-```
-
-Install for a specific agent target:
-
-```sh
-npx eslint-plugin-legibility-install-skill --target codex
-npx eslint-plugin-legibility-install-skill --target claude
-```
-
 ---
 
-## Configs
-
-| Config | Format | Behavior |
-| --- | --- | --- |
-| [recommended](#legibility-configs-recommended) | ESLint legacy | High-signal general rules as warnings. |
-| [strict](#legibility-configs-strict) | ESLint legacy | General rules as errors. |
-| [flat/recommended](#legibility-configs-flat-recommended) | ESLint flat config | High-signal general rules as warnings. |
-| [flat/strict](#legibility-configs-flat-strict) | ESLint flat config | General rules as errors. |
-
----
-
-## API
-
-Rules are configured through ESLint or Oxlint `rules`.
-
-```json
-{
-  rules: {
-    "legibility/rule-name": ["warn", { option: "value" }]
-  }
-}
-```
-
-### `legibility.configs["flat/recommended"]`
-
-Flat ESLint config with high-signal general rules enabled as warnings. Comment policies are configured through [recipes](#comment-policy-recipes).
-
----
-
-### `legibility.configs["flat/strict"]`
-
-Flat ESLint config with general rules enabled as errors. Comment policies are configured through [recipes](#comment-policy-recipes).
-
----
-
-### `legibility.configs.recommended`
-
-Legacy ESLint config with high-signal general rules enabled as warnings. Comment policies are configured through [recipes](#comment-policy-recipes).
-
----
-
-### `legibility.configs.strict`
-
-Legacy ESLint config with general rules enabled as errors. Comment policies are configured through [recipes](#comment-policy-recipes).
-
----
-
-### Rules
+## Rules
 
 Rules marked `recommended + strict` are enabled by `recommended` as `warn` and by `strict` as `error`. Rules marked `strict only` are enabled by `strict` as `error`. Comment rules are `recipe only` because their severity and options depend on whether a human, agent, or commit gate is running lint.
 
@@ -882,70 +754,6 @@ Use `max` and `min` to tune rule sensitivity.
 
 ---
 
-## Security Posture
-
-- No runtime dependencies.
-- Published package contents are allowlisted with `files`.
-- Releases are tag-triggered and publish GitHub release assets.
-- npm publishing uses GitHub Actions trusted publishing with provenance.
-<!-- runtime compatibility coverage from .github/workflows/ci.yml -->
-- CI runs validation on Node 20, 22, 24, and 26, plus compatibility suites on Bun and Deno.
-- Bun installs are configured to use Socket.dev's security scanner.
-
-## GitHub Secrets
-
-| Secret | Location | Used by | Required when |
-| --- | --- | --- | --- |
-| `CODECOV_TOKEN` | Repository Actions secret | `.github/workflows/codecov.yml` | Codecov uploads run on protected branches or token authentication is required in Codecov. |
-| `SOCKET_SECURITY_API_KEY` | Repository Actions secret | GitHub workflows that install, analyze, test, or publish packages | Socket.dev scanning or package-manager security integration is enabled. |
-| `SOCKET_API_KEY` | Repository Actions secret | Fallback Socket token name | Existing Socket automation expects this older token name. |
-
-`GITHUB_TOKEN` is provided by GitHub Actions automatically and does not need to be added manually.
-
-npm publishing does not use `NPM_TOKEN` or `NODE_AUTH_TOKEN`. Configure npm trusted publishing for:
-
-| Field | Value |
-| --- | --- |
-| Provider | GitHub Actions |
-| Repository owner | `yowainwright` |
-| Repository name | `eslint-plugin-legibility` |
-| Workflow filename | `publish.yml` |
-| Environment | blank |
-| Allowed action | `npm publish` |
-
-## Releases
-
-```sh
-pnpm release:current:dry
-pnpm release:current
-pnpm release:patch:dry
-pnpm release:patch
-pnpm release:minor
-pnpm release:major
-pnpm release:beta
-pnpm release:alpha
-```
-
-Releases use a local release wrapper around `release-it`. Run release commands from a clean, up-to-date `main` branch. Use `pnpm release:current` for the first publish of the current package version, then use the patch, minor, major, alpha, or beta commands for later releases. The wrapper resolves the exact version, verifies local `main` matches `origin/main`, and asks for confirmation before `release-it` pushes the tag that triggers npm publishing.
-
-The publish confirmation question is:
-
-```text
-Publish eslint-plugin-legibility@<version> from GitHub Actions trusted publishing? This will push v<version> and npm <dist-tag> will update if the workflow succeeds. Continue? [y/N]
-```
-
-Answer `y` or `yes` to continue. Any other answer aborts before the release tag is pushed. For intentional noninteractive release automation, pass `--yes` to the release wrapper.
-
-After confirmation, `release-it` runs `pnpm validate`, bumps `package.json` when incrementing, creates the release commit, creates `v${version}`, and pushes the branch with tags. The pushed tag triggers npm publishing and GitHub release asset upload through `.github/workflows/publish.yml`.
-
-Before publishing, configure npm trusted publishing for `publish.yml`. Leave the environment field blank because the publish workflow does not use a GitHub environment.
-
-## Attribution
-
-The first rules were adapted from the [Pastoralist](https://github.com/yowainwright/pastoralist) `scripts/oxlint-plugin` rule set, then packaged for ESLint and Oxlint with additional legibility and performance rules.
-
----
-
 <a id="comment-policy-recipes"></a>
 
 ## Recipes
@@ -1084,3 +892,197 @@ pnpm exec eslint --max-warnings 0 .
 ```
 
 This repository can install its managed validation hook with `pnpm install-hooks`.
+
+---
+
+## Configs
+
+| Config | Format | Behavior |
+| --- | --- | --- |
+| [recommended](#legibility-configs-recommended) | ESLint legacy | High-signal general rules as warnings. |
+| [strict](#legibility-configs-strict) | ESLint legacy | General rules as errors. |
+| [flat/recommended](#legibility-configs-flat-recommended) | ESLint flat config | High-signal general rules as warnings. |
+| [flat/strict](#legibility-configs-flat-strict) | ESLint flat config | General rules as errors. |
+
+---
+
+## Usage
+
+### Using With ESLint
+
+Flat config:
+
+```ts
+import legibility from "eslint-plugin-legibility";
+
+export default [legibility.configs["flat/recommended"]];
+```
+
+Configure rules directly:
+
+```ts
+import legibility from "eslint-plugin-legibility";
+
+export default [
+  {
+    plugins: { legibility },
+    rules: {
+      "legibility/max-array-chain-depth": ["warn", { max: 2 }],
+      "legibility/max-expression-operators": ["warn", { max: 4 }],
+      "legibility/no-quadratic-patterns": "warn",
+    },
+  },
+];
+```
+
+CommonJS compatibility:
+
+```js
+const legibility = require("eslint-plugin-legibility");
+```
+
+Legacy config:
+
+```js
+module.exports = {
+  plugins: ["legibility"],
+  extends: ["plugin:legibility/recommended"],
+};
+```
+
+### Usage With Oxlint
+
+Oxlint JavaScript plugins use the same ESLint-compatible rule API.
+
+```json
+{
+  "jsPlugins": [
+    {
+      "name": "legibility",
+      "specifier": "eslint-plugin-legibility"
+    }
+  ],
+  "rules": {
+    "legibility/max-array-chain-depth": ["warn", { "max": 2 }],
+    "legibility/max-expression-operators": ["warn", { "max": 4 }],
+    "legibility/no-quadratic-patterns": "warn"
+  }
+}
+```
+
+### Agent Skill
+
+<!-- agent skill install command from package.json bin and scripts/agent/constants.ts -->
+
+Install the packaged agent skill after installing the npm package:
+
+```sh
+npx eslint-plugin-legibility-install-skill
+```
+
+Install for a specific agent target:
+
+```sh
+npx eslint-plugin-legibility-install-skill --target codex
+npx eslint-plugin-legibility-install-skill --target claude
+```
+
+---
+
+## API
+
+Rules are configured through ESLint or Oxlint `rules`.
+
+```json
+{
+  rules: {
+    "legibility/rule-name": ["warn", { option: "value" }]
+  }
+}
+```
+
+### `legibility.configs["flat/recommended"]`
+
+Flat ESLint config with high-signal general rules enabled as warnings. Comment policies are configured through [recipes](#comment-policy-recipes).
+
+---
+
+### `legibility.configs["flat/strict"]`
+
+Flat ESLint config with general rules enabled as errors. Comment policies are configured through [recipes](#comment-policy-recipes).
+
+---
+
+### `legibility.configs.recommended`
+
+Legacy ESLint config with high-signal general rules enabled as warnings. Comment policies are configured through [recipes](#comment-policy-recipes).
+
+---
+
+### `legibility.configs.strict`
+
+Legacy ESLint config with general rules enabled as errors. Comment policies are configured through [recipes](#comment-policy-recipes).
+
+---
+
+## Security Posture
+
+- No runtime dependencies.
+- Published package contents are allowlisted with `files`.
+- Releases are tag-triggered and publish GitHub release assets.
+- npm publishing uses GitHub Actions trusted publishing with provenance.
+<!-- runtime compatibility coverage from .github/workflows/ci.yml -->
+- CI runs validation on Node 20, 22, 24, and 26, plus compatibility suites on Bun and Deno.
+- Bun installs are configured to use Socket.dev's security scanner.
+
+## GitHub Secrets
+
+| Secret | Location | Used by | Required when |
+| --- | --- | --- | --- |
+| `CODECOV_TOKEN` | Repository Actions secret | `.github/workflows/codecov.yml` | Codecov uploads run on protected branches or token authentication is required in Codecov. |
+| `SOCKET_SECURITY_API_KEY` | Repository Actions secret | GitHub workflows that install, analyze, test, or publish packages | Socket.dev scanning or package-manager security integration is enabled. |
+| `SOCKET_API_KEY` | Repository Actions secret | Fallback Socket token name | Existing Socket automation expects this older token name. |
+
+`GITHUB_TOKEN` is provided by GitHub Actions automatically and does not need to be added manually.
+
+npm publishing does not use `NPM_TOKEN` or `NODE_AUTH_TOKEN`. Configure npm trusted publishing for:
+
+| Field | Value |
+| --- | --- |
+| Provider | GitHub Actions |
+| Repository owner | `yowainwright` |
+| Repository name | `eslint-plugin-legibility` |
+| Workflow filename | `publish.yml` |
+| Environment | blank |
+| Allowed action | `npm publish` |
+
+## Releases
+
+```sh
+pnpm release:current:dry
+pnpm release:current
+pnpm release:patch:dry
+pnpm release:patch
+pnpm release:minor
+pnpm release:major
+pnpm release:beta
+pnpm release:alpha
+```
+
+Releases use a local release wrapper around `release-it`. Run release commands from a clean, up-to-date `main` branch. Use `pnpm release:current` for the first publish of the current package version, then use the patch, minor, major, alpha, or beta commands for later releases. The wrapper resolves the exact version, verifies local `main` matches `origin/main`, and asks for confirmation before `release-it` pushes the tag that triggers npm publishing.
+
+The publish confirmation question is:
+
+```text
+Publish eslint-plugin-legibility@<version> from GitHub Actions trusted publishing? This will push v<version> and npm <dist-tag> will update if the workflow succeeds. Continue? [y/N]
+```
+
+Answer `y` or `yes` to continue. Any other answer aborts before the release tag is pushed. For intentional noninteractive release automation, pass `--yes` to the release wrapper.
+
+After confirmation, `release-it` runs `pnpm validate`, bumps `package.json` when incrementing, creates the release commit, creates `v${version}`, and pushes the branch with tags. The pushed tag triggers npm publishing and GitHub release asset upload through `.github/workflows/publish.yml`.
+
+Before publishing, configure npm trusted publishing for `publish.yml`. Leave the environment field blank because the publish workflow does not use a GitHub environment.
+
+## Attribution
+
+The first rules were adapted from the [Pastoralist](https://github.com/yowainwright/pastoralist) `scripts/oxlint-plugin` rule set, then packaged for ESLint and Oxlint with additional legibility and performance rules.
