@@ -14,11 +14,11 @@ import {
   parseTestRunMode,
   remapCoverageSources,
   runTestPlan,
-} from "../../../scripts/run-tests.ts";
-import type { TestCommandRunner, TestRunPlan } from "../../../scripts/types.ts";
+} from "../../scripts/test.ts";
+import type { TestCommandRunner, TestRunPlan } from "../../scripts/types.ts";
 
 function createTempDirectory(): string {
-  const directory = mkdtempSync(join(tmpdir(), "legibility-run-tests-"));
+  const directory = mkdtempSync(join(tmpdir(), "legibility-test-"));
   return directory;
 }
 
@@ -99,9 +99,9 @@ test("remaps generated coverage source paths", () => {
   const coveragePath = join(directory, "lcov.info");
 
   try {
-    writeFileSync(coveragePath, "SF:dist/index.js\nSF:.build/scripts/run-tests.js\n");
+    writeFileSync(coveragePath, "SF:dist/index.js\nSF:.build/scripts/test.js\n");
     remapCoverageSources(coveragePath);
-    assert.equal(readFileSync(coveragePath, "utf8"), "SF:src/index.ts\nSF:scripts/run-tests.ts\n");
+    assert.equal(readFileSync(coveragePath, "utf8"), "SF:src/index.ts\nSF:scripts/test.ts\n");
   } finally {
     rmSync(directory, { force: true, recursive: true });
   }

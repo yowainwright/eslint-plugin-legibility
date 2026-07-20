@@ -1,7 +1,10 @@
 # eslint plugin legibility
 
+<!-- package badges from package.json and GitHub workflows -->
 [![npm version](https://img.shields.io/npm/v/eslint-plugin-legibility.svg)](https://www.npmjs.com/package/eslint-plugin-legibility)
 [![npm downloads](https://img.shields.io/npm/dm/eslint-plugin-legibility.svg)](https://www.npmjs.com/package/eslint-plugin-legibility)
+![Node.js](https://img.shields.io/node/v/eslint-plugin-legibility.svg)
+![license](https://img.shields.io/npm/l/eslint-plugin-legibility.svg)
 [![TypeScript](https://img.shields.io/badge/TypeScript-types%20included-blue)](https://www.typescriptlang.org/)
 ![CI](https://github.com/yowainwright/eslint-plugin-legibility/actions/workflows/ci.yml/badge.svg)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/yowainwright/eslint-plugin-legibility/badge)](https://scorecard.dev/viewer/?uri=github.com/yowainwright/eslint-plugin-legibility)
@@ -182,6 +185,8 @@ Limit operators inside one expression.
 ### `legibility/max-function-parameters({options})`
 
 Limit the inputs a function exposes. The rule checks both top-level parameters and the properties listed by each destructured object parameter.
+
+TypeScript ambient declarations and function types are checked. A leading TypeScript `this` parameter is ignored because callers do not supply it.
 
 #### options
 

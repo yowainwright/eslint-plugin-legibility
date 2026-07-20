@@ -407,7 +407,9 @@ function getFunctionName(node: MaybeAstNode): string {
   if (!isNode) return "Function";
 
   const nodeId = node.id;
-  const isNamedFunctionDeclaration = node.type === "FunctionDeclaration" && isRecord(nodeId);
+  const isFunctionDeclaration =
+    node.type === "FunctionDeclaration" || node.type === "TSDeclareFunction";
+  const isNamedFunctionDeclaration = isFunctionDeclaration && isRecord(nodeId);
   if (isNamedFunctionDeclaration) return nodeId.name ?? "Function";
 
   const parent = node.parent;
@@ -463,12 +465,7 @@ function getCallbackFunction(node: MaybeAstNode): AstNode | null {
 }
 
 function getFunctionParamNames(node: MaybeAstNode): string[] {
-  const isFunction = isFunctionNode(node);
-  if (!isFunction) return [];
-
-  const params = node.params ?? [];
-  const hasArrayParams = Array.isArray(params);
-  if (!hasArrayParams) return [];
+  const params = getFunctionParams(node);
 
   const hasOnlyIdentifierParams = params.every(
     (param) => isRecord(param) && param.type === "Identifier" && typeof param.name === "string",
@@ -479,11 +476,20 @@ function getFunctionParamNames(node: MaybeAstNode): string[] {
   return paramNames;
 }
 
+function isTypeScriptThisParameter(parameter: AstNode, index: number): boolean {
+  const isLeadingParameter = index === 0;
+  if (!isLeadingParameter) return false;
+
+  const isThisIdentifier = parameter.type === "Identifier" && parameter.name === "this";
+  return isThisIdentifier;
+}
+
 function getFunctionParams(node: MaybeAstNode): AstNode[] {
   const isFunction = isFunctionNode(node);
   if (!isFunction) return [];
 
-  return getNodeArray(node.params);
+  const params = getNodeArray(node.params);
+  return params.filter((parameter, index) => !isTypeScriptThisParameter(parameter, index));
 }
 
 function getObjectParameterPattern(parameter: MaybeAstNode): AstNode | null {
@@ -1431,6 +1437,8 @@ function createMaxFunctionParameters(context: RuleContext): RuleListener {
     ArrowFunctionExpression: check,
     FunctionDeclaration: check,
     FunctionExpression: check,
+    TSDeclareFunction: check,
+    TSFunctionType: check,
   };
 }
 

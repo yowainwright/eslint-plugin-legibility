@@ -1289,6 +1289,37 @@ test("flat config works through ESLint Linter when ESLint is installed", async (
   assert.equal(messages[0].ruleId, "legibility/hoist-if-operators");
 });
 
+test("max-function-parameters handles TypeScript signatures and this parameters", async () => {
+  const { Linter } = await import("eslint");
+  const tseslint = (await import("typescript-eslint")).default;
+  const source = [
+    "declare function declared(a: string, b: string, c: string, d: string, e: string): void;",
+    "type Handler = (a: string, b: string, c: string, d: string, e: string) => void;",
+    "function runtime(this: void, a: string, b: string, c: string, d: string): void {}",
+  ].join("\n");
+  const linter = new Linter({ configType: "flat" });
+  const messages = linter.verify(
+    source,
+    [
+      {
+        files: ["**/*.ts"],
+        plugins: { legibility: plugin },
+        languageOptions: { parser: tseslint.parser },
+        rules: { "legibility/max-function-parameters": "error" },
+      },
+    ],
+    { filename: "src/check.ts" },
+  );
+
+  assert.deepEqual(
+    messages.map((message) => ({ line: message.line, ruleId: message.ruleId })),
+    [
+      { line: 1, ruleId: "legibility/max-function-parameters" },
+      { line: 2, ruleId: "legibility/max-function-parameters" },
+    ],
+  );
+});
+
 test("comment rules work through ESLint Linter when ESLint is installed", async (t) => {
   let Linter;
   try {

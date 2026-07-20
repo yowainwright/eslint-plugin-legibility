@@ -56,6 +56,8 @@ export const FUNCTION_NODE_TYPES = new Set([
   "ArrowFunctionExpression",
   "FunctionDeclaration",
   "FunctionExpression",
+  "TSDeclareFunction",
+  "TSFunctionType",
 ]);
 
 export const EXPRESSION_CONTAINER_NODE_TYPES = new Set([

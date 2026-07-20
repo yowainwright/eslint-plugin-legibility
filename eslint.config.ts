@@ -27,7 +27,7 @@ export default [
     rules: Object.assign({}, strictLegibilityConfig.rules, {
       "legibility/require-executable-shebang": [
         "error",
-        { files: ["scripts/lint-changed.node.ts"] },
+        { files: ["scripts/diff.ts"] },
       ],
     }),
   },
