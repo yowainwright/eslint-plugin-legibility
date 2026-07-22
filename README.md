@@ -3,9 +3,6 @@
 <!-- package badges from package.json and GitHub workflows -->
 [![npm version](https://img.shields.io/npm/v/eslint-plugin-legibility.svg)](https://www.npmjs.com/package/eslint-plugin-legibility)
 [![npm downloads](https://img.shields.io/npm/dm/eslint-plugin-legibility.svg)](https://www.npmjs.com/package/eslint-plugin-legibility)
-![Node.js](https://img.shields.io/node/v/eslint-plugin-legibility.svg)
-![license](https://img.shields.io/npm/l/eslint-plugin-legibility.svg)
-[![TypeScript](https://img.shields.io/badge/TypeScript-types%20included-blue)](https://www.typescriptlang.org/)
 ![CI](https://github.com/yowainwright/eslint-plugin-legibility/actions/workflows/ci.yml/badge.svg)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/yowainwright/eslint-plugin-legibility/badge)](https://scorecard.dev/viewer/?uri=github.com/yowainwright/eslint-plugin-legibility)
 [![codecov](https://codecov.io/gh/yowainwright/eslint-plugin-legibility/branch/main/graph/badge.svg)](https://codecov.io/gh/yowainwright/eslint-plugin-legibility)
@@ -16,8 +13,6 @@
 > Working with LLM's for the majority of my work, I find the way that I code and read code has changed. This project contains rules I find useful for keeping Typescript and/or JavaScript more readable when written mainly by LLMs's. 
 
 ## TLDR;
-
-We review thousands of lines of code a day. It is very hard to do but this is our responsibility: ensuring code works as expected and is maintenance. 
 
 The goal of rules in this package are to make code readable for reviewing lots of code and avoiding things that have a high probability of complexity or confusion. 
 
@@ -31,14 +26,14 @@ The package exports an ESLint-compatible plugin object. ESLint can load it as a 
 
 ```sh
 # npm, pnpm, bun
-pnpm add -D eslint-plugin-legibility
+npm add -D eslint-plugin-legibility
 ```
 
 ---
 
 ## Rules
 
-Rules marked `recommended + strict` are enabled by `recommended` as `warn` and by `strict` as `error`. Rules marked `strict only` are enabled by `strict` as `error`. Comment rules are `recipe only` because their severity and options depend on whether a human, agent, or commit gate is running lint.
+Rules marked `recommended + strict` are enabled by `recommended` as `warn` and by `strict` as `error`. Rules marked `strict only` are enabled by `strict` as `error`. Comment rules are `recipe only` because agent sessions, development, and commit gates need different severities and options.
 
 <!-- rule presets and option summaries from src/constants.ts -->
 | Rule | Preset configuration | Options |
@@ -59,6 +54,7 @@ Rules marked `recommended + strict` are enabled by `recommended` as `warn` and b
 | [legibility/no-redundant-nullish-fallback](#no-redundant-nullish-fallback) | recommended + strict | none |
 | [legibility/no-repeated-collection-search](#no-repeated-collection-search) | strict only | `{searchMethods}` |
 | [legibility/no-single-use-renaming-alias](#no-single-use-renaming-alias) | strict only | none |
+| [legibility/no-stacked-comments](#no-stacked-comments) | recipe only | none |
 | [legibility/no-standalone-array-mutations](#no-standalone-array-mutations) | recommended + strict | `{arrayMutatingMethods, mutatingMethods}` |
 | [legibility/no-trivial-wrapper-functions](#no-trivial-wrapper-functions) | recommended + strict | none |
 | [legibility/no-unmatched-comments](#no-unmatched-comments) | recipe only | `{matchers: [], prefixIdentifiers: [], suffixIdentifiers: []}` |
@@ -446,11 +442,13 @@ Avoid wrappers that only forward their parameters to another call.
 
 <!-- comment rule responsibilities from rule metadata in src/constants.ts -->
 
-Comment rules are opt-in because agent sessions, human development, and commit gates need different severities. Start with the [comment policy recipes](#comment-policy-recipes), then use this section as the option reference.
+Comment rules are opt-in because agent sessions, development, and commit gates need different severities.
+Start with the [comment policy recipes](#comment-policy-recipes), then use this section as the option reference.
 
 | Rule | Responsibility |
 | --- | --- |
 | [`legibility/no-unmatched-comments`](#no-unmatched-comments) | Reject comments without an explicitly configured matcher, prefix, or suffix. |
+| [`legibility/no-stacked-comments`](#no-stacked-comments) | Report comments stacked on consecutive lines. |
 | [`legibility/no-automated-comment-attribution`](#no-automated-comment-attribution) | Reject explicit automated attribution signatures. |
 | [`legibility/require-jsdoc-multiline-comments`](#require-jsdoc-multiline-comments) | Require JSDoc syntax for multiline block comments. |
 
@@ -474,7 +472,7 @@ No matcher or identifier is configured by default. Enabling the rule without opt
 | `prefixIdentifiers` | `string[]` | `[]` | Case-insensitive literal identifiers matched at the start of the normalized comment body. |
 | `suffixIdentifiers` | `string[]` | `[]` | Case-insensitive literal identifiers matched at the end of the normalized comment body. |
 
-The arrays are independent allow paths. Set all three explicitly when the configuration should make the entire comment policy visible.
+The arrays are independent allow paths. A matching prefix or suffix lets ESLint allow the comment. `matchers` provides the regular-expression option.
 
 ##### matching details
 
@@ -485,6 +483,23 @@ The arrays are independent allow paths. Set all three explicitly when the config
 - Invalid regular expressions are ignored. If no other allow path matches, the comment is rejected.
 - Empty or whitespace-only prefix and suffix identifiers never match.
 - The rule has no autofix.
+
+---
+
+<a id="no-stacked-comments"></a>
+
+#### `legibility/no-stacked-comments()`
+
+<!-- no-stacked-comments behavior from src/constants.ts and src/index.ts -->
+
+Report comments stacked on consecutive lines. A stack signals that the adjacent comment should be updated or removed instead of adding another comment.
+
+```diff
+- // Retry every failed request.
+  // Retry requests that fail during regional failover.
+```
+
+A blank line between comments is not a stack. The rule has no options and no autofix.
 
 ---
 
@@ -537,11 +552,11 @@ Require block comments spanning multiple lines to use `/** ... */` JSDoc syntax.
 ```diff
 - /*
 -  * The provider can return a stale token during regional failover.
--  * Preserve the retry order. @owned
+-  * Preserve the retry order.
 -  */
 + /**
 +  * The provider can return a stale token during regional failover.
-+  * Preserve the retry order. @owned
++  * Preserve the retry order.
 +  */
 ```
 
@@ -765,46 +780,18 @@ Use `max` and `min` to tune rule sensitivity.
 
 <!-- comment rule recipe options and agent commands from src/constants.ts, src/index.ts, and package.json -->
 
-Comment rules are intentionally absent from the bundled presets. Layer one of these policies over `flat/recommended` or `flat/strict`.
-
-### Choose an ownership convention
-
-A repository can accept issue references, leading ownership markers, trailing ownership markers, or any combination:
-
-```js
-const matchers = [
-  "\\b(ENG|OPS)-\\d+\\b",
-  "^\\s*eslint-(disable|enable)(-next-line|-line){0,1}\\b",
-];
-const prefixIdentifiers = ["HUMAN", "LEGAL"];
-const suffixIdentifiers = ["@owned"];
-const commentOwnership = { matchers, prefixIdentifiers, suffixIdentifiers };
-```
-
-| Convention | Configuration | Accepted example |
-| --- | --- | --- |
-| Issue reference | `matchers: ["\\bENG-\\d+\\b"]` | `// ENG-482: Preserve the retry order.` |
-| Leading marker | `prefixIdentifiers: ["HUMAN"]` | `// HUMAN: Safari 15 requires this fallback.` |
-| Trailing marker | `suffixIdentifiers: ["@owned"]` | `// Preserve the retry order. @owned` |
-
-Prefix and suffix identifiers are literal, case-insensitive, and boundary-aware. Regular-expression matchers are source strings compiled with the `i` and `u` flags.
+Comment rules are absent from the bundled presets. Add the rules needed for each lint mode.
 
 ### Agent mode
 
-Agents can read human-owned comments but cannot create ownership markers. Automated attribution and unmatched comments are errors; multiline formatting remains off so an agent is not pushed to rewrite human-owned prose.
+Agents do not add comments by default:
 
 ```js
 import legibility from "eslint-plugin-legibility";
 
-const matchers = ["\\b(ENG|OPS)-\\d+\\b"];
-const prefixIdentifiers = ["HUMAN", "LEGAL"];
-const suffixIdentifiers = ["@owned"];
-const commentOwnership = { matchers, prefixIdentifiers, suffixIdentifiers };
-const ownershipRule = ["error", commentOwnership];
 const commentRules = {
-  "legibility/no-automated-comment-attribution": "error",
-  "legibility/no-unmatched-comments": ownershipRule,
-  "legibility/require-jsdoc-multiline-comments": "off",
+  "legibility/no-stacked-comments": "error",
+  "legibility/no-unmatched-comments": "error",
 };
 
 export default [
@@ -813,79 +800,54 @@ export default [
 ];
 ```
 
-Install the packaged policy skill and lint changed files:
+To allow marked comments, configure a prefix, suffix, or both:
+
+```js
+const prefixIdentifiers = ["APPROVED"];
+const suffixIdentifiers = ["@approved"];
+const commentOptions = { prefixIdentifiers, suffixIdentifiers };
+const unmatchedComments = ["error", commentOptions];
+
+const commentRules = {
+  "legibility/no-stacked-comments": "error",
+  "legibility/no-unmatched-comments": unmatchedComments,
+};
+```
+
+Either matching identifier allows the comment. `matchers` and the other comment rules provide additional configuration in the [comment rule reference](#comment-rules).
+
+Install the packaged skill and lint changed files:
 
 ```sh
 npx eslint-plugin-legibility-install-skill --target codex
 npx lint-changed
 ```
 
-The agent policy is:
-
-- Do not add source comments or ownership markers.
-- Preserve matching comments unless the user explicitly requests a change.
-- Remove an unmatched comment introduced during the session.
-- Leave pre-existing unmatched comments alone unless comment cleanup is in scope.
-
 ### Developer mode
 
-Developers get a warning when a comment has not been marked for later agent ownership. Multiline comment formatting is also a warning while editing.
+Use warnings while editing:
 
 ```js
-import legibility from "eslint-plugin-legibility";
-
-const matchers = ["\\b(ENG|OPS)-\\d+\\b"];
-const prefixIdentifiers = ["HUMAN", "LEGAL"];
-const suffixIdentifiers = ["@owned"];
-const commentOwnership = { matchers, prefixIdentifiers, suffixIdentifiers };
-const ownershipRule = ["warn", commentOwnership];
 const commentRules = {
-  "legibility/no-unmatched-comments": ownershipRule,
-  "legibility/require-jsdoc-multiline-comments": "warn",
+  "legibility/no-stacked-comments": "warn",
+  "legibility/no-unmatched-comments": "warn",
 };
-
-export default [
-  legibility.configs["flat/recommended"],
-  { rules: commentRules },
-];
 ```
 
-Comments that survive later agent sessions carry the configured convention:
-
-```js
-// HUMAN: Safari 15 requires this fallback.
-
-const timeout = 5_000; // OPS-318: Keep this aligned with the worker timeout.
-
-/**
- * The payload shape is part of the public contract. @owned
- */
-function sendPayload() {}
-```
+Use the same `no-unmatched-comments` options when the repository allows marked comments.
 
 ### Commit gate
 
-Promote the repository policy to errors and layer it over the strict general rules:
+Promote the chosen comment policy to errors:
 
 ```js
-import legibility from "eslint-plugin-legibility";
-
-const matchers = ["\\b(ENG|OPS)-\\d+\\b"];
-const prefixIdentifiers = ["HUMAN", "LEGAL"];
-const suffixIdentifiers = ["@owned"];
-const commentOwnership = { matchers, prefixIdentifiers, suffixIdentifiers };
-const ownershipRule = ["error", commentOwnership];
 const commentRules = {
-  "legibility/no-automated-comment-attribution": "error",
-  "legibility/no-unmatched-comments": ownershipRule,
-  "legibility/require-jsdoc-multiline-comments": "error",
+  "legibility/no-stacked-comments": "error",
+  "legibility/no-unmatched-comments": "error",
 };
-
-export default [
-  legibility.configs["flat/strict"],
-  { rules: commentRules },
-];
 ```
+
+Use the configured prefix, suffix, or other matcher here when the repository allows comments.
 
 A pre-commit hook can run the configured ESLint rules:
 

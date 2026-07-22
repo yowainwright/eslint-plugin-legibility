@@ -45,16 +45,16 @@ const compatibilityHeading = "## Agent Compatibility";
 const compatibilityBody =
   "Use this as the shared workflow for Codex, Claude, and generic agent skill roots. Keep tool-specific rule files as generated pointers or thin wrappers over this content.";
 
-const commentOwnershipHeading = "## Comment Ownership";
-const commentOwnershipIntro =
-  "Use `legibility/no-unmatched-comments` in agent hooks as a human-ownership gate.";
-const commentOwnershipRules = [
-  "- Agents must not add source comments, matcher text, or prefix/suffix identifiers.",
-  "- Treat comments accepted by a configured matcher or identifier as human-owned. Do not remove or rewrite them unless the user explicitly requests it.",
-  "- Remove an unmatched comment introduced by the agent instead of adding a matcher.",
-  "- Preserve pre-existing unmatched comments unless the task explicitly includes comment cleanup.",
+const commentPolicyHeading = "## Comments";
+const commentPolicyIntro =
+  "Use `legibility/no-unmatched-comments` without options to reject comments by default.";
+const commentPolicyRules = [
+  "- Agents do not add source comments by default.",
+  "- A configured `prefixIdentifiers` or `suffixIdentifiers` value lets ESLint allow a matching comment.",
+  "- Use `matchers` and the other comment rules for additional repository-specific controls.",
+  "- `legibility/no-stacked-comments` means an adjacent comment should be updated or removed instead of adding another.",
 ].join("\n");
-const commentOwnershipBody = [commentOwnershipIntro, commentOwnershipRules].join("\n\n");
+const commentPolicyBody = [commentPolicyIntro, commentPolicyRules].join("\n\n");
 
 const installHeading = "## Package Install";
 const installBody = [
@@ -119,8 +119,8 @@ export const agentSkillBody = [
   purposeBody,
   compatibilityHeading,
   compatibilityBody,
-  commentOwnershipHeading,
-  commentOwnershipBody,
+  commentPolicyHeading,
+  commentPolicyBody,
   installHeading,
   installBody,
   cleanupHeading,

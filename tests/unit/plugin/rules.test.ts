@@ -57,6 +57,20 @@ function comment(type: "Block" | "Line", value: string, text: string): any {
   return { type, value, __text: text };
 }
 
+function locatedComment(
+  type: "Block" | "Line",
+  value: string,
+  text: string,
+  startLine: number,
+  endLine = startLine,
+): any {
+  const start = { column: 0, line: startLine };
+  const end = { column: text.length, line: endLine };
+  const node = comment(type, value, text);
+  node.loc = { start, end };
+  return node;
+}
+
 function call(callee: any, args: any[] = []): any {
   const node: any = {
     type: "CallExpression",
@@ -206,6 +220,7 @@ test("exports an ESLint and Oxlint compatible plugin shape", () => {
   assert.ok(plugin.rules["max-function-parameters"]);
   assert.ok(plugin.rules["no-automated-comment-attribution"]);
   assert.ok(plugin.rules["prefer-early-return"]);
+  assert.ok(plugin.rules["no-stacked-comments"]);
   assert.ok(plugin.rules["no-unmatched-comments"]);
   assert.ok(plugin.rules["require-jsdoc-multiline-comments"]);
   assert.ok(plugin.configs["flat/recommended"].plugins.legibility);
@@ -219,6 +234,7 @@ test("exports an ESLint and Oxlint compatible plugin shape", () => {
   );
   const commentRuleNames = [
     "no-automated-comment-attribution",
+    "no-stacked-comments",
     "no-unmatched-comments",
     "require-jsdoc-multiline-comments",
   ];
@@ -341,9 +357,9 @@ test("no-unmatched-comments supports custom and empty matcher lists", () => {
 });
 
 test("comment rules accept direct sources without text readers", () => {
-  const comments = [comment("Line", " HUMAN: preserve this", "// HUMAN: preserve this")];
+  const comments = [comment("Line", " APPROVED: preserve this", "// APPROVED: preserve this")];
   const sourceCode = { getAllComments: () => comments };
-  const options = [{ prefixIdentifiers: ["HUMAN"] }];
+  const options = [{ prefixIdentifiers: ["APPROVED"] }];
   const { visitor, reports } = createRule("no-unmatched-comments", options, { sourceCode });
 
   visitor.Program({ type: "Program" });
@@ -353,19 +369,19 @@ test("comment rules accept direct sources without text readers", () => {
 
 test("no-unmatched-comments accepts bounded prefix and suffix identifiers", () => {
   const allowedComments = [
-    comment("Line", " HUMAN: preserve this", "// HUMAN: preserve this"),
-    comment("Line", " preserve this @owned", "// preserve this @owned"),
-    comment("Block", "*\n * preserve this\n * @owned\n ", "/** comment */"),
+    comment("Line", " APPROVED: preserve this", "// APPROVED: preserve this"),
+    comment("Line", " preserve this @approved", "// preserve this @approved"),
+    comment("Block", "*\n * preserve this\n * @approved\n ", "/** comment */"),
   ];
   const rejectedComments = [
-    comment("Line", " HUMANIZED: generated", "// HUMANIZED: generated"),
-    comment("Line", " preserve this not@owned", "// preserve this not@owned"),
+    comment("Line", " APPROVEDLY: generated", "// APPROVEDLY: generated"),
+    comment("Line", " preserve this not@approved", "// preserve this not@approved"),
   ];
   const options = [
     {
       matchers: [],
-      prefixIdentifiers: ["human"],
-      suffixIdentifiers: ["@owned"],
+      prefixIdentifiers: ["approved"],
+      suffixIdentifiers: ["@approved"],
     },
   ];
   const allowedRule = createCommentRule("no-unmatched-comments", allowedComments, options);
@@ -378,19 +394,46 @@ test("no-unmatched-comments accepts bounded prefix and suffix identifiers", () =
   assert.equal(rejectedRule.reports.length, 2);
 });
 
+test("no-stacked-comments reports comments on consecutive lines", () => {
+  const comments = [
+    locatedComment("Line", " First comment.", "// First comment.", 1),
+    locatedComment("Line", " Second comment.", "// Second comment.", 2),
+  ];
+  const { visitor, reports } = createCommentRule("no-stacked-comments", comments);
+
+  visitor.Program({ type: "Program" });
+
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].messageId, "stackedComment");
+  assert.equal(reports[0].node, comments[1]);
+});
+
+test("no-stacked-comments accepts comments separated by blank lines", () => {
+  const comments = [
+    locatedComment("Line", " First comment.", "// First comment.", 1),
+    locatedComment("Line", " Second comment.", "// Second comment.", 3),
+    locatedComment("Block", " Third comment. ", "/* Third comment. */", 5),
+  ];
+  const { visitor, reports } = createCommentRule("no-stacked-comments", comments);
+
+  visitor.Program({ type: "Program" });
+
+  assert.equal(reports.length, 0);
+});
+
 test("require-jsdoc-multiline-comments reports ordinary multiline blocks", () => {
   const comments = [
     comment(
       "Block",
-      "\n * HUMAN: Explain the API.\n ",
-      "/*\n * HUMAN: Explain the API.\n */",
+      "\n * Explain the API contract.\n ",
+      "/*\n * Explain the API contract.\n */",
     ),
     comment(
       "Block",
-      "*\n * HUMAN: Explain the API.\n ",
-      "/**\n * HUMAN: Explain the API.\n */",
+      "*\n * Explain the API contract.\n ",
+      "/**\n * Explain the API contract.\n */",
     ),
-    comment("Block", " HUMAN: Explain the API. ", "/* HUMAN: Explain the API. */"),
+    comment("Block", " Explain the API contract. ", "/* Explain the API contract. */"),
   ];
   const { visitor, reports } = createCommentRule(
     "require-jsdoc-multiline-comments",
@@ -1341,9 +1384,10 @@ test("comment rules work through ESLint Linter when ESLint is installed", async 
       languageOptions: { ecmaVersion: 2022, sourceType: "script" },
       rules: {
         "legibility/no-automated-comment-attribution": "error",
+        "legibility/no-stacked-comments": "error",
         "legibility/no-unmatched-comments": [
           "error",
-          { matchers: [], prefixIdentifiers: ["HUMAN"] },
+          { matchers: [], prefixIdentifiers: ["APPROVED"] },
         ],
         "legibility/require-jsdoc-multiline-comments": "error",
       },
@@ -1360,13 +1404,25 @@ test("comment rules work through ESLint Linter when ESLint is installed", async 
 
   const validSource = [
     "/**",
-    " * HUMAN: Explain the value.",
+    " * APPROVED: Explain the value.",
     " */",
     "const value = true;",
   ].join("\n");
   const validMessages = linter.verify(validSource, config, { filename: "src/check.js" });
 
   assert.equal(validMessages.length, 0);
+
+  const stackedSource = [
+    "// APPROVED: First explanation.",
+    "// APPROVED: Second explanation.",
+    "const value = true;",
+  ].join("\n");
+  const stackedMessages = linter.verify(stackedSource, config, { filename: "src/check.js" });
+
+  assert.deepEqual(
+    stackedMessages.map((message) => message.ruleId),
+    ["legibility/no-stacked-comments"],
+  );
 });
 
 test("oxlint can load the package as a JS plugin when oxlint is installed", (t) => {

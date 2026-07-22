@@ -14,7 +14,7 @@ npx lint-changed
 
 This only lints files changed vs `origin/main`. New files are checked at error level; modified files at warn level.
 
-For `legibility/no-unmatched-comments`, matchers and prefix/suffix identifiers are human ownership markers. Never add marker text. Preserve matched comments, and remove an unmatched comment introduced by the agent instead of granting it a marker.
+Agents do not add source comments by default. `legibility/no-unmatched-comments` allows a comment when it matches a configured prefix, suffix, or other matcher. `legibility/no-stacked-comments` means an adjacent comment should be updated or removed instead of stacking another one.
 
 To override the base branch:
 

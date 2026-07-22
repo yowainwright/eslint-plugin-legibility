@@ -279,6 +279,7 @@ export const RECOMMENDED_RULE_NAMES = [
 
 export const COMMENT_RULE_NAMES = new Set([
   "no-automated-comment-attribution",
+  "no-stacked-comments",
   "no-unmatched-comments",
   "require-jsdoc-multiline-comments",
 ]);
@@ -410,6 +411,25 @@ export const NO_AUTOMATED_COMMENT_ATTRIBUTION_META = defineMeta(
       prohibitedAttribution: "Comment contains the prohibited attribution \"{{identifier}}\".",
     },
   },
+);
+
+const noStackedCommentsDocs = {
+  description: "Avoid comments stacked directly above other comments.",
+  recommended: false,
+};
+const noStackedCommentsMessages = {
+  stackedComment: "Update or remove the adjacent comment instead of stacking another comment.",
+};
+const noStackedCommentsConfig: RuleMeta = {
+  type: "suggestion",
+  docs: noStackedCommentsDocs,
+  schema: [],
+  messages: noStackedCommentsMessages,
+};
+
+export const NO_STACKED_COMMENTS_META = defineMeta(
+  "no-stacked-comments",
+  noStackedCommentsConfig,
 );
 
 export const NO_HIDDEN_SIDE_EFFECTS_META = defineMeta("no-hidden-side-effects", {

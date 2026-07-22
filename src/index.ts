@@ -54,6 +54,7 @@ import {
   NO_MIXED_FILENAME_CASING_META,
   NO_SINGLE_USE_RENAMING_ALIAS_META,
   REQUIRE_FILENAME_MATCHES_DIRNAME_META,
+  NO_STACKED_COMMENTS_META,
   NO_STANDALONE_ARRAY_MUTATIONS_META,
   NO_TRIVIAL_WRAPPER_FUNCTIONS_META,
   NO_UNMATCHED_COMMENTS_META,
@@ -962,6 +963,52 @@ function createNoAutomatedCommentAttribution(context: RuleContext): RuleListener
           messageId: "prohibitedAttribution",
           data: { identifier },
         });
+      });
+    },
+  };
+}
+
+function getLocationLine(value: AstValue): number | null {
+  if (!isRecord(value)) return null;
+
+  const line = value.line;
+  const isLineNumber = typeof line === "number";
+  if (!isLineNumber) return null;
+  return line;
+}
+
+function getCommentLineRange(comment: AstNode): [number, number] | null {
+  const location = comment.loc;
+  if (!isRecord(location)) return null;
+
+  const startLine = getLocationLine(location.start);
+  if (startLine === null) return null;
+
+  const endLine = getLocationLine(location.end);
+  if (endLine === null) return null;
+  return [startLine, endLine];
+}
+
+function areCommentsStacked(previous: AstNode, current: AstNode): boolean {
+  const previousLines = getCommentLineRange(previous);
+  if (previousLines === null) return false;
+
+  const currentLines = getCommentLineRange(current);
+  if (currentLines === null) return false;
+
+  const lineDistance = currentLines[0] - previousLines[1];
+  return lineDistance === 1;
+}
+
+function createNoStackedComments(context: RuleContext): RuleListener {
+  return {
+    Program() {
+      const comments = getAllComments(context);
+      comments.slice(1).forEach((comment, index) => {
+        const previousComment = comments[index];
+        if (previousComment === undefined) return;
+        if (!areCommentsStacked(previousComment, comment)) return;
+        context.report({ node: comment, messageId: "stackedComment" });
       });
     },
   };
@@ -2903,6 +2950,7 @@ const rules = {
     NO_SINGLE_USE_RENAMING_ALIAS_META,
     createNoSingleUseRenamingAlias,
   ),
+  "no-stacked-comments": defineRule(NO_STACKED_COMMENTS_META, createNoStackedComments),
   "no-standalone-array-mutations": defineRule(
     NO_STANDALONE_ARRAY_MUTATIONS_META,
     createNoStandaloneArrayMutations,
