@@ -28,6 +28,7 @@ const scripts = manifest.scripts as ManifestScripts;
 const releaseIt = manifest["release-it"] as ReleaseItConfig;
 const ciWorkflow = readFileSync(".github/workflows/ci.yml", "utf8");
 const publishWorkflow = readFileSync(".github/workflows/publish.yml", "utf8");
+const updateWorkflow = readFileSync(".github/workflows/update.yml", "utf8");
 
 test("release scripts use the publish confirmation wrapper", () => {
   assert.equal(scripts.release, "jiti scripts/release.ts");
@@ -79,4 +80,12 @@ test("ci workflow runs Bun and Deno compatibility suites", () => {
   assert.match(ciWorkflow, /name: deno/);
   assert.match(ciWorkflow, /denoland\/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282/);
   assert.match(ciWorkflow, /pnpm test:deno/);
+});
+
+test("update workflow maintains dependencies and override metadata", () => {
+  assert.match(updateWorkflow, /pnpm run codependence:update/);
+  assert.match(updateWorkflow, /pnpm run pastoralist/);
+  assert.match(updateWorkflow, /pnpm run pastoralist --dry-run --strict/);
+  assert.match(updateWorkflow, /pnpm validate/);
+  assert.match(updateWorkflow, /peter-evans\/create-pull-request@/);
 });
