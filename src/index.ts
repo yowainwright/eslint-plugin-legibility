@@ -2,6 +2,7 @@ import { basename, relative } from "node:path";
 import {
   ARRAY_MUTATING_METHODS,
   ARG_COMMAND_FUNCTIONS,
+  COMMENT_RULE_NAMES,
   COMPARISON_OPERATORS,
   CONTROL_FLOW_TYPES,
   DEFAULT_AI_COMMENT_IDENTIFIERS,
@@ -19,8 +20,10 @@ import {
   DEFAULT_ALLOWED_FILENAME_QUALIFIERS,
   DEFAULT_ALLOWED_STANDALONE_FILENAMES,
   DEFAULT_MAX_EXPRESSION_OPERATORS,
+  DEFAULT_MAX_FUNCTION_PARAMETERS,
   DEFAULT_MIN_DIRNAME_MATCH_DEPTH,
   DEFAULT_MAX_IF_OPERATORS,
+  DEFAULT_MAX_OBJECT_PARAMETER_PROPERTIES,
   DEFAULT_MAX_TERNARY_OPERATORS,
   DEFAULT_MIN_OBJECT_LOOKUP_CHAIN_LENGTH,
   DEFAULT_READABILITY_OPERATOR_COMPLEXITY,
@@ -35,6 +38,7 @@ import {
   MAX_ARRAY_CHAIN_DEPTH_META,
   MAX_CONTROL_FLOW_DEPTH_META,
   MAX_EXPRESSION_OPERATORS_META,
+  MAX_FUNCTION_PARAMETERS_META,
   MUTATING_METHODS,
   NEGATIVE_CONDITION_NAME_PATTERN,
   NO_AUTOMATED_COMMENT_ATTRIBUTION_META,
@@ -50,6 +54,7 @@ import {
   NO_MIXED_FILENAME_CASING_META,
   NO_SINGLE_USE_RENAMING_ALIAS_META,
   REQUIRE_FILENAME_MATCHES_DIRNAME_META,
+  NO_STACKED_COMMENTS_META,
   NO_STANDALONE_ARRAY_MUTATIONS_META,
   NO_TRIVIAL_WRAPPER_FUNCTIONS_META,
   NO_UNMATCHED_COMMENTS_META,
@@ -403,7 +408,9 @@ function getFunctionName(node: MaybeAstNode): string {
   if (!isNode) return "Function";
 
   const nodeId = node.id;
-  const isNamedFunctionDeclaration = node.type === "FunctionDeclaration" && isRecord(nodeId);
+  const isFunctionDeclaration =
+    node.type === "FunctionDeclaration" || node.type === "TSDeclareFunction";
+  const isNamedFunctionDeclaration = isFunctionDeclaration && isRecord(nodeId);
   if (isNamedFunctionDeclaration) return nodeId.name ?? "Function";
 
   const parent = node.parent;
@@ -459,12 +466,7 @@ function getCallbackFunction(node: MaybeAstNode): AstNode | null {
 }
 
 function getFunctionParamNames(node: MaybeAstNode): string[] {
-  const isFunction = isFunctionNode(node);
-  if (!isFunction) return [];
-
-  const params = node.params ?? [];
-  const hasArrayParams = Array.isArray(params);
-  if (!hasArrayParams) return [];
+  const params = getFunctionParams(node);
 
   const hasOnlyIdentifierParams = params.every(
     (param) => isRecord(param) && param.type === "Identifier" && typeof param.name === "string",
@@ -473,6 +475,34 @@ function getFunctionParamNames(node: MaybeAstNode): string[] {
 
   const paramNames = params.map((param) => String(param.name));
   return paramNames;
+}
+
+function isTypeScriptThisParameter(parameter: AstNode, index: number): boolean {
+  const isLeadingParameter = index === 0;
+  if (!isLeadingParameter) return false;
+
+  const isThisIdentifier = parameter.type === "Identifier" && parameter.name === "this";
+  return isThisIdentifier;
+}
+
+function getFunctionParams(node: MaybeAstNode): AstNode[] {
+  const isFunction = isFunctionNode(node);
+  if (!isFunction) return [];
+
+  const params = getNodeArray(node.params);
+  return params.filter((parameter, index) => !isTypeScriptThisParameter(parameter, index));
+}
+
+function getObjectParameterPattern(parameter: MaybeAstNode): AstNode | null {
+  const isParameterNode = isRecord(parameter);
+  if (!isParameterNode) return null;
+
+  const isObjectPattern = parameter.type === "ObjectPattern";
+  if (isObjectPattern) return parameter;
+
+  const isDefaultParameter = parameter.type === "AssignmentPattern";
+  if (!isDefaultParameter) return null;
+  return getObjectParameterPattern(parameter.left);
 }
 
 function isBooleanLiteral(node: MaybeAstNode, value?: boolean): boolean {
@@ -938,6 +968,52 @@ function createNoAutomatedCommentAttribution(context: RuleContext): RuleListener
   };
 }
 
+function getLocationLine(value: AstValue): number | null {
+  if (!isRecord(value)) return null;
+
+  const line = value.line;
+  const isLineNumber = typeof line === "number";
+  if (!isLineNumber) return null;
+  return line;
+}
+
+function getCommentLineRange(comment: AstNode): [number, number] | null {
+  const location = comment.loc;
+  if (!isRecord(location)) return null;
+
+  const startLine = getLocationLine(location.start);
+  if (startLine === null) return null;
+
+  const endLine = getLocationLine(location.end);
+  if (endLine === null) return null;
+  return [startLine, endLine];
+}
+
+function areCommentsStacked(previous: AstNode, current: AstNode): boolean {
+  const previousLines = getCommentLineRange(previous);
+  if (previousLines === null) return false;
+
+  const currentLines = getCommentLineRange(current);
+  if (currentLines === null) return false;
+
+  const lineDistance = currentLines[0] - previousLines[1];
+  return lineDistance === 1;
+}
+
+function createNoStackedComments(context: RuleContext): RuleListener {
+  return {
+    Program() {
+      const comments = getAllComments(context);
+      comments.slice(1).forEach((comment, index) => {
+        const previousComment = comments[index];
+        if (previousComment === undefined) return;
+        if (!areCommentsStacked(previousComment, comment)) return;
+        context.report({ node: comment, messageId: "stackedComment" });
+      });
+    },
+  };
+}
+
 function compileCommentMatcher(source: string): RegExp | null {
   try {
     return new RegExp(source, "iu");
@@ -1356,6 +1432,63 @@ function createMaxExpressionOperators(context: RuleContext): RuleListener {
   };
 }
 
+function reportFunctionParameterCount(context: RuleContext, node: AstNode, max: number): void {
+  const count = getFunctionParams(node).length;
+  const hasTooManyParameters = count > max;
+  if (!hasTooManyParameters) return;
+
+  const name = getFunctionName(node);
+  context.report({ node, messageId: "tooManyParameters", data: { name, count, max } });
+}
+
+function reportObjectParameterProperties(
+  context: RuleContext,
+  node: AstNode,
+  max: number,
+): void {
+  const name = getFunctionName(node);
+  const objectParameters = getFunctionParams(node)
+    .map(getObjectParameterPattern)
+    .filter((parameter): parameter is AstNode => parameter !== null);
+  objectParameters.forEach((parameter) => {
+    const count = getNodeArray(parameter.properties).length;
+    const hasTooManyProperties = count > max;
+    if (!hasTooManyProperties) return;
+    context.report({
+      node: parameter,
+      messageId: "tooManyObjectProperties",
+      data: { name, count, max },
+    });
+  });
+}
+
+function checkFunctionParameters(
+  context: RuleContext,
+  node: AstNode,
+  max: number,
+  maxObjectProperties: number,
+): void {
+  reportFunctionParameterCount(context, node, max);
+  reportObjectParameterProperties(context, node, maxObjectProperties);
+}
+
+function createMaxFunctionParameters(context: RuleContext): RuleListener {
+  const max = getConfiguredMax(context, DEFAULT_MAX_FUNCTION_PARAMETERS);
+  const maxObjectProperties = getConfiguredNumber(
+    context,
+    "maxObjectProperties",
+    DEFAULT_MAX_OBJECT_PARAMETER_PROPERTIES,
+  );
+  const check = (node: AstNode) => checkFunctionParameters(context, node, max, maxObjectProperties);
+  return {
+    ArrowFunctionExpression: check,
+    FunctionDeclaration: check,
+    FunctionExpression: check,
+    TSDeclareFunction: check,
+    TSFunctionType: check,
+  };
+}
+
 function createHoistIfOperators(context: RuleContext): RuleListener {
   const max = getConfiguredMax(context, DEFAULT_MAX_IF_OPERATORS);
   const complexity = getConfiguredOperatorComplexity(
@@ -1569,21 +1702,21 @@ function checkStandaloneArrayMutation(
   });
 }
 
-function reportComputedValue(
+function createComputedValueReporter(
   context: RuleContext,
-  node: MaybeAstNode,
-  messageId: string,
   max: number,
   complexity: OperatorComplexity,
-): void {
-  const isNode = isRecord(node);
-  if (!isNode) return;
+): (node: MaybeAstNode, messageId: string) => void {
+  return (node, messageId) => {
+    const isNode = isRecord(node);
+    if (!isNode) return;
 
-  const count = countComputedValueOperators(node, complexity);
-  const isWithinLimit = count <= max;
-  if (isWithinLimit) return;
+    const count = countComputedValueOperators(node, complexity);
+    const isWithinLimit = count <= max;
+    if (isWithinLimit) return;
 
-  context.report({ node, messageId, data: { count, max } });
+    context.report({ node, messageId, data: { count, max } });
+  };
 }
 
 function isComputedReturnSkipped(argument: MaybeAstNode): boolean {
@@ -1605,6 +1738,7 @@ function createNoComputedValues(context: RuleContext): RuleListener {
     context,
     DEFAULT_COMPUTED_VALUE_OPERATOR_COMPLEXITY,
   );
+  const reportComputedValue = createComputedValueReporter(context, max, complexity);
   return {
     Property(node) {
       const value = node.value;
@@ -1617,14 +1751,14 @@ function createNoComputedValues(context: RuleContext): RuleListener {
       const isJsxValue = isJsxNode(value);
       if (isJsxValue) return;
 
-      reportComputedValue(context, value, "computedObjectValue", max, complexity);
+      reportComputedValue(value, "computedObjectValue");
     },
     ReturnStatement(node) {
       const argument = node.argument;
       const shouldSkipReturn = isComputedReturnSkipped(argument);
       if (shouldSkipReturn) return;
 
-      reportComputedValue(context, argument, "computedReturn", max, complexity);
+      reportComputedValue(argument, "computedReturn");
     },
   };
 }
@@ -2770,6 +2904,10 @@ const rules = {
     MAX_EXPRESSION_OPERATORS_META,
     createMaxExpressionOperators,
   ),
+  "max-function-parameters": defineRule(
+    MAX_FUNCTION_PARAMETERS_META,
+    createMaxFunctionParameters,
+  ),
   "no-automated-comment-attribution": defineRule(
     NO_AUTOMATED_COMMENT_ATTRIBUTION_META,
     createNoAutomatedCommentAttribution,
@@ -2812,6 +2950,7 @@ const rules = {
     NO_SINGLE_USE_RENAMING_ALIAS_META,
     createNoSingleUseRenamingAlias,
   ),
+  "no-stacked-comments": defineRule(NO_STACKED_COMMENTS_META, createNoStackedComments),
   "no-standalone-array-mutations": defineRule(
     NO_STANDALONE_ARRAY_MUTATIONS_META,
     createNoStandaloneArrayMutations,
@@ -2850,7 +2989,8 @@ function buildRuleConfig(
 }
 
 const recommendedRules = buildRuleConfig(RECOMMENDED_RULE_NAMES, "warn");
-const strictRules = buildRuleConfig(Object.keys(rules), "error");
+const strictRuleNames = Object.keys(rules).filter((ruleName) => !COMMENT_RULE_NAMES.has(ruleName));
+const strictRules = buildRuleConfig(strictRuleNames, "error");
 
 const plugin: LegibilityPlugin = {
   meta: {

@@ -31,6 +31,8 @@ export const DEFAULT_MAX_TERNARY_OPERATORS = 2;
 export const DEFAULT_MAX_COMPUTED_VALUE_OPERATORS = 1;
 export const DEFAULT_MAX_CONTROL_FLOW_DEPTH = 3;
 export const DEFAULT_MAX_ARRAY_CHAIN_DEPTH = 2;
+export const DEFAULT_MAX_FUNCTION_PARAMETERS = 4;
+export const DEFAULT_MAX_OBJECT_PARAMETER_PROPERTIES = 8;
 export const DEFAULT_MIN_OBJECT_LOOKUP_CHAIN_LENGTH = 3;
 
 export const DEFAULT_AI_COMMENT_IDENTIFIERS = [
@@ -54,6 +56,8 @@ export const FUNCTION_NODE_TYPES = new Set([
   "ArrowFunctionExpression",
   "FunctionDeclaration",
   "FunctionExpression",
+  "TSDeclareFunction",
+  "TSFunctionType",
 ]);
 
 export const EXPRESSION_CONTAINER_NODE_TYPES = new Set([
@@ -251,7 +255,7 @@ export const RECOMMENDED_RULE_NAMES = [
   "max-array-chain-depth",
   "max-control-flow-depth",
   "max-expression-operators",
-  "no-automated-comment-attribution",
+  "max-function-parameters",
   "no-complex-ternaries",
   "no-computed-values",
   "no-direct-node-bin-smoke",
@@ -263,7 +267,6 @@ export const RECOMMENDED_RULE_NAMES = [
   "no-redundant-nullish-fallback",
   "no-standalone-array-mutations",
   "no-trivial-wrapper-functions",
-  "no-unmatched-comments",
   "no-unnecessary-block-callback",
   "prefer-concat-object-assign",
   "prefer-early-return",
@@ -272,8 +275,14 @@ export const RECOMMENDED_RULE_NAMES = [
   "prefer-object-lookup",
   "require-executable-shebang",
   "require-filename-matches-dirname",
-  "require-jsdoc-multiline-comments",
 ];
+
+export const COMMENT_RULE_NAMES = new Set([
+  "no-automated-comment-attribution",
+  "no-stacked-comments",
+  "no-unmatched-comments",
+  "require-jsdoc-multiline-comments",
+]);
 
 const STRING_ARRAY_SCHEMA = { type: "array", items: { type: "string" } };
 
@@ -316,6 +325,30 @@ export const MAX_EXPRESSION_OPERATORS_META = defineMeta("max-expression-operator
   messages: {
     tooMany:
       "Expression has {{count}} readability operators (max {{max}}). Extract named sub-expressions.",
+  },
+});
+
+export const MAX_FUNCTION_PARAMETERS_META = defineMeta("max-function-parameters", {
+  type: "suggestion",
+  docs: {
+    description: "Limit positional parameters and destructured object parameter properties.",
+    recommended: true,
+  },
+  schema: [
+    {
+      type: "object",
+      properties: {
+        max: { type: "integer", minimum: 0 },
+        maxObjectProperties: { type: "integer", minimum: 0 },
+      },
+      additionalProperties: false,
+    },
+  ],
+  messages: {
+    tooManyParameters:
+      "{{name}} has {{count}} parameters (max {{max}}). Group related inputs or split the function.",
+    tooManyObjectProperties:
+      "{{name}} destructures {{count}} properties from one parameter (max {{max}}). Pass a smaller object or split the function.",
   },
 });
 
@@ -363,7 +396,7 @@ export const NO_AUTOMATED_COMMENT_ATTRIBUTION_META = defineMeta(
     type: "problem",
     docs: {
       description: "Flag comments that contain prohibited authorship signatures.",
-      recommended: true,
+      recommended: false,
     },
     schema: [
       {
@@ -378,6 +411,25 @@ export const NO_AUTOMATED_COMMENT_ATTRIBUTION_META = defineMeta(
       prohibitedAttribution: "Comment contains the prohibited attribution \"{{identifier}}\".",
     },
   },
+);
+
+const noStackedCommentsDocs = {
+  description: "Avoid comments stacked directly above other comments.",
+  recommended: false,
+};
+const noStackedCommentsMessages = {
+  stackedComment: "Update or remove the adjacent comment instead of stacking another comment.",
+};
+const noStackedCommentsConfig: RuleMeta = {
+  type: "suggestion",
+  docs: noStackedCommentsDocs,
+  schema: [],
+  messages: noStackedCommentsMessages,
+};
+
+export const NO_STACKED_COMMENTS_META = defineMeta(
+  "no-stacked-comments",
+  noStackedCommentsConfig,
 );
 
 export const NO_HIDDEN_SIDE_EFFECTS_META = defineMeta("no-hidden-side-effects", {
@@ -499,7 +551,7 @@ export const REQUIRE_JSDOC_MULTILINE_COMMENTS_META = defineMeta(
     type: "layout",
     docs: {
       description: "Require multiline block comments to use JSDoc syntax.",
-      recommended: true,
+      recommended: false,
     },
     schema: [],
     messages: {
@@ -731,7 +783,7 @@ export const NO_UNMATCHED_COMMENTS_META = defineMeta("no-unmatched-comments", {
   type: "problem",
   docs: {
     description: "Reject comments without an allowed matcher or boundary identifier.",
-    recommended: true,
+    recommended: false,
   },
   schema: [
     {

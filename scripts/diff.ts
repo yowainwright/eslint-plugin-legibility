@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const JS_EXTENSIONS = new Set(['.js', '.ts', '.jsx', '.tsx', '.mjs', '.cjs', '.mts', '.cts']);
-const DEFAULT_BASE = 'origin/main';
+const DEFAULT_DIFF_BASE = 'origin/main';
 const NO_LINTERS_MSG = 'lint-changed: no linters found (eslint, oxlint)\n';
 const NO_FILES_MSG = 'No changed JS/TS files.\n';
 
@@ -50,7 +50,7 @@ export { isLintable, resolveExecutable, changedFiles, runLinter, isDirectRun };
 
 const isMain = isDirectRun(import.meta.url, process.argv[1]);
 if (isMain) {
-  const base = process.argv[2] || DEFAULT_BASE;
+  const base = process.argv[2] || DEFAULT_DIFF_BASE;
   const eslint = resolveExecutable('eslint');
   const oxlint = resolveExecutable('oxlint');
   const linters = [eslint, oxlint].filter((x): x is string => x !== null);

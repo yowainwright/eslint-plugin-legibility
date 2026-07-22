@@ -1,0 +1,24 @@
+{
+  "files": [
+    "package.json"
+  ],
+  "ignore": [
+    "**/node_modules/**",
+    "tests/**"
+  ],
+  "codependencies": [
+    { "@eslint/js": "^9.0.0" },
+    "@socketsecurity/bun-security-scanner",
+    { "@types/node": "^25.9.1" },
+    "codependence",
+    { "eslint": "^9.0.0" },
+    "jiti",
+    "merge-tsconfigs",
+    { "oxlint": "^1.0.0" },
+    "pastoralist",
+    "release-it",
+    "type-coverage",
+    { "typescript": "^6.0.3" },
+    { "typescript-eslint": "^8.60.1" }
+  ]
+}

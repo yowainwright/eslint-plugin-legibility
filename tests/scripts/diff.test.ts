@@ -30,7 +30,7 @@ test('isDirectRun compares resolved file URLs', () => {
   const binUrl = pathToFileURL(binPath).href;
   assert.equal(isDirectRun(binUrl, binPath), true);
   assert.equal(isDirectRun(binUrl, undefined), false);
-  assert.equal(isDirectRun(binUrl, join(process.cwd(), 'scripts', 'lint-changed.js')), false);
+  assert.equal(isDirectRun(binUrl, join(process.cwd(), '.build', 'scripts', 'diff.js')), false);
 });
 
 test('lint-changed exits 0 with no changed files against HEAD', () => {
