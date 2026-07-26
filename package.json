@@ -96,7 +96,7 @@
     "@socketsecurity/bun-security-scanner": "^1.1.2",
     "@types/node": "^25.9.1",
     "codependence": "1.0.3",
-    "eslint": "^9.0.0",
+    "eslint": "^10.8.0",
     "jiti": "^2.7.0",
     "merge-tsconfigs": "^0.2.4",
     "oxlint": "^1.0.0",
