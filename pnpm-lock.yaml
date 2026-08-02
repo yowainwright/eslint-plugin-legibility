@@ -18,8 +18,8 @@ importers:
         specifier: ^25.9.1
         version: 25.9.1
       codependence:
-        specifier: 1.0.3
-        version: 1.0.3
+        specifier: 1.0.6
+        version: 1.0.6
       eslint:
         specifier: ^9.0.0
         version: 9.39.4(jiti@2.7.0)
@@ -612,8 +612,8 @@ packages:
     resolution: {integrity: sha512-ouuZd4/dm2Sw5Gmqy6bGyNNNe1qt9RpmxveLSO7KcgsTnU7RXfsw+/bukWGo1abgBiMAic068rclZsO4IWmmxQ==}
     engines: {node: '>= 12'}
 
-  codependence@1.0.3:
-    resolution: {integrity: sha512-nJYr1oJ4B93SWHiL+YdCNJmAfH2nA4j86t/a7m9lFD7WlOxI6wiuZS28su75o1Vso33XUVDnagqk3pLnTrz7zQ==}
+  codependence@1.0.6:
+    resolution: {integrity: sha512-8hrYR95dJY2I4o10SczlyKROO6W8qXn3qE3VTcWVZa3PEzziTx1TYcWEpXFUyFiy9+lgm4TAbtCrN8n6bs+aBA==}
     engines: {node: '>=20'}
     hasBin: true
 
@@ -1896,7 +1896,7 @@ snapshots:
 
   cli-width@4.1.0: {}
 
-  codependence@1.0.3: {}
+  codependence@1.0.6: {}
 
   color-convert@2.0.1:
     dependencies:
