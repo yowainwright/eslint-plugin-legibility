@@ -100,7 +100,7 @@
     "jiti": "^2.7.0",
     "merge-tsconfigs": "^0.2.4",
     "oxlint": "^1.0.0",
-    "pastoralist": "1.12.8",
+    "pastoralist": "1.12.12",
     "release-it": "20.2.1",
     "type-coverage": "^2.29.7",
     "typescript": "^6.0.3",
