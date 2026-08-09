@@ -33,8 +33,8 @@ importers:
         specifier: ^1.0.0
         version: 1.67.0
       pastoralist:
-        specifier: 1.12.8
-        version: 1.12.8
+        specifier: 1.12.16
+        version: 1.12.16
       release-it:
         specifier: 20.2.1
         version: 20.2.1(@types/node@25.9.1)
@@ -1111,8 +1111,8 @@ packages:
     resolution: {integrity: sha512-bCgsFI+GeGWPAvAiUv63ZorMeif3/U0zaXABGJbOWt5OH2KCaPHF6S+0ok4aqM9RuIPGyZdx9tR9l13PsW4AYQ==}
     engines: {node: '>=14.13.0'}
 
-  pastoralist@1.12.8:
-    resolution: {integrity: sha512-5w6rTXIpu43G9uLxipPnu6gHA4YCaJydXcB+Y/v6JxunFN2dvu6iMulRiNUQgTihP9kVoSnAzvYOE5Dn4cWWdA==}
+  pastoralist@1.12.16:
+    resolution: {integrity: sha512-zuFu03D3WNdLjmH0lZZuPF6f/gA2yut57XqOH9Pte+jRFvNnWS9owXvFxnfy7Y3MxdoduJQKj7JyDHrMC+n4Cg==}
     engines: {node: '>=20'}
     hasBin: true
 
@@ -2394,7 +2394,7 @@ snapshots:
       '@types/parse-path': 7.1.0
       parse-path: 7.1.0
 
-  pastoralist@1.12.8: {}
+  pastoralist@1.12.16: {}
 
   path-exists@4.0.0: {}
 
