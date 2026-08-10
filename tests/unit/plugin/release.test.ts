@@ -56,7 +56,7 @@ test("release-it creates git releases while GitHub Actions publishes npm", () =>
   assert.equal(releaseIt.git?.push, true);
   assert.equal(releaseIt.npm?.publish, false);
   assert.equal(releaseIt.github?.release, false);
-  assert.equal(releaseIt.hooks?.["before:init"], "pnpm validate");
+  assert.equal(releaseIt.hooks?.["before:init"], "nub run validate");
 });
 
 test("publish workflow uses npm trusted publishing", () => {
@@ -76,16 +76,16 @@ test("publish workflow uses npm trusted publishing", () => {
 
 test("ci workflow runs Bun and Deno compatibility suites", () => {
   assert.match(ciWorkflow, /name: bun/);
-  assert.match(ciWorkflow, /pnpm test:bun/);
+  assert.match(ciWorkflow, /nub run test:bun/);
   assert.match(ciWorkflow, /name: deno/);
-  assert.match(ciWorkflow, /denoland\/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282/);
-  assert.match(ciWorkflow, /pnpm test:deno/);
+  assert.match(ciWorkflow, /denoland\/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed/);
+  assert.match(ciWorkflow, /nub run test:deno/);
 });
 
 test("update workflow maintains dependencies and override metadata", () => {
-  assert.match(updateWorkflow, /pnpm run codependence:update/);
-  assert.match(updateWorkflow, /pnpm run pastoralist/);
-  assert.match(updateWorkflow, /pnpm run pastoralist --dry-run --strict/);
-  assert.match(updateWorkflow, /pnpm validate/);
+  assert.match(updateWorkflow, /nub run codependence:update/);
+  assert.match(updateWorkflow, /nub run pastoralist/);
+  assert.match(updateWorkflow, /nub run pastoralist --dry-run --strict/);
+  assert.match(updateWorkflow, /nub run validate/);
   assert.match(updateWorkflow, /peter-evans\/create-pull-request@/);
 });

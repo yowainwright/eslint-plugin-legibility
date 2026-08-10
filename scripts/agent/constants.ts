@@ -85,12 +85,12 @@ const cleanupEdits = [
 
 const cleanupClose = [
   "5. Re-run `npx lint-changed` until the touched files are clean or only documented unrelated failures remain.",
-  "Do not run `eslint .`, `pnpm lint`, or `oxlint .` for the cleanup loop unless the user asks for full-repo validation.",
+  "Do not run `eslint .`, `nub run lint`, or `oxlint .` for the cleanup loop unless the user asks for full-repo validation.",
 ].join("\n\n");
 
 const maintenanceHeading = "## Repository Maintenance Loop";
-const maintenanceCommands = "```sh\npnpm build\nnpx lint-changed\npnpm test\n```";
-const maintenanceFullCheck = "```sh\npnpm validate\n```";
+const maintenanceCommands = "```sh\nnub run build\nnubx lint-changed\nnub run test\n```";
+const maintenanceFullCheck = "```sh\nnub run validate\n```";
 const maintenanceBody = [
   "In this repository, use the local package:",
   maintenanceCommands,
@@ -103,7 +103,7 @@ const maintenanceEdits = [
   "- Update rule metadata and implementation in `src/constants.ts` and `src/index.ts`.",
   "- Add positive and negative tests in `tests/unit/plugin`.",
   "- Update README rule tables and examples when public behavior changed.",
-  "- Rebuild generated agent artifacts with `pnpm build:agent -- --target all`.",
+  "- Rebuild generated agent artifacts with `nub run build:agent -- --target all`.",
 ].join("\n");
 
 const reviewHeading = "## Review Guidance";

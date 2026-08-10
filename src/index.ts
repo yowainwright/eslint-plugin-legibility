@@ -2,6 +2,8 @@ import { basename, relative } from "node:path";
 import {
   ARRAY_MUTATING_METHODS,
   ARG_COMMAND_FUNCTIONS,
+  ASYNC_FS_MODULE_SPECIFIERS,
+  ASYNC_FS_SYNC_METHODS,
   COMMENT_RULE_NAMES,
   COMPARISON_OPERATORS,
   CONTROL_FLOW_TYPES,
@@ -25,11 +27,13 @@ import {
   DEFAULT_MAX_IF_OPERATORS,
   DEFAULT_MAX_OBJECT_PARAMETER_PROPERTIES,
   DEFAULT_MAX_TERNARY_OPERATORS,
+  DEFAULT_MIN_LOOKUP_COLLECTION_SIZE,
   DEFAULT_MIN_OBJECT_LOOKUP_CHAIN_LENGTH,
   DEFAULT_READABILITY_OPERATOR_COMPLEXITY,
   EQUALITY_OPERATORS,
   EXPRESSION_CONTAINER_NODE_TYPES,
   FLAT_METHODS,
+  FS_MODULE_SPECIFIERS,
   FUNCTION_NODE_TYPES,
   HOIST_IF_OPERATORS_META,
   ITERATION_METHODS,
@@ -52,12 +56,14 @@ import {
   NO_REDUNDANT_NULLISH_FALLBACK_META,
   NO_REPEATED_COLLECTION_SEARCH_META,
   NO_MIXED_FILENAME_CASING_META,
+  NO_SMALL_COLLECTION_CONVERSION_META,
   NO_SINGLE_USE_RENAMING_ALIAS_META,
   REQUIRE_FILENAME_MATCHES_DIRNAME_META,
   NO_STACKED_COMMENTS_META,
   NO_STANDALONE_ARRAY_MUTATIONS_META,
   NO_TRIVIAL_WRAPPER_FUNCTIONS_META,
   NO_UNMATCHED_COMMENTS_META,
+  NO_UNNECESSARY_ASYNC_META,
   NO_UNNECESSARY_BLOCK_CALLBACK_META,
   OBJECT_LOOKUP_OPERATORS,
   PACKAGE_VERSION,
@@ -81,6 +87,8 @@ import type {
   AliasCandidate,
   AliasScope,
   AliasScopeStack,
+  AsyncFsBindings,
+  AsyncRuleFinding,
   AstNode,
   AstValue,
   FunctionDepthFrame,
@@ -2634,6 +2642,324 @@ function createNoUnnecessaryBlockCallback(context: RuleContext): RuleListener {
   };
 }
 
+function isAwaitOperation(node: AstNode): boolean {
+  const isAwaitExpression = node.type === "AwaitExpression";
+  if (isAwaitExpression) return true;
+
+  const isForOfStatement = node.type === "ForOfStatement";
+  if (isForOfStatement) return Boolean(node.await);
+
+  const isVariableDeclaration = node.type === "VariableDeclaration";
+  if (!isVariableDeclaration) return false;
+  return node.kind === "await using";
+}
+
+function collectChildAwaitOperations(child: AstValue, root: AstNode): AstNode[] {
+  const isArrayChild = Array.isArray(child);
+  if (isArrayChild) {
+    return child.flatMap((item) => collectChildAwaitOperations(item, root));
+  }
+
+  if (!isRecord(child)) return [];
+  return collectAwaitOperations(child, root);
+}
+
+function collectAwaitOperations(node: AstNode, root = node): AstNode[] {
+  if (isFunctionBoundary(node, root)) return [];
+
+  const operations = isAwaitOperation(node) ? [node] : [];
+  const childOperations = getTraversableEntries(node).flatMap(([, child]) =>
+    collectChildAwaitOperations(child, root),
+  );
+  return operations.concat(childOperations);
+}
+
+function getImportName(node: AstValue): string | null {
+  const isIdentifier = isRecord(node) && node.type === "Identifier";
+  if (!isIdentifier) return null;
+  return node.name ?? null;
+}
+
+function trackAsyncFsSpecifier(specifier: AstNode, bindings: AsyncFsBindings): void {
+  const localName = getImportName(specifier.local);
+  if (!localName) return;
+
+  const isNamedImport = specifier.type === "ImportSpecifier";
+  if (!isNamedImport) {
+    bindings.promises.add(localName);
+    return;
+  }
+
+  const importedName = getImportName(specifier.imported);
+  const syncMethod = importedName ? ASYNC_FS_SYNC_METHODS.get(importedName) : null;
+  if (syncMethod) bindings.methods.set(localName, syncMethod);
+}
+
+function trackFsSpecifier(specifier: AstNode, bindings: AsyncFsBindings): void {
+  const localName = getImportName(specifier.local);
+  if (!localName) return;
+
+  const importedName = getImportName(specifier.imported);
+  const isPromisesImport = specifier.type === "ImportSpecifier" && importedName === "promises";
+  if (isPromisesImport) {
+    bindings.promises.add(localName);
+    return;
+  }
+
+  bindings.fs.add(localName);
+}
+
+function trackAsyncFsImport(node: AstNode, bindings: AsyncFsBindings): void {
+  const specifiers = getNodeArray(node.specifiers);
+  specifiers.forEach((specifier) => trackAsyncFsSpecifier(specifier, bindings));
+}
+
+function trackNodeFsImport(node: AstNode, bindings: AsyncFsBindings): void {
+  const specifiers = getNodeArray(node.specifiers);
+  specifiers.forEach((specifier) => trackFsSpecifier(specifier, bindings));
+}
+
+function trackFsImport(node: AstNode, bindings: AsyncFsBindings): void {
+  const sourceNode = node.source;
+  const source = getStringValue(isRecord(sourceNode) ? sourceNode : null);
+  if (!source) return;
+
+  const isAsyncFsModule = ASYNC_FS_MODULE_SPECIFIERS.has(source);
+  if (isAsyncFsModule) {
+    trackAsyncFsImport(node, bindings);
+    return;
+  }
+
+  if (FS_MODULE_SPECIFIERS.has(source)) trackNodeFsImport(node, bindings);
+}
+
+function getMemberObjectName(member: AstNode): string | null {
+  const object = unwrapChainExpression(member.object);
+  return getImportName(object);
+}
+
+function isFsPromisesMember(member: MaybeAstNode, bindings: AsyncFsBindings): boolean {
+  const isMember = isRecord(member) && member.type === "MemberExpression";
+  if (!isMember) return false;
+
+  const isPromisesProperty = getStaticPropertyName(member) === "promises";
+  if (!isPromisesProperty) return false;
+
+  const fsName = getMemberObjectName(member);
+  return fsName ? bindings.fs.has(fsName) : false;
+}
+
+function getAsyncFsMemberMethod(callee: AstNode, bindings: AsyncFsBindings): string | null {
+  const method = getStaticPropertyName(callee);
+  const syncMethod = method ? ASYNC_FS_SYNC_METHODS.get(method) : null;
+  if (!syncMethod) return null;
+
+  const namespaceName = getMemberObjectName(callee);
+  const isPromiseNamespace = namespaceName ? bindings.promises.has(namespaceName) : false;
+  const isFsPromisesNamespace = isFsPromisesMember(callee.object, bindings);
+  const usesPromiseNamespace = isPromiseNamespace || isFsPromisesNamespace;
+  if (!usesPromiseNamespace) return null;
+  return syncMethod;
+}
+
+function getAwaitedFsSyncMethod(
+  operation: AstNode,
+  bindings: AsyncFsBindings,
+): string | null {
+  const call = unwrapChainExpression(operation.argument);
+  const isCall = isRecord(call) && call.type === "CallExpression";
+  if (!isCall) return null;
+
+  const callee = unwrapChainExpression(call.callee);
+  const directName = getImportName(callee);
+  if (directName) return bindings.methods.get(directName) ?? null;
+
+  const isMember = isRecord(callee) && callee.type === "MemberExpression";
+  return isMember ? getAsyncFsMemberMethod(callee, bindings) : null;
+}
+
+function getSyncFsReplacements(
+  operations: AstNode[],
+  bindings: AsyncFsBindings,
+): string[] | null {
+  const areAwaitExpressions = operations.every((node) => node.type === "AwaitExpression");
+  if (!areAwaitExpressions) return null;
+
+  const replacements = operations.map((node) => getAwaitedFsSyncMethod(node, bindings));
+  const hasUnknownReplacement = replacements.some((replacement) => !replacement);
+  if (hasUnknownReplacement) return null;
+
+  const knownReplacements = replacements.filter(
+    (replacement): replacement is string => typeof replacement === "string",
+  );
+  return Array.from(new Set(knownReplacements));
+}
+
+function hasTryAncestor(node: AstNode, boundary: AstNode): boolean {
+  let current = node.parent;
+  while (isRecord(current) && current !== boundary) {
+    if (current.type === "TryStatement") return true;
+    current = current.parent;
+  }
+  return false;
+}
+
+function isRemovableReturnAwait(operation: AstNode, functionNode: AstNode): boolean {
+  const isConciseReturn = functionNode.body === operation;
+  const parent = operation.parent;
+  const isReturnStatement = isRecord(parent) && parent.type === "ReturnStatement";
+  const isDirectReturn = isReturnStatement && parent.argument === operation;
+  const isReturnedAwait = isConciseReturn || isDirectReturn;
+  if (!isReturnedAwait) return false;
+  return !hasTryAncestor(operation, functionNode);
+}
+
+function getAsyncRuleFinding(
+  node: AstNode,
+  body: AstNode,
+  bindings: AsyncFsBindings,
+): AsyncRuleFinding | null {
+  const name = getFunctionName(node);
+  const operations = collectAwaitOperations(body);
+  if (!operations.length) return { messageId: "unnecessaryAsync", data: { name } };
+
+  const replacements = getSyncFsReplacements(operations, bindings);
+  if (replacements) {
+    const replacementList = replacements.join(", ");
+    return { messageId: "synchronousFilesystem", data: { name, replacements: replacementList } };
+  }
+
+  const onlyOperation = operations.length === 1 ? operations[0] : null;
+  const hasSingleReturnAwait = isRecord(onlyOperation)
+    ? isRemovableReturnAwait(onlyOperation, node)
+    : false;
+  if (hasSingleReturnAwait) return { messageId: "unnecessaryReturnAwait", data: { name } };
+  return null;
+}
+
+function checkUnnecessaryAsync(
+  context: RuleContext,
+  node: AstNode,
+  bindings: AsyncFsBindings,
+): void {
+  const isAsyncFunction = Boolean(node.async);
+  if (!isAsyncFunction) return;
+
+  const isAsyncGenerator = Boolean(node.generator);
+  if (isAsyncGenerator) return;
+
+  const body = node.body;
+  if (!isRecord(body)) return;
+
+  const finding = getAsyncRuleFinding(node, body, bindings);
+  if (!finding) return;
+  context.report({ node, messageId: finding.messageId, data: finding.data });
+}
+
+function createNoUnnecessaryAsync(context: RuleContext): RuleListener {
+  const fs = new Set<string>();
+  const methods = new Map<string, string>();
+  const promises = new Set<string>();
+  const bindings = { fs, methods, promises };
+  const functionVisitors = createFunctionNodeVisitors((node) => {
+    checkUnnecessaryAsync(context, node, bindings);
+  });
+  return Object.assign({}, functionVisitors, {
+    ImportDeclaration(node: AstNode) {
+      trackFsImport(node, bindings);
+    },
+  });
+}
+
+function getCollectionConstructorName(node: AstNode): string | null {
+  const callee = node.callee;
+  const isIdentifier = isRecord(callee) && callee.type === "Identifier";
+  if (!isIdentifier) return null;
+
+  const name = callee.name;
+  const isLookupCollection = name === "Map" || name === "Set";
+  return isLookupCollection ? name : null;
+}
+
+function getArrayLiteralSize(node: AstNode): number | null {
+  const elements = node.elements;
+  if (!Array.isArray(elements)) return null;
+
+  const hasSpread = elements.some(
+    (element) => isRecord(element) && element.type === "SpreadElement",
+  );
+  return hasSpread ? null : elements.length;
+}
+
+function getStaticCollectionSize(source: AstNode, collection: string): number | null {
+  const isArrayLiteral = source.type === "ArrayExpression";
+  if (isArrayLiteral) return getArrayLiteralSize(source);
+
+  const value = source.value;
+  const isSetString = collection === "Set" && typeof value === "string";
+  if (!isSetString) return null;
+
+  return Array.from(value).length;
+}
+
+function isCollectionLookupMethod(collection: string, method: string | null): boolean {
+  if (collection === "Set") return method === "has";
+  if (collection !== "Map") return false;
+
+  const isGet = method === "get";
+  const isHas = method === "has";
+  return isGet || isHas;
+}
+
+function isImmediateCollectionLookup(node: AstNode, collection: string): boolean {
+  const member = node.parent;
+  if (!isRecord(member)) return false;
+  if (member.type !== "MemberExpression") return false;
+  if (member.object !== node) return false;
+
+  const method = getStaticPropertyName(member);
+  if (!isCollectionLookupMethod(collection, method)) return false;
+
+  const call = member.parent;
+  if (!isRecord(call)) return false;
+  if (call.type !== "CallExpression") return false;
+  return call.callee === member;
+}
+
+function checkSmallCollectionConversion(
+  context: RuleContext,
+  node: AstNode,
+  min: number,
+): void {
+  const collection = getCollectionConstructorName(node);
+  if (!collection) return;
+
+  const isImmediateLookup = isImmediateCollectionLookup(node, collection);
+  if (!isImmediateLookup) return;
+
+  const source = node.arguments?.[0];
+  if (!isRecord(source)) return;
+
+  const count = getStaticCollectionSize(source, collection);
+  const isSmallCollection = count !== null && count < min;
+  if (!isSmallCollection) return;
+
+  context.report({
+    node,
+    messageId: "smallCollection",
+    data: { collection, count, min },
+  });
+}
+
+function createNoSmallCollectionConversion(context: RuleContext): RuleListener {
+  const min = getConfiguredNumber(context, "min", DEFAULT_MIN_LOOKUP_COLLECTION_SIZE);
+  return {
+    NewExpression(node) {
+      checkSmallCollectionConversion(context, node, min);
+    },
+  };
+}
+
 function checkUnnecessaryBlockCallback(context: RuleContext, node: AstNode): void {
   const isCallback = isCallbackArgument(node);
   if (!isCallback) return;
@@ -2930,6 +3256,10 @@ const rules = {
     NO_REDUNDANT_NULLISH_FALLBACK_META,
     createNoRedundantNullishFallback,
   ),
+  "no-small-collection-conversion": defineRule(
+    NO_SMALL_COLLECTION_CONVERSION_META,
+    createNoSmallCollectionConversion,
+  ),
   "no-repeated-collection-search": defineRule(
     NO_REPEATED_COLLECTION_SEARCH_META,
     createNoRepeatedCollectionSearch,
@@ -2946,6 +3276,7 @@ const rules = {
     NO_UNNECESSARY_BLOCK_CALLBACK_META,
     createNoUnnecessaryBlockCallback,
   ),
+  "no-unnecessary-async": defineRule(NO_UNNECESSARY_ASYNC_META, createNoUnnecessaryAsync),
   "no-single-use-renaming-alias": defineRule(
     NO_SINGLE_USE_RENAMING_ALIAS_META,
     createNoSingleUseRenamingAlias,

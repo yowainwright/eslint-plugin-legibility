@@ -58,22 +58,22 @@ npx eslint-plugin-legibility-install-skill --target claude
 
 5. Re-run `npx lint-changed` until the touched files are clean or only documented unrelated failures remain.
 
-Do not run `eslint .`, `pnpm lint`, or `oxlint .` for the cleanup loop unless the user asks for full-repo validation.
+Do not run `eslint .`, `nub run lint`, or `oxlint .` for the cleanup loop unless the user asks for full-repo validation.
 
 ## Repository Maintenance Loop
 
 In this repository, use the local package:
 
 ```sh
-pnpm build
-npx lint-changed
-pnpm test
+nub run build
+nubx lint-changed
+nub run test
 ```
 
 For a full release-grade check:
 
 ```sh
-pnpm validate
+nub run validate
 ```
 
 When changing public rule behavior:
@@ -81,7 +81,7 @@ When changing public rule behavior:
 - Update rule metadata and implementation in `src/constants.ts` and `src/index.ts`.
 - Add positive and negative tests in `tests/unit/plugin`.
 - Update README rule tables and examples when public behavior changed.
-- Rebuild generated agent artifacts with `pnpm build:agent -- --target all`.
+- Rebuild generated agent artifacts with `nub run build:agent -- --target all`.
 
 ## Review Guidance
 

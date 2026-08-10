@@ -21,7 +21,15 @@ install_pre_commit_hook() {
 
 set -eu
 
-pnpm validate
+repo_root="$(git rev-parse --show-toplevel)"
+nub_path="$repo_root/node_modules/.bin/nub"
+
+if [ ! -x "$nub_path" ]; then
+  echo "Nub is not installed at $nub_path. Run nub install first." >&2
+  exit 1
+fi
+
+"$nub_path" run validate
 HOOK
   chmod 755 "$pre_commit_path"
 }
@@ -42,8 +50,14 @@ changed_files="$(git diff-tree -r --name-only --no-commit-id ORIG_HEAD HEAD || t
 
 case "$changed_files" in
   *package.json*|*pnpm-lock.yaml*)
-    echo "Dependencies changed; running pnpm install --frozen-lockfile"
-    pnpm install --frozen-lockfile
+    repo_root="$(git rev-parse --show-toplevel)"
+    nub_path="$repo_root/node_modules/.bin/nub"
+    if [ ! -x "$nub_path" ]; then
+      echo "Nub is not installed at $nub_path. Run nub install first." >&2
+      exit 1
+    fi
+    echo "Dependencies changed; running nub install --frozen-lockfile"
+    "$nub_path" install --frozen-lockfile
     ;;
 esac
 HOOK
