@@ -46,6 +46,14 @@ nub run validate
 
 Rules marked `recommended + strict` are enabled by `recommended` as `warn` and by `strict` as `error`. Rules marked `strict only` are enabled by `strict` as `error`. Comment rules are `recipe only` because agent sessions, development, and commit gates need different severities and options.
 
+The presets also enable ESLint core rules implemented natively by both ESLint and Oxlint.
+
+<!-- ESLint core rules configured by exported presets from src/constants.ts and src/index.ts -->
+| Core rule | Recommended | Strict | Options |
+| --- | --- | --- | --- |
+| `complexity` | warn | error | `{max: 20, variant: "classic"}` |
+| `max-lines-per-function` | warn | error | `{max: 40, skipBlankLines: true, skipComments: true, IIFEs: true}` |
+
 <!-- rule presets and option summaries from src/constants.ts -->
 | Rule | Preset configuration | Options |
 | --- | --- | --- |
@@ -921,10 +929,10 @@ This repository can install its managed validation hook with `nub run install-ho
 
 | Config | Format | Behavior |
 | --- | --- | --- |
-| [recommended](#legibility-configs-recommended) | ESLint legacy | High-signal general rules as warnings. |
-| [strict](#legibility-configs-strict) | ESLint legacy | General rules as errors. |
-| [flat/recommended](#legibility-configs-flat-recommended) | ESLint flat config | High-signal general rules as warnings. |
-| [flat/strict](#legibility-configs-flat-strict) | ESLint flat config | General rules as errors. |
+| [recommended](#legibility-configs-recommended) | ESLint legacy | High-signal and core complexity rules as warnings. |
+| [strict](#legibility-configs-strict) | ESLint legacy | General and core complexity rules as errors. |
+| [flat/recommended](#legibility-configs-flat-recommended) | ESLint flat config | High-signal and core complexity rules as warnings. |
+| [flat/strict](#legibility-configs-flat-strict) | ESLint flat config | General and core complexity rules as errors. |
 
 ---
 
@@ -987,7 +995,17 @@ Oxlint JavaScript plugins use the same ESLint-compatible rule API.
   "rules": {
     "legibility/max-array-chain-depth": ["warn", { "max": 2 }],
     "legibility/max-expression-operators": ["warn", { "max": 4 }],
-    "legibility/no-quadratic-patterns": "warn"
+    "legibility/no-quadratic-patterns": "warn",
+    "complexity": ["warn", { "max": 20, "variant": "classic" }],
+    "max-lines-per-function": [
+      "warn",
+      {
+        "max": 40,
+        "skipBlankLines": true,
+        "skipComments": true,
+        "IIFEs": true
+      }
+    ]
   }
 }
 ```
@@ -1025,25 +1043,25 @@ Rules are configured through ESLint or Oxlint `rules`.
 
 ### `legibility.configs["flat/recommended"]`
 
-Flat ESLint config with high-signal general rules enabled as warnings. Comment policies are configured through [recipes](#comment-policy-recipes).
+Flat ESLint config with high-signal general rules and shared core complexity limits enabled as warnings. Comment policies are configured through [recipes](#comment-policy-recipes).
 
 ---
 
 ### `legibility.configs["flat/strict"]`
 
-Flat ESLint config with general rules enabled as errors. Comment policies are configured through [recipes](#comment-policy-recipes).
+Flat ESLint config with general rules and shared core complexity limits enabled as errors. Comment policies are configured through [recipes](#comment-policy-recipes).
 
 ---
 
 ### `legibility.configs.recommended`
 
-Legacy ESLint config with high-signal general rules enabled as warnings. Comment policies are configured through [recipes](#comment-policy-recipes).
+Legacy ESLint config with high-signal general rules and shared core complexity limits enabled as warnings. Comment policies are configured through [recipes](#comment-policy-recipes).
 
 ---
 
 ### `legibility.configs.strict`
 
-Legacy ESLint config with general rules enabled as errors. Comment policies are configured through [recipes](#comment-policy-recipes).
+Legacy ESLint config with general rules and shared core complexity limits enabled as errors. Comment policies are configured through [recipes](#comment-policy-recipes).
 
 ---
 

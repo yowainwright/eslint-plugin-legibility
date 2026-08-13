@@ -6,5 +6,28 @@
     "node_modules/**",
     "pnpm-lock.yaml",
     "tests/fixtures/oxlint/**"
+  ],
+  "overrides": [
+    {
+      "files": ["scripts/**/*.ts", "src/**/*.ts"],
+      "rules": {
+        "complexity": [
+          "error",
+          {
+            "max": 20,
+            "variant": "classic"
+          }
+        ],
+        "max-lines-per-function": [
+          "error",
+          {
+            "max": 40,
+            "skipBlankLines": true,
+            "skipComments": true,
+            "IIFEs": true
+          }
+        ]
+      }
+    }
   ]
 }

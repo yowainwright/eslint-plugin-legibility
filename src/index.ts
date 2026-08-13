@@ -23,6 +23,8 @@ import {
   DEFAULT_ALLOWED_STANDALONE_FILENAMES,
   DEFAULT_MAX_EXPRESSION_OPERATORS,
   DEFAULT_MAX_FUNCTION_PARAMETERS,
+  DEFAULT_MAX_CYCLOMATIC_COMPLEXITY,
+  DEFAULT_MAX_FUNCTION_LINES,
   DEFAULT_MIN_DIRNAME_MATCH_DEPTH,
   DEFAULT_MAX_IF_OPERATORS,
   DEFAULT_MAX_OBJECT_PARAMETER_PROPERTIES,
@@ -91,7 +93,7 @@ import type {
   AsyncRuleFinding,
   AstNode,
   AstValue,
-  FunctionDepthFrame,
+  ControlFlowState,
   LegibilityPlugin,
   LoopStack,
   LookupPart,
@@ -100,6 +102,7 @@ import type {
   NodeScope,
   OperatorComplexity,
   RuleContext,
+  RuleConfig,
   RuleCreate,
   RuleLevel,
   RuleListener,
@@ -1963,58 +1966,86 @@ function isElseIf(node: AstNode): boolean {
   return isElseIfStatement;
 }
 
-function createControlFlowVisitors(context: RuleContext): RuleListener {
-  const max = getConfiguredMax(context, DEFAULT_MAX_CONTROL_FLOW_DEPTH);
-  let depth = 0;
-  let stack: number[] = [];
-  let functionStack: FunctionDepthFrame[] = [];
+function enterControlFlow(state: ControlFlowState, type: string, node: AstNode): void {
+  state.stack = state.stack.concat(state.depth);
+  state.depth = getNextControlFlowDepth(type, node, state.depth);
+  const isWithinLimit = state.depth <= state.max;
+  if (isWithinLimit) return;
 
-  const controlVisitors = Object.fromEntries(
+  state.context.report({
+    node,
+    messageId: "tooDeep",
+    data: { depth: state.depth, max: state.max },
+  });
+}
+
+function exitControlFlow(state: ControlFlowState): void {
+  state.depth = getLastStackNumber(state.stack);
+  state.stack = dropLastStackItem(state.stack);
+}
+
+function createControlTypeVisitors(state: ControlFlowState): RuleListener {
+  return Object.fromEntries(
     Array.from(CONTROL_FLOW_TYPES).flatMap((type) => [
       [
         type,
         (node: AstNode) => {
-          stack = stack.concat(depth);
-          depth = getNextControlFlowDepth(type, node, depth);
-          const isWithinLimit = depth <= max;
-          if (isWithinLimit) return;
-
-          context.report({
-            node,
-            messageId: "tooDeep",
-            data: { depth, max },
-          });
+          enterControlFlow(state, type, node);
         },
       ],
       [
         `${type}:exit`,
         () => {
-          depth = getLastStackNumber(stack);
-          stack = dropLastStackItem(stack);
+          exitControlFlow(state);
         },
       ],
     ]),
   );
-  const functionVisitors = Object.fromEntries(
+}
+
+function enterControlFlowFunction(state: ControlFlowState): void {
+  const frame = { depth: state.depth, stackLength: state.stack.length };
+  state.functionStack = state.functionStack.concat(frame);
+  state.depth = 0;
+}
+
+function exitControlFlowFunction(state: ControlFlowState): void {
+  const previous = getLastStackItem(state.functionStack);
+  state.functionStack = dropLastStackItem(state.functionStack);
+  if (previous === undefined) {
+    state.depth = 0;
+    state.stack = [];
+    return;
+  }
+
+  state.depth = previous.depth;
+  state.stack = state.stack.slice(0, previous.stackLength);
+}
+
+function createFunctionTypeVisitors(state: ControlFlowState): RuleListener {
+  return Object.fromEntries(
     Array.from(FUNCTION_NODE_TYPES).flatMap((type) => [
       [
         type,
         () => {
-          functionStack = functionStack.concat({ depth, stackLength: stack.length });
-          depth = 0;
+          enterControlFlowFunction(state);
         },
       ],
       [
         `${type}:exit`,
         () => {
-          const previous = getLastStackItem(functionStack);
-          functionStack = dropLastStackItem(functionStack);
-          depth = previous?.depth ?? 0;
-          stack = stack.slice(0, previous?.stackLength ?? 0);
+          exitControlFlowFunction(state);
         },
       ],
     ]),
   );
+}
+
+function createControlFlowVisitors(context: RuleContext): RuleListener {
+  const max = getConfiguredMax(context, DEFAULT_MAX_CONTROL_FLOW_DEPTH);
+  const state: ControlFlowState = { context, max, depth: 0, stack: [], functionStack: [] };
+  const controlVisitors = createControlTypeVisitors(state);
+  const functionVisitors = createFunctionTypeVisitors(state);
   return Object.assign({}, controlVisitors, functionVisitors);
 }
 
@@ -3319,9 +3350,29 @@ function buildRuleConfig(
   return Object.fromEntries(ruleNames.map((ruleName) => [`${PLUGIN_NAME}/${ruleName}`, level]));
 }
 
-const recommendedRules = buildRuleConfig(RECOMMENDED_RULE_NAMES, "warn");
+function buildCoreRuleConfig(level: RuleLevel): Record<string, RuleConfig> {
+  const complexityOptions = {
+    max: DEFAULT_MAX_CYCLOMATIC_COMPLEXITY,
+    variant: "classic",
+  };
+  const complexity: RuleConfig = [level, complexityOptions];
+  const maxLineOptions = {
+    max: DEFAULT_MAX_FUNCTION_LINES,
+    skipBlankLines: true,
+    skipComments: true,
+    IIFEs: true,
+  };
+  const maxLines: RuleConfig = [level, maxLineOptions];
+  return { complexity, "max-lines-per-function": maxLines };
+}
+
+const recommendedPluginRules = buildRuleConfig(RECOMMENDED_RULE_NAMES, "warn");
+const recommendedCoreRules = buildCoreRuleConfig("warn");
+const recommendedRules = Object.assign({}, recommendedPluginRules, recommendedCoreRules);
 const strictRuleNames = Object.keys(rules).filter((ruleName) => !COMMENT_RULE_NAMES.has(ruleName));
-const strictRules = buildRuleConfig(strictRuleNames, "error");
+const strictPluginRules = buildRuleConfig(strictRuleNames, "error");
+const strictCoreRules = buildCoreRuleConfig("error");
+const strictRules = Object.assign({}, strictPluginRules, strictCoreRules);
 
 const plugin: LegibilityPlugin = {
   meta: {

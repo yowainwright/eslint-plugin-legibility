@@ -80,6 +80,8 @@ const cleanupEdits = [
   "   - Name intermediate computed values before returns and object or array values.",
   "   - Replace repeated collection scans with lookups.",
   "   - Split long array chains when each step deserves a name.",
+  "   - Keep cyclomatic complexity at 20 or below.",
+  "   - Keep functions at 40 nonblank, non-comment lines or fewer.",
   "   - Keep JSX and object literals free of hidden complex logic.",
 ].join("\n");
 

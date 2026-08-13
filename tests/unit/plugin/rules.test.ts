@@ -252,6 +252,28 @@ test("exports an ESLint and Oxlint compatible plugin shape", () => {
     plugin.configs["flat/strict"].rules["legibility/max-function-parameters"],
     "error",
   );
+  assert.deepEqual(plugin.configs["flat/recommended"].rules.complexity, [
+    "warn",
+    { max: 20, variant: "classic" },
+  ]);
+  assert.deepEqual(plugin.configs["flat/strict"].rules.complexity, [
+    "error",
+    { max: 20, variant: "classic" },
+  ]);
+  const maxLinesOptions = {
+    max: 40,
+    skipBlankLines: true,
+    skipComments: true,
+    IIFEs: true,
+  };
+  assert.deepEqual(plugin.configs["flat/recommended"].rules["max-lines-per-function"], [
+    "warn",
+    maxLinesOptions,
+  ]);
+  assert.deepEqual(plugin.configs["flat/strict"].rules["max-lines-per-function"], [
+    "error",
+    maxLinesOptions,
+  ]);
   const commentRuleNames = [
     "no-automated-comment-attribution",
     "no-stacked-comments",
@@ -1419,6 +1441,25 @@ test("flat config works through ESLint Linter when ESLint is installed", async (
   assert.equal(messages[0].ruleId, "legibility/hoist-if-operators");
 });
 
+test("flat config enables ESLint complexity limits", async () => {
+  const { Linter } = await import("eslint");
+  const branches = Array.from(
+    { length: 21 },
+    (_, index) => `  if (value === ${index}) return ${index};`,
+  );
+  const padding = Array.from({ length: 20 }, (_, index) => `  const pad${index} = ${index};`);
+  const lines = ["function choose(value) {"].concat(branches, padding, "  return value;", "}");
+  const source = lines.join("\n");
+  const linter = new Linter({ configType: "flat" });
+  const messages = linter.verify(source, [plugin.configs["flat/strict"]]);
+  const coreRuleIds = messages
+    .map((message) => message.ruleId)
+    .filter((ruleId) => ruleId === "complexity" || ruleId === "max-lines-per-function")
+    .sort();
+
+  assert.deepEqual(coreRuleIds, ["complexity", "max-lines-per-function"]);
+});
+
 test("no-unnecessary-async detects replaceable filesystem awaits", async () => {
   const { Linter } = await import("eslint");
   const source = [
@@ -1570,4 +1611,6 @@ test("oxlint can load the package as a JS plugin when oxlint is installed", (t) 
   assert.notEqual(result.status, 0);
   assert.match(output, /legibility(?:\/|\()prefer-early-return/);
   assert.match(output, /legibility(?:\/|\()no-unmatched-comments/);
+  assert.match(output, /complexity/);
+  assert.match(output, /max-lines-per-function/);
 });

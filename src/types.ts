@@ -164,6 +164,14 @@ export interface FunctionDepthFrame {
   stackLength: number;
 }
 
+export interface ControlFlowState {
+  readonly context: RuleContext;
+  readonly max: number;
+  depth: number;
+  stack: number[];
+  functionStack: FunctionDepthFrame[];
+}
+
 export type ScopeCallback = () => void;
 
 export interface LegacyConfig {
