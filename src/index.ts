@@ -2769,7 +2769,84 @@ function getMemberObjectName(member: AstNode): string | null {
   return getImportName(object);
 }
 
-function isFsPromisesMember(member: MaybeAstNode, bindings: AsyncFsBindings): boolean {
+function getObjectPatternBindingNames(node: AstNode): string[] {
+  return getNodeArray(node.properties).flatMap((property) =>
+    getBindingValueNames(property.value ?? property.argument),
+  );
+}
+
+function getBindingValueNames(value: AstValue): string[] {
+  return isRecord(value) ? getBindingPatternNames(value) : [];
+}
+
+function getBindingPatternNames(node: MaybeAstNode): string[] {
+  if (!isRecord(node)) return [];
+  if (node.type === "Identifier") return node.name ? [node.name] : [];
+
+  const isWrapper = node.type === "AssignmentPattern" || node.type === "RestElement";
+  if (isWrapper) return getBindingPatternNames(node.left ?? node.argument);
+  if (node.type === "ArrayPattern") {
+    return getNodeArray(node.elements).flatMap(getBindingPatternNames);
+  }
+  if (node.type !== "ObjectPattern") return [];
+  return getObjectPatternBindingNames(node);
+}
+
+function getDeclarationBindingNames(node: AstNode): string[] {
+  if (node.type === "VariableDeclarator") return getBindingPatternNames(node.id);
+  if (node.type === "CatchClause") return getBindingValueNames(node.param);
+
+  const isNamedDeclaration =
+    node.type === "FunctionDeclaration" || node.type === "ClassDeclaration";
+  return isNamedDeclaration ? getBindingPatternNames(node.id) : [];
+}
+
+function collectChildLocalBindingNames(child: AstValue, root: AstNode): string[] {
+  if (Array.isArray(child)) {
+    return getNodeArray(child).flatMap((item) => collectLocalBindingNames(item, root));
+  }
+  return isRecord(child) ? collectLocalBindingNames(child, root) : [];
+}
+
+function collectLocalBindingNames(node: AstNode, root: AstNode): string[] {
+  const names = getDeclarationBindingNames(node);
+  if (isFunctionBoundary(node, root)) return names;
+
+  const childNames = getTraversableEntries(node).flatMap(([, child]) =>
+    collectChildLocalBindingNames(child, root),
+  );
+  return names.concat(childNames);
+}
+
+function getFunctionBindingNames(node: AstNode, body: AstNode): StringSet {
+  const ownName = getBindingPatternNames(node.id);
+  const parameterNames = getFunctionParams(node).flatMap(getBindingPatternNames);
+  const localNames = collectLocalBindingNames(body, body);
+  return new Set(ownName.concat(parameterNames, localNames));
+}
+
+function isTrackedBinding(name: string | null, tracked: StringSet, localNames: StringSet): boolean {
+  if (!name) return false;
+  const isTracked = tracked.has(name);
+  const isUnshadowed = !localNames.has(name);
+  return isTracked && isUnshadowed;
+}
+
+function getTrackedMethod(
+  name: string | null,
+  methods: ReadonlyMap<string, string>,
+  localNames: StringSet,
+): string | null {
+  if (!name) return null;
+  if (localNames.has(name)) return null;
+  return methods.get(name) ?? null;
+}
+
+function isFsPromisesMember(
+  member: MaybeAstNode,
+  bindings: AsyncFsBindings,
+  localNames: StringSet,
+): boolean {
   const isMember = isRecord(member) && member.type === "MemberExpression";
   if (!isMember) return false;
 
@@ -2777,17 +2854,21 @@ function isFsPromisesMember(member: MaybeAstNode, bindings: AsyncFsBindings): bo
   if (!isPromisesProperty) return false;
 
   const fsName = getMemberObjectName(member);
-  return fsName ? bindings.fs.has(fsName) : false;
+  return isTrackedBinding(fsName, bindings.fs, localNames);
 }
 
-function getAsyncFsMemberMethod(callee: AstNode, bindings: AsyncFsBindings): string | null {
+function getAsyncFsMemberMethod(
+  callee: AstNode,
+  bindings: AsyncFsBindings,
+  localNames: StringSet,
+): string | null {
   const method = getStaticPropertyName(callee);
   const syncMethod = method ? ASYNC_FS_SYNC_METHODS.get(method) : null;
   if (!syncMethod) return null;
 
   const namespaceName = getMemberObjectName(callee);
-  const isPromiseNamespace = namespaceName ? bindings.promises.has(namespaceName) : false;
-  const isFsPromisesNamespace = isFsPromisesMember(callee.object, bindings);
+  const isPromiseNamespace = isTrackedBinding(namespaceName, bindings.promises, localNames);
+  const isFsPromisesNamespace = isFsPromisesMember(callee.object, bindings, localNames);
   const usesPromiseNamespace = isPromiseNamespace || isFsPromisesNamespace;
   if (!usesPromiseNamespace) return null;
   return syncMethod;
@@ -2796,6 +2877,7 @@ function getAsyncFsMemberMethod(callee: AstNode, bindings: AsyncFsBindings): str
 function getAwaitedFsSyncMethod(
   operation: AstNode,
   bindings: AsyncFsBindings,
+  localNames: StringSet,
 ): string | null {
   const call = unwrapChainExpression(operation.argument);
   const isCall = isRecord(call) && call.type === "CallExpression";
@@ -2803,20 +2885,24 @@ function getAwaitedFsSyncMethod(
 
   const callee = unwrapChainExpression(call.callee);
   const directName = getImportName(callee);
-  if (directName) return bindings.methods.get(directName) ?? null;
+  const directMethod = getTrackedMethod(directName, bindings.methods, localNames);
+  if (directMethod) return directMethod;
 
   const isMember = isRecord(callee) && callee.type === "MemberExpression";
-  return isMember ? getAsyncFsMemberMethod(callee, bindings) : null;
+  return isMember ? getAsyncFsMemberMethod(callee, bindings, localNames) : null;
 }
 
 function getSyncFsReplacements(
   operations: AstNode[],
   bindings: AsyncFsBindings,
+  localNames: StringSet,
 ): string[] | null {
   const areAwaitExpressions = operations.every((node) => node.type === "AwaitExpression");
   if (!areAwaitExpressions) return null;
 
-  const replacements = operations.map((node) => getAwaitedFsSyncMethod(node, bindings));
+  const replacements = operations.map((node) =>
+    getAwaitedFsSyncMethod(node, bindings, localNames),
+  );
   const hasUnknownReplacement = replacements.some((replacement) => !replacement);
   if (hasUnknownReplacement) return null;
 
@@ -2854,7 +2940,8 @@ function getAsyncRuleFinding(
   const operations = collectAwaitOperations(body);
   if (!operations.length) return { messageId: "unnecessaryAsync", data: { name } };
 
-  const replacements = getSyncFsReplacements(operations, bindings);
+  const localNames = getFunctionBindingNames(node, body);
+  const replacements = getSyncFsReplacements(operations, bindings, localNames);
   if (replacements) {
     const replacementList = replacements.join(", ");
     return { messageId: "synchronousFilesystem", data: { name, replacements: replacementList } };

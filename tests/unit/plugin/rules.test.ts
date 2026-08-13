@@ -1460,7 +1460,7 @@ test("flat config enables ESLint complexity limits", async () => {
   assert.deepEqual(coreRuleIds, ["complexity", "max-lines-per-function"]);
 });
 
-test("no-unnecessary-async detects replaceable filesystem awaits", async () => {
+test("no-unnecessary-async ignores shadowed filesystem imports", async () => {
   const { Linter } = await import("eslint");
   const source = [
     'import { readFile } from "node:fs/promises";',
@@ -1468,6 +1468,8 @@ test("no-unnecessary-async detects replaceable filesystem awaits", async () => {
     'async function readConfig() { return await readFile("config.json", "utf8"); }',
     'async function readData() { const value = await fs.readFile("data.json"); return value; }',
     'async function request() { const value = await fetch("/data"); return value.json(); }',
+    'async function readParameter(readFile) { const value = await readFile("remote"); return value; }',
+    'async function readClient() { const fs = client; const value = await fs.readFile("remote"); return value; }',
   ].join("\n");
   const linter = new Linter({ configType: "flat" });
   const messages = linter.verify(
