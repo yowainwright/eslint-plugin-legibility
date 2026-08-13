@@ -277,16 +277,26 @@ test("exports an ESLint and Oxlint compatible plugin shape", () => {
   const commentRuleNames = [
     "no-automated-comment-attribution",
     "no-stacked-comments",
-    "no-unmatched-comments",
     "require-jsdoc-multiline-comments",
   ];
   commentRuleNames.forEach((ruleName) => {
     const ruleId = `legibility/${ruleName}`;
-    assert.equal(plugin.rules[ruleName].meta.docs.recommended, false);
-    assert.equal(plugin.configs["flat/recommended"].rules[ruleId], undefined);
-    assert.equal(plugin.configs["flat/strict"].rules[ruleId], undefined);
+    assert.equal(plugin.rules[ruleName].meta.docs.recommended, true);
+    assert.equal(plugin.configs["flat/recommended"].rules[ruleId], "warn");
+    assert.equal(plugin.configs["flat/strict"].rules[ruleId], "error");
   });
-  assert.equal(plugin.configs.recommended.plugins[0], "legibility");
+  const unmatchedRuleId = "legibility/no-unmatched-comments";
+  assert.equal(plugin.rules["no-unmatched-comments"].meta.docs.recommended, false);
+  assert.equal(plugin.configs["flat/recommended"].rules[unmatchedRuleId], undefined);
+  assert.equal(plugin.configs["flat/strict"].rules[unmatchedRuleId], undefined);
+  Object.keys(plugin.rules)
+    .filter((ruleName) => ruleName !== "no-unmatched-comments")
+    .forEach((ruleName) => {
+      const ruleId = `legibility/${ruleName}`;
+      assert.equal(plugin.configs["flat/recommended"].rules[ruleId], "warn");
+      assert.equal(plugin.configs["flat/strict"].rules[ruleId], "error");
+    });
+  assert.deepEqual(Object.keys(plugin.configs).sort(), ["flat/recommended", "flat/strict"]);
   assert.equal(requiredPlugin, plugin);
   assert.equal(requiredPlugin.meta.name, "legibility");
 });

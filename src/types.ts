@@ -174,11 +174,6 @@ export interface ControlFlowState {
 
 export type ScopeCallback = () => void;
 
-export interface LegacyConfig {
-  plugins: string[];
-  rules: Record<string, RuleConfig>;
-}
-
 export interface FlatConfig {
   plugins: Record<string, LegibilityPlugin>;
   rules: Record<string, RuleConfig>;
@@ -191,8 +186,6 @@ export interface LegibilityPlugin {
   };
   rules: Record<string, RuleModule>;
   configs: {
-    recommended: LegacyConfig;
-    strict: LegacyConfig;
     "flat/recommended": FlatConfig;
     "flat/strict": FlatConfig;
   };

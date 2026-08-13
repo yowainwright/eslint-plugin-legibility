@@ -31,6 +31,37 @@ npm add -D eslint-plugin-legibility
 
 ---
 
+## Configs
+
+Choose one flat config preset.
+
+### `flat/recommended`
+
+Enables the bundled rules and core complexity limits as warnings.
+
+```ts
+import legibility from "eslint-plugin-legibility";
+
+export default [legibility.configs["flat/recommended"]];
+```
+
+### `flat/strict`
+
+Enables the same rules and core complexity limits as errors.
+
+```ts
+import legibility from "eslint-plugin-legibility";
+
+export default [legibility.configs["flat/strict"]];
+```
+
+Both presets configure these ESLint core rules:
+
+- `complexity`: `max: 20`, using the `classic` variant.
+- `max-lines-per-function`: `max: 40`, excluding blank lines and comments and including IIFEs.
+
+---
+
 ## Development
 
 The repository uses Mise for Node 26 and Nub for pnpm 11. Nub keeps `pnpm-lock.yaml` as the package-manager source of truth.
@@ -44,13 +75,7 @@ nub run validate
 
 ## Rules
 
-Rules marked `recommended + strict` are enabled by `recommended` as `warn` and by `strict` as `error`. Rules marked `strict only` are enabled by `strict` as `error`. Comment rules are `recipe only` because agent sessions, development, and commit gates need different severities and options.
-
-The presets also enable ESLint core rules implemented natively by both ESLint and Oxlint.
-
-<!-- ESLint core rules configured by exported presets from src/constants.ts and src/index.ts -->
-- `complexity`: `max: 20`, using the `classic` variant.
-- `max-lines-per-function`: `max: 40`, excluding blank lines and comments and including IIFEs.
+Both presets enable the same rules. `flat/recommended` uses warnings; `flat/strict` uses errors. `no-unmatched-comments` is opt-in because it is intended for temporary no-comment sessions and repositories that define an explicit comment allow list.
 
 <!-- rule section links grouped by preset membership from src/constants.ts -->
 <details>
@@ -69,11 +94,13 @@ The presets also enable ESLint core rules implemented natively by both ESLint an
 - [`legibility/no-hidden-side-effects`](#no-hidden-side-effects)
 - [`legibility/no-identity-array-callback`](#no-identity-array-callback)
 - [`legibility/no-mixed-filename-casing`](#no-mixed-filename-casing)
+- [`legibility/no-automated-comment-attribution`](#no-automated-comment-attribution)
 - [`legibility/no-quadratic-patterns`](#no-quadratic-patterns)
 - [`legibility/no-redundant-boolean-logic`](#no-redundant-boolean-logic)
 - [`legibility/no-redundant-nullish-fallback`](#no-redundant-nullish-fallback)
 - [`legibility/no-small-collection-conversion`](#no-small-collection-conversion)
 - [`legibility/no-standalone-array-mutations`](#no-standalone-array-mutations)
+- [`legibility/no-stacked-comments`](#no-stacked-comments)
 - [`legibility/no-trivial-wrapper-functions`](#no-trivial-wrapper-functions)
 - [`legibility/no-unnecessary-async`](#no-unnecessary-async)
 - [`legibility/no-unnecessary-block-callback`](#no-unnecessary-block-callback)
@@ -84,6 +111,7 @@ The presets also enable ESLint core rules implemented natively by both ESLint an
 - [`legibility/prefer-object-lookup`](#prefer-object-lookup)
 - [`legibility/require-executable-shebang`](#require-executable-shebang)
 - [`legibility/require-filename-matches-dirname`](#require-filename-matches-dirname)
+- [`legibility/require-jsdoc-multiline-comments`](#require-jsdoc-multiline-comments)
 
 **Strict only**
 
@@ -91,12 +119,9 @@ The presets also enable ESLint core rules implemented natively by both ESLint an
 - [`legibility/no-single-use-renaming-alias`](#no-single-use-renaming-alias)
 - [`legibility/prefer-positive-condition-names`](#prefer-positive-condition-names)
 
-**Comment policy recipes**
+**Opt-in comment policy**
 
-- [`legibility/no-automated-comment-attribution`](#no-automated-comment-attribution)
-- [`legibility/no-stacked-comments`](#no-stacked-comments)
 - [`legibility/no-unmatched-comments`](#no-unmatched-comments)
-- [`legibility/require-jsdoc-multiline-comments`](#require-jsdoc-multiline-comments)
 
 </details>
 
@@ -498,107 +523,85 @@ Avoid wrappers that only forward their parameters to another call.
 
 ---
 
-### Comment rules
-
-Comment rules are opt-in because agent sessions, development, and commit gates need different severities.
-Start with the [comment policy recipes](#comment-policy-recipes), then use this section as the option reference.
-
 <a id="no-unmatched-comments"></a>
 
-#### `legibility/no-unmatched-comments({options})`
+### `legibility/no-unmatched-comments({options})`
 
 <!-- no-unmatched-comments defaults and matching behavior from src/constants.ts and src/index.ts -->
 
-Reject every comment that lacks an explicitly configured regular-expression matcher, prefix identifier, or suffix identifier.
+Allow only comments that match an explicit pattern, prefix, or suffix. With no options, the rule rejects every line and block comment. Executable shebangs are ignored.
 
-A comment is accepted when any configured `matchers`, `prefixIdentifiers`, or `suffixIdentifiers` entry matches. The rule reports unmatched comments without modifying them.
+#### options
 
-No matcher or identifier is configured by default. Enabling the rule without options rejects all line and block comments.
+- `matchers`: case-insensitive regular expressions matched against the comment body.
+- `prefixIdentifiers`: case-insensitive identifiers allowed at the start of a comment.
+- `suffixIdentifiers`: case-insensitive identifiers allowed at the end of a comment.
 
-##### options
+All options accept string arrays and default to empty arrays.
 
-| Option | Type | Default | Behavior |
-| --- | --- | --- | --- |
-| `matchers` | `string[]` | `[]` | Case-insensitive regular-expression sources matched against the normalized comment body. |
-| `prefixIdentifiers` | `string[]` | `[]` | Case-insensitive literal identifiers matched at the start of the normalized comment body. |
-| `suffixIdentifiers` | `string[]` | `[]` | Case-insensitive literal identifiers matched at the end of the normalized comment body. |
+The three options are independent allow paths. Matching ignores comment delimiters, surrounding whitespace, and leading JSDoc stars. Invalid regular expressions and empty identifiers never match. The rule has no autofix.
 
-The arrays are independent allow paths. A matching prefix or suffix lets ESLint allow the comment. `matchers` provides the regular-expression option.
+#### do / don't
 
-##### matching details
+With the `WHY:` prefix configured:
 
-- Line comments, inline comments, trailing comments, and block comments are checked.
-- Executable shebang tokens are ignored.
-- Regular-expression matchers run against the trimmed comment body without delimiters or leading JSDoc `*` prefixes.
-- Regular-expression matchers are compiled with the `i` and `u` flags.
-- Invalid regular expressions are ignored. If no other allow path matches, the comment is rejected.
-- Empty or whitespace-only prefix and suffix identifiers never match.
-- The rule has no autofix.
+```diff
+- // Retry after the provider resets its rate limit.
++ // WHY: The provider resets its rate limit every 30 seconds.
+```
 
 ---
 
 <a id="no-stacked-comments"></a>
 
-#### `legibility/no-stacked-comments()`
+### `legibility/no-stacked-comments()`
 
 <!-- no-stacked-comments behavior from src/constants.ts and src/index.ts -->
 
-Report comments stacked on consecutive lines. A stack signals that the adjacent comment should be updated or removed instead of adding another comment.
+Reject comments on consecutive lines. A blank line between comments is allowed.
+
+#### do / don't
 
 ```diff
 - // Retry every failed request.
-  // Retry requests that fail during regional failover.
+- // Retry requests that fail during regional failover.
++ // Retry only requests that fail during regional failover.
 ```
 
-A blank line between comments is not a stack. The rule has no options and no autofix.
+The rule has no options and no autofix.
 
 ---
 
 <a id="no-automated-comment-attribution"></a>
 
-#### `legibility/no-automated-comment-attribution({options})`
+### `legibility/no-automated-comment-attribution({options})`
 
 <!-- no-automated-comment-attribution defaults and signatures from src/constants.ts and src/index.ts -->
 
-Reject explicit automated authorship and generation signatures in comments.
+Reject comments that explicitly attribute authorship to an automated tool. The rule detects configured identifiers in attribution tags, `generated by <identifier>`, and `<identifier>-generated`. It does not classify unmarked prose.
 
-Static linting cannot determine how unmarked prose was produced. This rule only detects configured identifiers in structured attribution tags and phrases equivalent to `generated by <identifier>` or `<identifier>-generated`.
-
-##### options
+#### options
 
 - `{identifiers: string[]}`: case-insensitive names treated as automated sources. Default: `ai`, `chatgpt`, `claude`, `codex`, `copilot`, `gemini`, `gpt`, `llm`, and `openai`.
 
-##### examples
+#### do / don't
 
-| Comment content | Result |
-| --- | --- |
-| `Generated by <configured identifier>` | rejected |
-| `<configured identifier>-generated` | rejected |
-| `Send a request to <configured identifier>` | accepted |
-| Unmarked prose | not classified |
-
-Use custom identifiers when a repository has additional automated tools:
-
-```js
-{
-  "legibility/no-automated-comment-attribution": [
-    "error",
-    {
-      identifiers: ["assistant", "robot"],
-    },
-  ],
-}
+```diff
+- // Generated by Codex. Normalize provider errors before retrying.
++ // Normalize provider errors before retrying.
 ```
 
 ---
 
 <a id="require-jsdoc-multiline-comments"></a>
 
-#### `legibility/require-jsdoc-multiline-comments()`
+### `legibility/require-jsdoc-multiline-comments()`
 
 <!-- require-jsdoc-multiline-comments behavior from src/constants.ts and src/index.ts -->
 
 Require block comments spanning multiple lines to use `/** ... */` JSDoc syntax. Line comments and single-line block comments are unchanged.
+
+#### do / don't
 
 ```diff
 - /*
@@ -869,98 +872,70 @@ Use `max` and `min` to tune rule sensitivity.
 
 ## Recipes
 
-<!-- comment rule recipe options and agent commands from src/constants.ts, src/index.ts, and package.json -->
+The bundled presets check comment quality. They do not ban every comment. Use a session flag or configure `no-unmatched-comments` when comments need an explicit allow policy.
 
-Comment rules are absent from the bundled presets. Add the rules needed for each lint mode.
+### Block comments during an agent session
 
-### Agent mode
-
-Agents do not add comments by default:
-
-```js
-import legibility from "eslint-plugin-legibility";
-
-const commentRules = {
-  "legibility/no-stacked-comments": "error",
-  "legibility/no-unmatched-comments": "error",
-};
-
-export default [
-  legibility.configs["flat/recommended"],
-  { rules: commentRules },
-];
-```
-
-To allow marked comments, configure a prefix, suffix, or both:
-
-```js
-const prefixIdentifiers = ["APPROVED"];
-const suffixIdentifiers = ["@approved"];
-const commentOptions = { prefixIdentifiers, suffixIdentifiers };
-const unmatchedComments = ["error", commentOptions];
-
-const commentRules = {
-  "legibility/no-stacked-comments": "error",
-  "legibility/no-unmatched-comments": unmatchedComments,
-};
-```
-
-Either matching identifier allows the comment. `matchers` and the other comment rules provide additional configuration in the [comment rule reference](#comment-rules).
-
-Install the packaged skill and lint changed files:
+Pass `--comments=forbid` to the changed-file lint command:
 
 ```sh
-npx eslint-plugin-legibility-install-skill --target codex
+npx lint-changed --comments=forbid
+```
+
+The flag enables `legibility/no-unmatched-comments` as an error for that invocation. It does not change the project config. New and modified files fail when the linter reports a comment.
+
+Pass the base branch before or after the flag:
+
+```sh
+npx lint-changed origin/develop --comments=forbid
+```
+
+### Keep normal comment checks
+
+Run changed-file linting without the flag:
+
+```sh
 npx lint-changed
 ```
 
-### Developer mode
+This uses the project config. The bundled presets still reject automated attribution, stacked comments, and non-JSDoc multiline blocks.
 
-Use warnings while editing:
+### Allow only marked comments
 
-```js
-const commentRules = {
-  "legibility/no-stacked-comments": "warn",
-  "legibility/no-unmatched-comments": "warn",
-};
+Configure `no-unmatched-comments` directly when a repository permits a small set of durable comments:
+
+```diff
+ import legibility from "eslint-plugin-legibility";
+
++const approvedPrefixes = ["WHY:"];
++const commentOptions = { prefixIdentifiers: approvedPrefixes };
++const approvedCommentRule = ["error", commentOptions];
++const commentRules = {
++  "legibility/no-unmatched-comments": approvedCommentRule,
++};
++const commentConfig = { rules: commentRules };
++
+ export default [
+   legibility.configs["flat/recommended"],
++  commentConfig,
+ ];
 ```
 
-Use the same `no-unmatched-comments` options when the repository allows marked comments.
-
-### Commit gate
-
-Promote the chosen comment policy to errors:
-
-```js
-const commentRules = {
-  "legibility/no-stacked-comments": "error",
-  "legibility/no-unmatched-comments": "error",
-};
+```diff
+- // Wait before retrying.
++ // WHY: The provider resets its rate-limit window every 30 seconds.
+  const retryDelayMs = 30_000;
 ```
 
-Use the configured prefix, suffix, or other matcher here when the repository allows comments.
+### Enforce the session policy in CI
 
-A pre-commit hook can run the configured ESLint rules:
+Use the same flag in a commit or pull-request gate:
 
 ```sh
-#!/bin/sh
-set -eu
-
-nubx eslint --max-warnings 0 .
+npx lint-changed origin/main --comments=forbid
 ```
 
-This repository can install its managed validation hook with `nub run install-hooks`.
-
----
-
-## Configs
-
-| Config | Format | Behavior |
-| --- | --- | --- |
-| [recommended](#legibility-configs-recommended) | ESLint legacy | High-signal and core complexity rules as warnings. |
-| [strict](#legibility-configs-strict) | ESLint legacy | General and core complexity rules as errors. |
-| [flat/recommended](#legibility-configs-flat-recommended) | ESLint flat config | High-signal and core complexity rules as warnings. |
-| [flat/strict](#legibility-configs-flat-strict) | ESLint flat config | General and core complexity rules as errors. |
+The flag forces comment violations to error severity even when the project uses `flat/recommended`.
 
 ---
 
@@ -997,15 +972,6 @@ CommonJS compatibility:
 
 ```js
 const legibility = require("eslint-plugin-legibility");
-```
-
-Legacy config:
-
-```js
-module.exports = {
-  plugins: ["legibility"],
-  extends: ["plugin:legibility/recommended"],
-};
 ```
 
 ### Usage With Oxlint
@@ -1063,33 +1029,11 @@ Rules are configured through ESLint or Oxlint `rules`.
 
 ```json
 {
-  rules: {
-    "legibility/rule-name": ["warn", { option: "value" }]
+  "rules": {
+    "legibility/rule-name": ["warn", { "option": "value" }]
   }
 }
 ```
-
-### `legibility.configs["flat/recommended"]`
-
-Flat ESLint config with high-signal general rules and shared core complexity limits enabled as warnings. Comment policies are configured through [recipes](#comment-policy-recipes).
-
----
-
-### `legibility.configs["flat/strict"]`
-
-Flat ESLint config with general rules and shared core complexity limits enabled as errors. Comment policies are configured through [recipes](#comment-policy-recipes).
-
----
-
-### `legibility.configs.recommended`
-
-Legacy ESLint config with high-signal general rules and shared core complexity limits enabled as warnings. Comment policies are configured through [recipes](#comment-policy-recipes).
-
----
-
-### `legibility.configs.strict`
-
-Legacy ESLint config with general rules and shared core complexity limits enabled as errors. Comment policies are configured through [recipes](#comment-policy-recipes).
 
 ---
 
@@ -1125,17 +1069,6 @@ npm publishing does not use `NPM_TOKEN` or `NODE_AUTH_TOKEN`. Configure npm trus
 | Allowed action | `npm publish` |
 
 ## Releases
-
-```sh
-nub run release:current:dry
-nub run release:current
-nub run release:patch:dry
-nub run release:patch
-nub run release:minor
-nub run release:major
-nub run release:beta
-nub run release:alpha
-```
 
 Releases use a local release wrapper around `release-it`. Run release commands from a clean, up-to-date `main` branch. Use `nub run release:current` for the first publish of the current package version, then use the patch, minor, major, alpha, or beta commands for later releases. The wrapper resolves the exact version, verifies local `main` matches `origin/main`, and asks for confirmation before `release-it` pushes the tag that triggers npm publishing.
 

@@ -3453,10 +3453,11 @@ function buildCoreRuleConfig(level: RuleLevel): Record<string, RuleConfig> {
   return { complexity, "max-lines-per-function": maxLines };
 }
 
-const recommendedPluginRules = buildRuleConfig(RECOMMENDED_RULE_NAMES, "warn");
+const recommendedRuleNames = RECOMMENDED_RULE_NAMES.concat(COMMENT_RULE_NAMES);
+const recommendedPluginRules = buildRuleConfig(recommendedRuleNames, "warn");
 const recommendedCoreRules = buildCoreRuleConfig("warn");
 const recommendedRules = Object.assign({}, recommendedPluginRules, recommendedCoreRules);
-const strictRuleNames = Object.keys(rules).filter((ruleName) => !COMMENT_RULE_NAMES.has(ruleName));
+const strictRuleNames = Object.keys(rules).filter((ruleName) => ruleName !== "no-unmatched-comments");
 const strictPluginRules = buildRuleConfig(strictRuleNames, "error");
 const strictCoreRules = buildCoreRuleConfig("error");
 const strictRules = Object.assign({}, strictPluginRules, strictCoreRules);
@@ -3468,16 +3469,6 @@ const plugin: LegibilityPlugin = {
   },
   rules,
   configs: {} as LegibilityPlugin["configs"],
-};
-
-plugin.configs.recommended = {
-  plugins: [PLUGIN_NAME],
-  rules: recommendedRules,
-};
-
-plugin.configs.strict = {
-  plugins: [PLUGIN_NAME],
-  rules: strictRules,
 };
 
 plugin.configs["flat/recommended"] = {

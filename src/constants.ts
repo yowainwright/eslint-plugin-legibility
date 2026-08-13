@@ -299,9 +299,11 @@ export const RECOMMENDED_RULE_NAMES = [
   "no-identity-array-callback",
   "no-mixed-filename-casing",
   "no-quadratic-patterns",
+  "no-repeated-collection-search",
   "no-redundant-boolean-logic",
   "no-redundant-nullish-fallback",
   "no-small-collection-conversion",
+  "no-single-use-renaming-alias",
   "no-standalone-array-mutations",
   "no-trivial-wrapper-functions",
   "no-unnecessary-block-callback",
@@ -311,16 +313,16 @@ export const RECOMMENDED_RULE_NAMES = [
   "prefer-flat-map",
   "prefer-guard-clauses",
   "prefer-object-lookup",
+  "prefer-positive-condition-names",
   "require-executable-shebang",
   "require-filename-matches-dirname",
 ];
 
-export const COMMENT_RULE_NAMES = new Set([
+export const COMMENT_RULE_NAMES = [
   "no-automated-comment-attribution",
   "no-stacked-comments",
-  "no-unmatched-comments",
   "require-jsdoc-multiline-comments",
-]);
+];
 
 const STRING_ARRAY_SCHEMA = { type: "array", items: { type: "string" } };
 
@@ -434,7 +436,7 @@ export const NO_AUTOMATED_COMMENT_ATTRIBUTION_META = defineMeta(
     type: "problem",
     docs: {
       description: "Flag comments that contain prohibited authorship signatures.",
-      recommended: false,
+      recommended: true,
     },
     schema: [
       {
@@ -453,7 +455,7 @@ export const NO_AUTOMATED_COMMENT_ATTRIBUTION_META = defineMeta(
 
 const noStackedCommentsDocs = {
   description: "Avoid comments stacked directly above other comments.",
-  recommended: false,
+  recommended: true,
 };
 const noStackedCommentsMessages = {
   stackedComment: "Update or remove the adjacent comment instead of stacking another comment.",
@@ -589,7 +591,7 @@ export const REQUIRE_JSDOC_MULTILINE_COMMENTS_META = defineMeta(
     type: "layout",
     docs: {
       description: "Require multiline block comments to use JSDoc syntax.",
-      recommended: false,
+      recommended: true,
     },
     schema: [],
     messages: {
@@ -679,7 +681,7 @@ export const NO_REPEATED_COLLECTION_SEARCH_META = defineMeta("no-repeated-collec
   docs: {
     description:
       "Flag repeated searches over the same collection in one scope; prefer a named lookup Map or Set.",
-    recommended: false,
+    recommended: true,
   },
   schema: [
     {
@@ -736,7 +738,7 @@ export const PREFER_POSITIVE_CONDITION_NAMES_META = defineMeta("prefer-positive-
   type: "suggestion",
   docs: {
     description: "Prefer positive boolean names instead of double-negative condition names.",
-    recommended: false,
+    recommended: true,
   },
   schema: [
     {
@@ -757,7 +759,7 @@ export const NO_SINGLE_USE_RENAMING_ALIAS_META = defineMeta("no-single-use-renam
   type: "suggestion",
   docs: {
     description: "Avoid aliases that only rename another identifier or member once.",
-    recommended: false,
+    recommended: true,
   },
   schema: [],
   messages: {
