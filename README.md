@@ -49,45 +49,56 @@ Rules marked `recommended + strict` are enabled by `recommended` as `warn` and b
 The presets also enable ESLint core rules implemented natively by both ESLint and Oxlint.
 
 <!-- ESLint core rules configured by exported presets from src/constants.ts and src/index.ts -->
-| Core rule | Recommended | Strict | Options |
-| --- | --- | --- | --- |
-| `complexity` | warn | error | `{max: 20, variant: "classic"}` |
-| `max-lines-per-function` | warn | error | `{max: 40, skipBlankLines: true, skipComments: true, IIFEs: true}` |
+- `complexity`: `max: 20`, using the `classic` variant.
+- `max-lines-per-function`: `max: 40`, excluding blank lines and comments and including IIFEs.
 
-<!-- rule presets and option summaries from src/constants.ts -->
-| Rule | Preset configuration | Options |
-| --- | --- | --- |
-| [legibility/hoist-if-operators](#hoist-if-operators) | recommended + strict | `{max: 0, operators: ["&&", "\|\|", "??", "?:"], complexity}` |
-| [legibility/max-array-chain-depth](#max-array-chain-depth) | recommended + strict | `{max: 2, iterationMethods}` |
-| [legibility/max-control-flow-depth](#max-control-flow-depth) | recommended + strict | `{max: 3}` |
-| [legibility/max-expression-operators](#max-expression-operators) | recommended + strict | `{max: 4, operators, complexity}` |
-| [legibility/max-function-parameters](#max-function-parameters) | recommended + strict | `{max: 4, maxObjectProperties: 8}` |
-| [legibility/no-automated-comment-attribution](#no-automated-comment-attribution) | recipe only | `{identifiers}` |
-| [legibility/no-complex-ternaries](#no-complex-ternaries) | recommended + strict | `{max: 2, operators, complexity}` |
-| [legibility/no-computed-values](#no-computed-values) | recommended + strict | `{max: 1, operators, complexity}` |
-| [legibility/no-direct-node-bin-smoke](#no-direct-node-bin-smoke) | `recommended + strict` | `{entryPatterns}` |
-| [legibility/no-hidden-side-effects](#no-hidden-side-effects) | recommended + strict | `{mutatingMethods, sideEffectFreeIterationMethods}` |
-| [legibility/no-identity-array-callback](#no-identity-array-callback) | recommended + strict | none |
-| [legibility/no-quadratic-patterns](#no-quadratic-patterns) | recommended + strict | `{iterationMethods, searchMethods}` |
-| [legibility/no-redundant-boolean-logic](#no-redundant-boolean-logic) | recommended + strict | `{equalityOperators: ["==", "===", "!=", "!=="]}` |
-| [legibility/no-redundant-nullish-fallback](#no-redundant-nullish-fallback) | recommended + strict | none |
-| [legibility/no-repeated-collection-search](#no-repeated-collection-search) | strict only | `{searchMethods}` |
-| [legibility/no-single-use-renaming-alias](#no-single-use-renaming-alias) | strict only | none |
-| [legibility/no-small-collection-conversion](#no-small-collection-conversion) | recommended + strict | `{min: 3}` |
-| [legibility/no-stacked-comments](#no-stacked-comments) | recipe only | none |
-| [legibility/no-standalone-array-mutations](#no-standalone-array-mutations) | recommended + strict | `{arrayMutatingMethods, mutatingMethods}` |
-| [legibility/no-trivial-wrapper-functions](#no-trivial-wrapper-functions) | recommended + strict | none |
-| [legibility/no-unmatched-comments](#no-unmatched-comments) | recipe only | `{matchers: [], prefixIdentifiers: [], suffixIdentifiers: []}` |
-| [legibility/no-unnecessary-async](#no-unnecessary-async) | recommended + strict | none |
-| [legibility/no-unnecessary-block-callback](#no-unnecessary-block-callback) | recommended + strict | none |
-| [legibility/prefer-concat-object-assign](#prefer-concat-object-assign) | recommended + strict | none |
-| [legibility/prefer-early-return](#prefer-early-return) | recommended + strict | none |
-| [legibility/prefer-flat-map](#prefer-flat-map) | recommended + strict | none |
-| [legibility/prefer-guard-clauses](#prefer-guard-clauses) | recommended + strict | none |
-| [legibility/prefer-object-lookup](#prefer-object-lookup) | recommended + strict | `{min: 3, operators: ["==", "==="]}` |
-| [legibility/prefer-positive-condition-names](#prefer-positive-condition-names) | strict only | `{booleanOperators}` |
-| [legibility/require-executable-shebang](#require-executable-shebang) | recommended + strict | `{files, runtimes: ["bun", "deno", "node"]}` |
-| [legibility/require-jsdoc-multiline-comments](#require-jsdoc-multiline-comments) | recipe only | none |
+<!-- rule section links grouped by preset membership from src/constants.ts -->
+<details>
+<summary>Rule table of contents</summary>
+
+**Recommended and strict**
+
+- [`legibility/hoist-if-operators`](#hoist-if-operators)
+- [`legibility/max-array-chain-depth`](#max-array-chain-depth)
+- [`legibility/max-control-flow-depth`](#max-control-flow-depth)
+- [`legibility/max-expression-operators`](#max-expression-operators)
+- [`legibility/max-function-parameters`](#max-function-parameters)
+- [`legibility/no-complex-ternaries`](#no-complex-ternaries)
+- [`legibility/no-computed-values`](#no-computed-values)
+- [`legibility/no-direct-node-bin-smoke`](#no-direct-node-bin-smoke)
+- [`legibility/no-hidden-side-effects`](#no-hidden-side-effects)
+- [`legibility/no-identity-array-callback`](#no-identity-array-callback)
+- [`legibility/no-mixed-filename-casing`](#no-mixed-filename-casing)
+- [`legibility/no-quadratic-patterns`](#no-quadratic-patterns)
+- [`legibility/no-redundant-boolean-logic`](#no-redundant-boolean-logic)
+- [`legibility/no-redundant-nullish-fallback`](#no-redundant-nullish-fallback)
+- [`legibility/no-small-collection-conversion`](#no-small-collection-conversion)
+- [`legibility/no-standalone-array-mutations`](#no-standalone-array-mutations)
+- [`legibility/no-trivial-wrapper-functions`](#no-trivial-wrapper-functions)
+- [`legibility/no-unnecessary-async`](#no-unnecessary-async)
+- [`legibility/no-unnecessary-block-callback`](#no-unnecessary-block-callback)
+- [`legibility/prefer-concat-object-assign`](#prefer-concat-object-assign)
+- [`legibility/prefer-early-return`](#prefer-early-return)
+- [`legibility/prefer-flat-map`](#prefer-flat-map)
+- [`legibility/prefer-guard-clauses`](#prefer-guard-clauses)
+- [`legibility/prefer-object-lookup`](#prefer-object-lookup)
+- [`legibility/require-executable-shebang`](#require-executable-shebang)
+- [`legibility/require-filename-matches-dirname`](#require-filename-matches-dirname)
+
+**Strict only**
+
+- [`legibility/no-repeated-collection-search`](#no-repeated-collection-search)
+- [`legibility/no-single-use-renaming-alias`](#no-single-use-renaming-alias)
+- [`legibility/prefer-positive-condition-names`](#prefer-positive-condition-names)
+
+**Comment policy recipes**
+
+- [`legibility/no-automated-comment-attribution`](#no-automated-comment-attribution)
+- [`legibility/no-stacked-comments`](#no-stacked-comments)
+- [`legibility/no-unmatched-comments`](#no-unmatched-comments)
+- [`legibility/require-jsdoc-multiline-comments`](#require-jsdoc-multiline-comments)
+
+</details>
 
 ---
 
@@ -322,6 +333,15 @@ Reject `map` and `filter` callbacks that keep every item unchanged.
 
 ---
 
+<a id="no-mixed-filename-casing"></a>
+
+### `legibility/no-mixed-filename-casing()`
+
+<!-- no-mixed-filename-casing behavior from src/constants.ts and src/index.ts -->
+Use one filename convention: kebab-case, camelCase, PascalCase, or snake_case. Leading dots and file extensions are ignored.
+
+---
+
 <a id="no-quadratic-patterns"></a>
 
 ### `legibility/no-quadratic-patterns({options})`
@@ -480,17 +500,8 @@ Avoid wrappers that only forward their parameters to another call.
 
 ### Comment rules
 
-<!-- comment rule responsibilities from rule metadata in src/constants.ts -->
-
 Comment rules are opt-in because agent sessions, development, and commit gates need different severities.
 Start with the [comment policy recipes](#comment-policy-recipes), then use this section as the option reference.
-
-| Rule | Responsibility |
-| --- | --- |
-| [`legibility/no-unmatched-comments`](#no-unmatched-comments) | Reject comments without an explicitly configured matcher, prefix, or suffix. |
-| [`legibility/no-stacked-comments`](#no-stacked-comments) | Report comments stacked on consecutive lines. |
-| [`legibility/no-automated-comment-attribution`](#no-automated-comment-attribution) | Reject explicit automated attribution signatures. |
-| [`legibility/require-jsdoc-multiline-comments`](#require-jsdoc-multiline-comments) | Require JSDoc syntax for multiline block comments. |
 
 <a id="no-unmatched-comments"></a>
 
@@ -792,6 +803,23 @@ Require configured CLI entry source files to include a Node, Bun, or Deno sheban
 +
 + console.log("hello");
 ```
+
+---
+
+<a id="require-filename-matches-dirname"></a>
+
+### `legibility/require-filename-matches-dirname({options})`
+
+<!-- require-filename-matches-dirname defaults and behavior from src/constants.ts and src/index.ts -->
+Require files in named subdirectories to match their parent directory. Known standalone filenames and approved qualifiers remain available.
+
+#### options
+
+- `{minDepth: number}`: minimum parent depth to check. Default: `3`.
+- `{allowedQualifiers: string[]}`: suffixes allowed after the directory name.
+- `{allowedFilenames: string[]}`: standalone filenames that do not need to match the directory.
+
+The default qualifiers are `constants`, `helpers`, `spec`, `styles`, `test`, `types`, and `utils`. The default standalone filenames are `constants`, `index`, `types`, and `utils`.
 
 ---
 
