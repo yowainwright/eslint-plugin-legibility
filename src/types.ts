@@ -69,6 +69,7 @@ export interface AstNode {
   argument?: AstNode | null;
   arguments?: AstNode[];
   async?: boolean;
+  await?: boolean;
   body?: AstNode | AstNode[];
   callee?: AstNode;
   computed?: boolean;
@@ -79,9 +80,12 @@ export interface AstNode {
   generator?: boolean;
   id?: AstNode | null;
   init?: AstNode | null;
+  imported?: AstNode;
   key?: AstNode;
+  kind?: string;
   label?: AstNode | null;
   left?: AstNode;
+  local?: AstNode;
   name?: string;
   object?: AstNode;
   operator?: string;
@@ -92,6 +96,8 @@ export interface AstNode {
   quasis?: AstNode[];
   raw?: string;
   right?: AstNode;
+  source?: AstNode;
+  specifiers?: AstNode[];
   test?: AstNode;
   type?: string;
   update?: AstNode | null;
@@ -128,6 +134,17 @@ export interface AliasCandidate {
   target: string;
 }
 
+export interface AsyncFsBindings {
+  fs: Set<string>;
+  methods: Map<string, string>;
+  promises: Set<string>;
+}
+
+export interface AsyncRuleFinding {
+  data: RuleReportData;
+  messageId: string;
+}
+
 export type NodePredicate = (node: AstNode) => boolean;
 
 export type TraversableEntry = [string, AstValue];
@@ -145,6 +162,14 @@ export type AliasScopeStack = AliasScope[];
 export interface FunctionDepthFrame {
   depth: number;
   stackLength: number;
+}
+
+export interface ControlFlowState {
+  readonly context: RuleContext;
+  readonly max: number;
+  depth: number;
+  stack: number[];
+  functionStack: FunctionDepthFrame[];
 }
 
 export type ScopeCallback = () => void;

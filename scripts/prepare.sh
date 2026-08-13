@@ -13,8 +13,8 @@ if [ "$npm_command" = "pack" ] || [ "$npm_command" = "publish" ]; then
   exit 0
 fi
 
-if ! command -v pnpm >/dev/null 2>&1; then
+if ! command -v nub >/dev/null 2>&1; then
   exit 0
 fi
 
-pnpm run install-hooks
+nub run install-hooks

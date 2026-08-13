@@ -33,7 +33,10 @@ export const DEFAULT_MAX_CONTROL_FLOW_DEPTH = 3;
 export const DEFAULT_MAX_ARRAY_CHAIN_DEPTH = 2;
 export const DEFAULT_MAX_FUNCTION_PARAMETERS = 4;
 export const DEFAULT_MAX_OBJECT_PARAMETER_PROPERTIES = 8;
+export const DEFAULT_MAX_CYCLOMATIC_COMPLEXITY = 20;
+export const DEFAULT_MAX_FUNCTION_LINES = 40;
 export const DEFAULT_MIN_OBJECT_LOOKUP_CHAIN_LENGTH = 3;
+export const DEFAULT_MIN_LOOKUP_COLLECTION_SIZE = 3;
 
 export const DEFAULT_AI_COMMENT_IDENTIFIERS = [
   "ai",
@@ -244,6 +247,39 @@ export const DEFAULT_DIRECT_BIN_ENTRY_PATTERNS = [
 export const SHELL_COMMAND_FUNCTIONS = new Set(["exec", "execSync"]);
 export const ARG_COMMAND_FUNCTIONS = new Set(["execFile", "execFileSync", "spawn", "spawnSync"]);
 
+export const ASYNC_FS_MODULE_SPECIFIERS = new Set(["fs/promises", "node:fs/promises"]);
+export const FS_MODULE_SPECIFIERS = new Set(["fs", "node:fs"]);
+export const ASYNC_FS_SYNC_METHODS = new Map([
+  ["access", "accessSync"],
+  ["appendFile", "appendFileSync"],
+  ["chmod", "chmodSync"],
+  ["chown", "chownSync"],
+  ["copyFile", "copyFileSync"],
+  ["cp", "cpSync"],
+  ["glob", "globSync"],
+  ["lchmod", "lchmodSync"],
+  ["lchown", "lchownSync"],
+  ["link", "linkSync"],
+  ["lstat", "lstatSync"],
+  ["lutimes", "lutimesSync"],
+  ["mkdir", "mkdirSync"],
+  ["mkdtemp", "mkdtempSync"],
+  ["readFile", "readFileSync"],
+  ["readdir", "readdirSync"],
+  ["readlink", "readlinkSync"],
+  ["realpath", "realpathSync"],
+  ["rename", "renameSync"],
+  ["rm", "rmSync"],
+  ["rmdir", "rmdirSync"],
+  ["stat", "statSync"],
+  ["statfs", "statfsSync"],
+  ["symlink", "symlinkSync"],
+  ["truncate", "truncateSync"],
+  ["unlink", "unlinkSync"],
+  ["utimes", "utimesSync"],
+  ["writeFile", "writeFileSync"],
+]);
+
 export const NEGATIVE_CONDITION_NAME_PATTERN =
   /^(?:is|are|was|were|has|have|had|can|could|should|will|would|did|does)(?:Not|No)[A-Z]/;
 
@@ -265,9 +301,11 @@ export const RECOMMENDED_RULE_NAMES = [
   "no-quadratic-patterns",
   "no-redundant-boolean-logic",
   "no-redundant-nullish-fallback",
+  "no-small-collection-conversion",
   "no-standalone-array-mutations",
   "no-trivial-wrapper-functions",
   "no-unnecessary-block-callback",
+  "no-unnecessary-async",
   "prefer-concat-object-assign",
   "prefer-early-return",
   "prefer-flat-map",
@@ -753,6 +791,47 @@ export const NO_UNNECESSARY_BLOCK_CALLBACK_META = defineMeta("no-unnecessary-blo
       "This arrow callback only returns a value. Use an expression body instead.",
   },
 });
+
+export const NO_UNNECESSARY_ASYNC_META = defineMeta("no-unnecessary-async", {
+  type: "suggestion",
+  docs: {
+    description: "Avoid async functions when their work can remain synchronous.",
+    recommended: true,
+  },
+  schema: [],
+  messages: {
+    unnecessaryAsync:
+      "{{name}} is async but has no await operation. Remove async or add the missing await.",
+    unnecessaryReturnAwait:
+      "{{name}} only returns an awaited value. Return the Promise directly and remove async unless the await preserves local error handling.",
+    synchronousFilesystem:
+      "{{name}} only awaits filesystem operations with synchronous equivalents ({{replacements}}). Use the synchronous APIs unless non-blocking I/O is required.",
+  },
+});
+
+export const NO_SMALL_COLLECTION_CONVERSION_META = defineMeta(
+  "no-small-collection-conversion",
+  {
+    type: "suggestion",
+    docs: {
+      description: "Avoid small literal Map or Set conversions used for one lookup.",
+      recommended: true,
+    },
+    schema: [
+      {
+        type: "object",
+        properties: {
+          min: { type: "integer", minimum: 1 },
+        },
+        additionalProperties: false,
+      },
+    ],
+    messages: {
+      smallCollection:
+        "Converting {{count}} items to a {{collection}} for one lookup is below the configured minimum of {{min}}. Use the original representation directly.",
+    },
+  },
+);
 
 export const PREFER_FLAT_MAP_META = defineMeta("prefer-flat-map", {
   type: "suggestion",

@@ -143,6 +143,24 @@ function literal(value: any): any {
   };
 }
 
+function arrayExpression(elements: any[]): any {
+  const node: any = { type: "ArrayExpression", elements };
+  elements.forEach((element) => {
+    if (element && typeof element === "object") element.parent = node;
+  });
+  return node;
+}
+
+function newExpression(name: string, args: any[] = []): any {
+  const callee = id(name);
+  const node: any = { type: "NewExpression", callee, arguments: args };
+  callee.parent = node;
+  args.forEach((arg) => {
+    if (arg && typeof arg === "object") arg.parent = node;
+  });
+  return node;
+}
+
 function objectProperty(name: string): any {
   const key = id(name);
   const value = id(name);
@@ -219,6 +237,8 @@ test("exports an ESLint and Oxlint compatible plugin shape", () => {
   assert.ok(plugin.rules["max-expression-operators"]);
   assert.ok(plugin.rules["max-function-parameters"]);
   assert.ok(plugin.rules["no-automated-comment-attribution"]);
+  assert.ok(plugin.rules["no-small-collection-conversion"]);
+  assert.ok(plugin.rules["no-unnecessary-async"]);
   assert.ok(plugin.rules["prefer-early-return"]);
   assert.ok(plugin.rules["no-stacked-comments"]);
   assert.ok(plugin.rules["no-unmatched-comments"]);
@@ -232,6 +252,28 @@ test("exports an ESLint and Oxlint compatible plugin shape", () => {
     plugin.configs["flat/strict"].rules["legibility/max-function-parameters"],
     "error",
   );
+  assert.deepEqual(plugin.configs["flat/recommended"].rules.complexity, [
+    "warn",
+    { max: 20, variant: "classic" },
+  ]);
+  assert.deepEqual(plugin.configs["flat/strict"].rules.complexity, [
+    "error",
+    { max: 20, variant: "classic" },
+  ]);
+  const maxLinesOptions = {
+    max: 40,
+    skipBlankLines: true,
+    skipComments: true,
+    IIFEs: true,
+  };
+  assert.deepEqual(plugin.configs["flat/recommended"].rules["max-lines-per-function"], [
+    "warn",
+    maxLinesOptions,
+  ]);
+  assert.deepEqual(plugin.configs["flat/strict"].rules["max-lines-per-function"], [
+    "error",
+    maxLinesOptions,
+  ]);
   const commentRuleNames = [
     "no-automated-comment-attribution",
     "no-stacked-comments",
@@ -1248,6 +1290,73 @@ test("no-unnecessary-block-callback reports callbacks that only return", () => {
   assert.equal(reports[0].messageId, "unnecessaryBlock");
 });
 
+test("no-unnecessary-async catches no-op async and direct return await", () => {
+  const { visitor, reports } = createRule("no-unnecessary-async");
+  const noAwait = arrow([], block());
+  noAwait.async = true;
+  const returnedAwait: any = { type: "AwaitExpression", argument: call(id("load")) };
+  const directReturn: any = { type: "ReturnStatement", argument: returnedAwait };
+  returnedAwait.parent = directReturn;
+  const returnAwait = arrow([], block([directReturn]));
+  returnAwait.async = true;
+
+  visitor.ArrowFunctionExpression(noAwait);
+  visitor.ArrowFunctionExpression(returnAwait);
+
+  assert.deepEqual(
+    reports.map((report) => report.messageId),
+    ["unnecessaryAsync", "unnecessaryReturnAwait"],
+  );
+});
+
+test("no-unnecessary-async keeps async functions with meaningful awaited work", () => {
+  const { visitor, reports } = createRule("no-unnecessary-async");
+  const awaited: any = { type: "AwaitExpression", argument: call(id("load")) };
+  const statement = expressionStatement(awaited);
+  const node = arrow([], block([statement, { type: "ReturnStatement", argument: id("value") }]));
+  node.async = true;
+
+  visitor.ArrowFunctionExpression(node);
+
+  assert.equal(reports.length, 0);
+});
+
+test("no-small-collection-conversion reports small Map and Set inputs", () => {
+  const { visitor, reports } = createRule("no-small-collection-conversion");
+  const setNode = newExpression("Set", [arrayExpression([literal("a"), literal("b")])]);
+  const mapEntry = arrayExpression([literal("a"), literal(1)]);
+  const mapNode = newExpression("Map", [arrayExpression([mapEntry])]);
+  methodCall(setNode, "has", [id("value")]);
+  methodCall(mapNode, "get", [id("key")]);
+
+  visitor.NewExpression(setNode);
+  visitor.NewExpression(mapNode);
+
+  assert.deepEqual(
+    reports.map((report) => report.data),
+    [
+      { collection: "Set", count: 2, min: 3 },
+      { collection: "Map", count: 1, min: 3 },
+    ],
+  );
+});
+
+test("no-small-collection-conversion ignores useful or unknown collection sizes", () => {
+  const { visitor, reports } = createRule("no-small-collection-conversion");
+  const values = arrayExpression([literal("a"), literal("b"), literal("c")]);
+  const largeSet = newExpression("Set", [values]);
+  const dynamicMap = newExpression("Map", [id("entries")]);
+  methodCall(largeSet, "has", [id("value")]);
+  methodCall(dynamicMap, "get", [id("key")]);
+
+  visitor.NewExpression(largeSet);
+  visitor.NewExpression(dynamicMap);
+  visitor.NewExpression(newExpression("Set", [arrayExpression([literal("a")])]));
+  visitor.NewExpression(newExpression("Set"));
+
+  assert.equal(reports.length, 0);
+});
+
 test("prefer-flat-map reports map followed by flat", () => {
   const { visitor, reports } = createRule("prefer-flat-map");
   const mapCall = methodCall(id("items"), "map", [arrow([id("item")], id("item"))]);
@@ -1330,6 +1439,58 @@ test("flat config works through ESLint Linter when ESLint is installed", async (
 
   assert.equal(messages.length, 1);
   assert.equal(messages[0].ruleId, "legibility/hoist-if-operators");
+});
+
+test("flat config enables ESLint complexity limits", async () => {
+  const { Linter } = await import("eslint");
+  const branches = Array.from(
+    { length: 21 },
+    (_, index) => `  if (value === ${index}) return ${index};`,
+  );
+  const padding = Array.from({ length: 20 }, (_, index) => `  const pad${index} = ${index};`);
+  const lines = ["function choose(value) {"].concat(branches, padding, "  return value;", "}");
+  const source = lines.join("\n");
+  const linter = new Linter({ configType: "flat" });
+  const messages = linter.verify(source, [plugin.configs["flat/strict"]]);
+  const coreRuleIds = messages
+    .map((message) => message.ruleId)
+    .filter((ruleId) => ruleId === "complexity" || ruleId === "max-lines-per-function")
+    .sort();
+
+  assert.deepEqual(coreRuleIds, ["complexity", "max-lines-per-function"]);
+});
+
+test("no-unnecessary-async ignores shadowed filesystem imports", async () => {
+  const { Linter } = await import("eslint");
+  const source = [
+    'import { readFile } from "node:fs/promises";',
+    'import { promises as fs } from "node:fs";',
+    'async function readConfig() { return await readFile("config.json", "utf8"); }',
+    'async function readData() { const value = await fs.readFile("data.json"); return value; }',
+    'async function request() { const value = await fetch("/data"); return value.json(); }',
+    'async function readParameter(readFile) { const value = await readFile("remote"); return value; }',
+    'async function readClient() { const fs = client; const value = await fs.readFile("remote"); return value; }',
+  ].join("\n");
+  const linter = new Linter({ configType: "flat" });
+  const messages = linter.verify(
+    source,
+    [
+      {
+        plugins: { legibility: plugin },
+        languageOptions: { ecmaVersion: 2022, sourceType: "module" },
+        rules: { "legibility/no-unnecessary-async": "error" },
+      },
+    ],
+    { filename: "scripts/read-data.js" },
+  );
+
+  assert.deepEqual(
+    messages.map((message) => ({ line: message.line, messageId: message.messageId })),
+    [
+      { line: 3, messageId: "synchronousFilesystem" },
+      { line: 4, messageId: "synchronousFilesystem" },
+    ],
+  );
 });
 
 test("max-function-parameters handles TypeScript signatures and this parameters", async () => {
@@ -1427,9 +1588,8 @@ test("comment rules work through ESLint Linter when ESLint is installed", async 
 
 test("oxlint can load the package as a JS plugin when oxlint is installed", (t) => {
   const result = spawnSync(
-    process.platform === "win32" ? "pnpm.cmd" : "pnpm",
+    process.platform === "win32" ? "nubx.cmd" : "nubx",
     [
-      "exec",
       "oxlint",
       "--config",
       "tests/fixtures/oxlint/oxlint.fixture.json",
@@ -1440,7 +1600,7 @@ test("oxlint can load the package as a JS plugin when oxlint is installed", (t) 
 
   const spawnError = result.error as NodeJS.ErrnoException | undefined;
   if (spawnError?.code === "ENOENT") {
-    t.skip("pnpm is not installed");
+    t.skip("Nub is not installed");
     return;
   }
 
@@ -1453,4 +1613,6 @@ test("oxlint can load the package as a JS plugin when oxlint is installed", (t) 
   assert.notEqual(result.status, 0);
   assert.match(output, /legibility(?:\/|\()prefer-early-return/);
   assert.match(output, /legibility(?:\/|\()no-unmatched-comments/);
+  assert.match(output, /complexity/);
+  assert.match(output, /max-lines-per-function/);
 });

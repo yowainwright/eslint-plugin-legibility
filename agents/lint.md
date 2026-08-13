@@ -4,7 +4,7 @@ Run lint checks for this project.
 
 $ARGUMENTS
 
-Never run `eslint .`, `pnpm lint`, or `oxlint .` — these lint the entire codebase and consume unnecessary tokens.
+Never run `eslint .`, `nub run lint`, or `oxlint .` — these lint the entire codebase and consume unnecessary tokens.
 
 Always run:
 

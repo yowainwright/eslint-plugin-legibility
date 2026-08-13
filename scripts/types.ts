@@ -40,6 +40,18 @@ export interface ReleasePlan {
   version: string;
 }
 
+export interface RepoCommandResult {
+  status: number | null;
+}
+
+export type RepoCommandRunner = (
+  command: string,
+  args: readonly string[],
+) => RepoCommandResult;
+
+export type RepoManagerTarget = "pack" | "validate" | "validate:compat";
+export type ValidateMode = "compat" | "default";
+
 export type TestRunMode = "bun-ts" | "coverage" | "deno-ts" | "node-js" | "node-ts";
 
 export interface TestRunPlan {

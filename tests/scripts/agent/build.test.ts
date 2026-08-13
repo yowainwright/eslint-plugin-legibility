@@ -25,6 +25,8 @@ test("renders a Codex-compatible skill", () => {
   assert.match(skill, /prefixIdentifiers.*suffixIdentifiers/);
   assert.match(skill, /## Comments/);
   assert.match(skill, /no-stacked-comments/);
+  assert.match(skill, /cyclomatic complexity at 20 or below/);
+  assert.match(skill, /40 nonblank, non-comment lines or fewer/);
   assert.match(skill, /updated or removed/);
 });
 

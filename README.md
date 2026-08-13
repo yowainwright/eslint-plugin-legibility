@@ -31,42 +31,74 @@ npm add -D eslint-plugin-legibility
 
 ---
 
+## Development
+
+The repository uses Mise for Node 26 and Nub for pnpm 11. Nub keeps `pnpm-lock.yaml` as the package-manager source of truth.
+
+```sh
+nub install --frozen-lockfile
+nub run validate
+```
+
+---
+
 ## Rules
 
 Rules marked `recommended + strict` are enabled by `recommended` as `warn` and by `strict` as `error`. Rules marked `strict only` are enabled by `strict` as `error`. Comment rules are `recipe only` because agent sessions, development, and commit gates need different severities and options.
 
-<!-- rule presets and option summaries from src/constants.ts -->
-| Rule | Preset configuration | Options |
-| --- | --- | --- |
-| [legibility/hoist-if-operators](#hoist-if-operators) | recommended + strict | `{max: 0, operators: ["&&", "\|\|", "??", "?:"], complexity}` |
-| [legibility/max-array-chain-depth](#max-array-chain-depth) | recommended + strict | `{max: 2, iterationMethods}` |
-| [legibility/max-control-flow-depth](#max-control-flow-depth) | recommended + strict | `{max: 3}` |
-| [legibility/max-expression-operators](#max-expression-operators) | recommended + strict | `{max: 4, operators, complexity}` |
-| [legibility/max-function-parameters](#max-function-parameters) | recommended + strict | `{max: 4, maxObjectProperties: 8}` |
-| [legibility/no-automated-comment-attribution](#no-automated-comment-attribution) | recipe only | `{identifiers}` |
-| [legibility/no-complex-ternaries](#no-complex-ternaries) | recommended + strict | `{max: 2, operators, complexity}` |
-| [legibility/no-computed-values](#no-computed-values) | recommended + strict | `{max: 1, operators, complexity}` |
-| [legibility/no-direct-node-bin-smoke](#no-direct-node-bin-smoke) | `recommended + strict` | `{entryPatterns}` |
-| [legibility/no-hidden-side-effects](#no-hidden-side-effects) | recommended + strict | `{mutatingMethods, sideEffectFreeIterationMethods}` |
-| [legibility/no-identity-array-callback](#no-identity-array-callback) | recommended + strict | none |
-| [legibility/no-quadratic-patterns](#no-quadratic-patterns) | recommended + strict | `{iterationMethods, searchMethods}` |
-| [legibility/no-redundant-boolean-logic](#no-redundant-boolean-logic) | recommended + strict | `{equalityOperators: ["==", "===", "!=", "!=="]}` |
-| [legibility/no-redundant-nullish-fallback](#no-redundant-nullish-fallback) | recommended + strict | none |
-| [legibility/no-repeated-collection-search](#no-repeated-collection-search) | strict only | `{searchMethods}` |
-| [legibility/no-single-use-renaming-alias](#no-single-use-renaming-alias) | strict only | none |
-| [legibility/no-stacked-comments](#no-stacked-comments) | recipe only | none |
-| [legibility/no-standalone-array-mutations](#no-standalone-array-mutations) | recommended + strict | `{arrayMutatingMethods, mutatingMethods}` |
-| [legibility/no-trivial-wrapper-functions](#no-trivial-wrapper-functions) | recommended + strict | none |
-| [legibility/no-unmatched-comments](#no-unmatched-comments) | recipe only | `{matchers: [], prefixIdentifiers: [], suffixIdentifiers: []}` |
-| [legibility/no-unnecessary-block-callback](#no-unnecessary-block-callback) | recommended + strict | none |
-| [legibility/prefer-concat-object-assign](#prefer-concat-object-assign) | recommended + strict | none |
-| [legibility/prefer-early-return](#prefer-early-return) | recommended + strict | none |
-| [legibility/prefer-flat-map](#prefer-flat-map) | recommended + strict | none |
-| [legibility/prefer-guard-clauses](#prefer-guard-clauses) | recommended + strict | none |
-| [legibility/prefer-object-lookup](#prefer-object-lookup) | recommended + strict | `{min: 3, operators: ["==", "==="]}` |
-| [legibility/prefer-positive-condition-names](#prefer-positive-condition-names) | strict only | `{booleanOperators}` |
-| [legibility/require-executable-shebang](#require-executable-shebang) | recommended + strict | `{files, runtimes: ["bun", "deno", "node"]}` |
-| [legibility/require-jsdoc-multiline-comments](#require-jsdoc-multiline-comments) | recipe only | none |
+The presets also enable ESLint core rules implemented natively by both ESLint and Oxlint.
+
+<!-- ESLint core rules configured by exported presets from src/constants.ts and src/index.ts -->
+- `complexity`: `max: 20`, using the `classic` variant.
+- `max-lines-per-function`: `max: 40`, excluding blank lines and comments and including IIFEs.
+
+<!-- rule section links grouped by preset membership from src/constants.ts -->
+<details>
+<summary>Rule table of contents</summary>
+
+**Recommended and strict**
+
+- [`legibility/hoist-if-operators`](#hoist-if-operators)
+- [`legibility/max-array-chain-depth`](#max-array-chain-depth)
+- [`legibility/max-control-flow-depth`](#max-control-flow-depth)
+- [`legibility/max-expression-operators`](#max-expression-operators)
+- [`legibility/max-function-parameters`](#max-function-parameters)
+- [`legibility/no-complex-ternaries`](#no-complex-ternaries)
+- [`legibility/no-computed-values`](#no-computed-values)
+- [`legibility/no-direct-node-bin-smoke`](#no-direct-node-bin-smoke)
+- [`legibility/no-hidden-side-effects`](#no-hidden-side-effects)
+- [`legibility/no-identity-array-callback`](#no-identity-array-callback)
+- [`legibility/no-mixed-filename-casing`](#no-mixed-filename-casing)
+- [`legibility/no-quadratic-patterns`](#no-quadratic-patterns)
+- [`legibility/no-redundant-boolean-logic`](#no-redundant-boolean-logic)
+- [`legibility/no-redundant-nullish-fallback`](#no-redundant-nullish-fallback)
+- [`legibility/no-small-collection-conversion`](#no-small-collection-conversion)
+- [`legibility/no-standalone-array-mutations`](#no-standalone-array-mutations)
+- [`legibility/no-trivial-wrapper-functions`](#no-trivial-wrapper-functions)
+- [`legibility/no-unnecessary-async`](#no-unnecessary-async)
+- [`legibility/no-unnecessary-block-callback`](#no-unnecessary-block-callback)
+- [`legibility/prefer-concat-object-assign`](#prefer-concat-object-assign)
+- [`legibility/prefer-early-return`](#prefer-early-return)
+- [`legibility/prefer-flat-map`](#prefer-flat-map)
+- [`legibility/prefer-guard-clauses`](#prefer-guard-clauses)
+- [`legibility/prefer-object-lookup`](#prefer-object-lookup)
+- [`legibility/require-executable-shebang`](#require-executable-shebang)
+- [`legibility/require-filename-matches-dirname`](#require-filename-matches-dirname)
+
+**Strict only**
+
+- [`legibility/no-repeated-collection-search`](#no-repeated-collection-search)
+- [`legibility/no-single-use-renaming-alias`](#no-single-use-renaming-alias)
+- [`legibility/prefer-positive-condition-names`](#prefer-positive-condition-names)
+
+**Comment policy recipes**
+
+- [`legibility/no-automated-comment-attribution`](#no-automated-comment-attribution)
+- [`legibility/no-stacked-comments`](#no-stacked-comments)
+- [`legibility/no-unmatched-comments`](#no-unmatched-comments)
+- [`legibility/require-jsdoc-multiline-comments`](#require-jsdoc-multiline-comments)
+
+</details>
 
 ---
 
@@ -301,6 +333,15 @@ Reject `map` and `filter` callbacks that keep every item unchanged.
 
 ---
 
+<a id="no-mixed-filename-casing"></a>
+
+### `legibility/no-mixed-filename-casing()`
+
+<!-- no-mixed-filename-casing behavior from src/constants.ts and src/index.ts -->
+Use one filename convention: kebab-case, camelCase, PascalCase, or snake_case. Leading dots and file extensions are ignored.
+
+---
+
 <a id="no-quadratic-patterns"></a>
 
 ### `legibility/no-quadratic-patterns({options})`
@@ -384,6 +425,25 @@ Flag repeated searches over the same collection in one scope.
 
 ---
 
+<a id="no-small-collection-conversion"></a>
+
+### `legibility/no-small-collection-conversion({options})`
+
+Avoid converting a statically small array or string into a `Map` or `Set` for one immediate lookup. Named collections, dynamic inputs, and literal inputs at the threshold are unchanged.
+
+#### options
+
+- `{min: number}`: minimum known input size before a lookup collection is useful. Default: `3`.
+
+#### do / don't
+
+```diff
+- const isTerminal = new Set(["done", "failed"]).has(status);
++ const isTerminal = ["done", "failed"].includes(status);
+```
+
+---
+
 <a id="no-single-use-renaming-alias"></a>
 
 ### `legibility/no-single-use-renaming-alias()`
@@ -440,17 +500,8 @@ Avoid wrappers that only forward their parameters to another call.
 
 ### Comment rules
 
-<!-- comment rule responsibilities from rule metadata in src/constants.ts -->
-
 Comment rules are opt-in because agent sessions, development, and commit gates need different severities.
 Start with the [comment policy recipes](#comment-policy-recipes), then use this section as the option reference.
-
-| Rule | Responsibility |
-| --- | --- |
-| [`legibility/no-unmatched-comments`](#no-unmatched-comments) | Reject comments without an explicitly configured matcher, prefix, or suffix. |
-| [`legibility/no-stacked-comments`](#no-stacked-comments) | Report comments stacked on consecutive lines. |
-| [`legibility/no-automated-comment-attribution`](#no-automated-comment-attribution) | Reject explicit automated attribution signatures. |
-| [`legibility/require-jsdoc-multiline-comments`](#require-jsdoc-multiline-comments) | Require JSDoc syntax for multiline block comments. |
 
 <a id="no-unmatched-comments"></a>
 
@@ -561,6 +612,29 @@ Require block comments spanning multiple lines to use `/** ... */` JSDoc syntax.
 ```
 
 This rule has no options and no autofix.
+
+---
+
+<a id="no-unnecessary-async"></a>
+
+### `legibility/no-unnecessary-async()`
+
+Flag async functions that have no await, only return one awaited value, or only await Node filesystem operations with synchronous equivalents. Filesystem detection covers named and namespace imports from `node:fs/promises`, `fs/promises`, `node:fs`, and `fs`.
+
+Use the filesystem diagnostic for local tooling and scripts. Non-blocking filesystem I/O remains appropriate in request-serving code.
+
+#### do / don't
+
+```diff
+- import { readFile } from "node:fs/promises";
++ import { readFileSync } from "node:fs";
+
+- async function readConfig() {
+-   return await readFile("config.json", "utf8");
++ function readConfig() {
++   return readFileSync("config.json", "utf8");
+  }
+```
 
 ---
 
@@ -732,6 +806,23 @@ Require configured CLI entry source files to include a Node, Bun, or Deno sheban
 
 ---
 
+<a id="require-filename-matches-dirname"></a>
+
+### `legibility/require-filename-matches-dirname({options})`
+
+<!-- require-filename-matches-dirname defaults and behavior from src/constants.ts and src/index.ts -->
+Require files in named subdirectories to match their parent directory. Known standalone filenames and approved qualifiers remain available.
+
+#### options
+
+- `{minDepth: number}`: minimum parent depth to check. Default: `3`.
+- `{allowedQualifiers: string[]}`: suffixes allowed after the directory name.
+- `{allowedFilenames: string[]}`: standalone filenames that do not need to match the directory.
+
+The default qualifiers are `constants`, `helpers`, `spec`, `styles`, `test`, `types`, and `utils`. The default standalone filenames are `constants`, `index`, `types`, and `utils`.
+
+---
+
 ### Operator Options
 
 The operator-counting rules accept the same option shape:
@@ -855,10 +946,10 @@ A pre-commit hook can run the configured ESLint rules:
 #!/bin/sh
 set -eu
 
-pnpm exec eslint --max-warnings 0 .
+nubx eslint --max-warnings 0 .
 ```
 
-This repository can install its managed validation hook with `pnpm install-hooks`.
+This repository can install its managed validation hook with `nub run install-hooks`.
 
 ---
 
@@ -866,10 +957,10 @@ This repository can install its managed validation hook with `pnpm install-hooks
 
 | Config | Format | Behavior |
 | --- | --- | --- |
-| [recommended](#legibility-configs-recommended) | ESLint legacy | High-signal general rules as warnings. |
-| [strict](#legibility-configs-strict) | ESLint legacy | General rules as errors. |
-| [flat/recommended](#legibility-configs-flat-recommended) | ESLint flat config | High-signal general rules as warnings. |
-| [flat/strict](#legibility-configs-flat-strict) | ESLint flat config | General rules as errors. |
+| [recommended](#legibility-configs-recommended) | ESLint legacy | High-signal and core complexity rules as warnings. |
+| [strict](#legibility-configs-strict) | ESLint legacy | General and core complexity rules as errors. |
+| [flat/recommended](#legibility-configs-flat-recommended) | ESLint flat config | High-signal and core complexity rules as warnings. |
+| [flat/strict](#legibility-configs-flat-strict) | ESLint flat config | General and core complexity rules as errors. |
 
 ---
 
@@ -932,7 +1023,17 @@ Oxlint JavaScript plugins use the same ESLint-compatible rule API.
   "rules": {
     "legibility/max-array-chain-depth": ["warn", { "max": 2 }],
     "legibility/max-expression-operators": ["warn", { "max": 4 }],
-    "legibility/no-quadratic-patterns": "warn"
+    "legibility/no-quadratic-patterns": "warn",
+    "complexity": ["warn", { "max": 20, "variant": "classic" }],
+    "max-lines-per-function": [
+      "warn",
+      {
+        "max": 40,
+        "skipBlankLines": true,
+        "skipComments": true,
+        "IIFEs": true
+      }
+    ]
   }
 }
 ```
@@ -970,25 +1071,25 @@ Rules are configured through ESLint or Oxlint `rules`.
 
 ### `legibility.configs["flat/recommended"]`
 
-Flat ESLint config with high-signal general rules enabled as warnings. Comment policies are configured through [recipes](#comment-policy-recipes).
+Flat ESLint config with high-signal general rules and shared core complexity limits enabled as warnings. Comment policies are configured through [recipes](#comment-policy-recipes).
 
 ---
 
 ### `legibility.configs["flat/strict"]`
 
-Flat ESLint config with general rules enabled as errors. Comment policies are configured through [recipes](#comment-policy-recipes).
+Flat ESLint config with general rules and shared core complexity limits enabled as errors. Comment policies are configured through [recipes](#comment-policy-recipes).
 
 ---
 
 ### `legibility.configs.recommended`
 
-Legacy ESLint config with high-signal general rules enabled as warnings. Comment policies are configured through [recipes](#comment-policy-recipes).
+Legacy ESLint config with high-signal general rules and shared core complexity limits enabled as warnings. Comment policies are configured through [recipes](#comment-policy-recipes).
 
 ---
 
 ### `legibility.configs.strict`
 
-Legacy ESLint config with general rules enabled as errors. Comment policies are configured through [recipes](#comment-policy-recipes).
+Legacy ESLint config with general rules and shared core complexity limits enabled as errors. Comment policies are configured through [recipes](#comment-policy-recipes).
 
 ---
 
@@ -999,16 +1100,16 @@ Legacy ESLint config with general rules enabled as errors. Comment policies are 
 - Releases are tag-triggered and publish GitHub release assets.
 - npm publishing uses GitHub Actions trusted publishing with provenance.
 <!-- runtime compatibility coverage from .github/workflows/ci.yml -->
-- CI runs validation on Node 20, 22, 24, and 26, plus compatibility suites on Bun and Deno.
-- Bun installs are configured to use Socket.dev's security scanner.
+- CI runs validation on Node 26, plus compatibility suites on Bun and Deno.
+- Codependence maintains pnpm dependencies, GitHub Actions, and Docker image pins.
+- Pastoralist audits CVE overrides in `pnpm-workspace.yaml` and records their metadata in `package.json`.
+- Dependabot alerts, security updates, and version updates are disabled.
 
 ## GitHub Secrets
 
 | Secret | Location | Used by | Required when |
 | --- | --- | --- | --- |
 | `CODECOV_TOKEN` | Repository Actions secret | `.github/workflows/codecov.yml` | Codecov uploads run on protected branches or token authentication is required in Codecov. |
-| `SOCKET_SECURITY_API_KEY` | Repository Actions secret | GitHub workflows that install, analyze, test, or publish packages | Socket.dev scanning or package-manager security integration is enabled. |
-| `SOCKET_API_KEY` | Repository Actions secret | Fallback Socket token name | Existing Socket automation expects this older token name. |
 
 `GITHUB_TOKEN` is provided by GitHub Actions automatically and does not need to be added manually.
 
@@ -1026,17 +1127,17 @@ npm publishing does not use `NPM_TOKEN` or `NODE_AUTH_TOKEN`. Configure npm trus
 ## Releases
 
 ```sh
-pnpm release:current:dry
-pnpm release:current
-pnpm release:patch:dry
-pnpm release:patch
-pnpm release:minor
-pnpm release:major
-pnpm release:beta
-pnpm release:alpha
+nub run release:current:dry
+nub run release:current
+nub run release:patch:dry
+nub run release:patch
+nub run release:minor
+nub run release:major
+nub run release:beta
+nub run release:alpha
 ```
 
-Releases use a local release wrapper around `release-it`. Run release commands from a clean, up-to-date `main` branch. Use `pnpm release:current` for the first publish of the current package version, then use the patch, minor, major, alpha, or beta commands for later releases. The wrapper resolves the exact version, verifies local `main` matches `origin/main`, and asks for confirmation before `release-it` pushes the tag that triggers npm publishing.
+Releases use a local release wrapper around `release-it`. Run release commands from a clean, up-to-date `main` branch. Use `nub run release:current` for the first publish of the current package version, then use the patch, minor, major, alpha, or beta commands for later releases. The wrapper resolves the exact version, verifies local `main` matches `origin/main`, and asks for confirmation before `release-it` pushes the tag that triggers npm publishing.
 
 The publish confirmation question is:
 
@@ -1046,7 +1147,7 @@ Publish eslint-plugin-legibility@<version> from GitHub Actions trusted publishin
 
 Answer `y` or `yes` to continue. Any other answer aborts before the release tag is pushed. For intentional noninteractive release automation, pass `--yes` to the release wrapper.
 
-After confirmation, `release-it` runs `pnpm validate`, bumps `package.json` when incrementing, creates the release commit, creates `v${version}`, and pushes the branch with tags. The pushed tag triggers npm publishing and GitHub release asset upload through `.github/workflows/publish.yml`.
+After confirmation, `release-it` runs `nub run validate`, bumps `package.json` when incrementing, creates the release commit, creates `v${version}`, and pushes the branch with tags. The pushed tag triggers npm publishing and GitHub release asset upload through `.github/workflows/publish.yml`.
 
 Before publishing, configure npm trusted publishing for `publish.yml`. Leave the environment field blank because the publish workflow does not use a GitHub environment.
 

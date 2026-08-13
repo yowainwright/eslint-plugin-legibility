@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
+  chmodSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -66,11 +68,35 @@ test("installs executable managed hooks", () => {
     const preCommitHook = readFileSync(preCommitPath, "utf8");
     const postMergeHook = readFileSync(postMergePath, "utf8");
     assert.match(preCommitHook, new RegExp(managedHookMarker));
-    assert.match(preCommitHook, /pnpm validate/);
+    assert.match(preCommitHook, /node_modules\/\.bin\/nub/);
+    assert.match(preCommitHook, /"\$nub_path" run validate/);
     assert.match(postMergeHook, new RegExp(managedHookMarker));
-    assert.match(postMergeHook, /pnpm install --frozen-lockfile/);
+    assert.match(postMergeHook, /"\$nub_path" install --frozen-lockfile/);
     assert.equal(statSync(preCommitPath).mode & 0o111, 0o111);
     assert.equal(statSync(postMergePath).mode & 0o111, 0o111);
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+test("managed pre-commit hook resolves the repository Nub binary", () => {
+  const directory = createTempRepository();
+  const nubDirectory = join(directory, "node_modules", ".bin");
+  const nubPath = join(nubDirectory, "nub");
+  const invocationPath = join(directory, "nub-invocation.txt");
+
+  try {
+    mkdirSync(nubDirectory, { recursive: true });
+    writeFileSync(nubPath, '#!/bin/sh\nprintf "%s\\n" "$*" > nub-invocation.txt\n');
+    chmodSync(nubPath, 0o755);
+    assertSuccessfulRun(directory);
+
+    const hookPath = getHookPath(directory, "pre-commit");
+    const env = Object.assign({}, process.env, { PATH: "/usr/bin:/bin" });
+    const result = spawnSync(hookPath, { cwd: directory, encoding: "utf8", env });
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(readFileSync(invocationPath, "utf8"), "run validate\n");
   } finally {
     rmSync(directory, { force: true, recursive: true });
   }

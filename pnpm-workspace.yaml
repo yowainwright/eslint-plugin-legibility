@@ -1,0 +1,8 @@
+packages:
+  - "."
+
+strictDepBuilds: true
+onlyBuiltDependencies:
+  - "@nubjs/nub"
+
+overrides: {}

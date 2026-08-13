@@ -48,61 +48,72 @@
   ],
   "sideEffects": false,
   "engines": {
-    "node": "^20.19.0 || ^22.13.0 || >=24.0.0"
+    "node": "^26.0.0"
   },
-  "packageManager": "pnpm@10.12.1",
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "^26.0.0",
+      "onFail": "error"
+    },
+    "packageManager": {
+      "name": "pnpm",
+      "version": "^11.21.0",
+      "onFail": "warn"
+    }
+  },
+  "packageManager": "pnpm@11.21.0",
   "scripts": {
-    "build": "pnpm build:agent && pnpm build:plugin && pnpm build:bin",
-    "build:agent": "jiti scripts/agent/build.ts",
-    "build:bin": "pnpm build:runtime && jiti scripts/build.ts",
-    "build:plugin": "jiti scripts/build.ts plugin",
+    "build": "nub run build:agent && nub run build:plugin && nub run build:bin",
+    "build:agent": "nub --node scripts/agent/build.ts",
+    "build:bin": "nub run build:runtime && nub --node scripts/build.ts",
+    "build:plugin": "nub --node scripts/build.ts plugin",
     "build:runtime": "tsc -p tsconfig.json --noEmit false --declaration false --outDir .build --rootDir .",
     "codependence": "codependence",
     "codependence:update": "codependence --update",
-    "typecheck": "pnpm build:plugin && tsc -p tsconfig.json",
-    "lint": "pnpm build:plugin && eslint .",
+    "typecheck": "nub run build:plugin && tsc -p tsconfig.json",
+    "lint": "nub run build:plugin && eslint .",
     "lint:oxlint": "oxlint .",
     "pastoralist": "pastoralist",
-    "pack:check": "pnpm build:plugin && pnpm pack --json --pack-destination ./.npm-cache",
+    "pack:check": "nub --node scripts/repoManager.ts pack",
     "prepare": "sh scripts/prepare.sh",
-    "prepack": "pnpm build",
+    "prepack": "nub run build",
     "install-hooks": "sh scripts/hooks.sh",
-    "release": "jiti scripts/release.ts",
-    "release:current": "jiti scripts/release.ts --current",
-    "release:current:dry": "jiti scripts/release.ts --current --dry-run",
-    "release:patch": "jiti scripts/release.ts patch",
-    "release:patch:dry": "jiti scripts/release.ts patch --dry-run",
-    "release:minor": "jiti scripts/release.ts minor",
-    "release:minor:dry": "jiti scripts/release.ts minor --dry-run",
-    "release:major": "jiti scripts/release.ts major",
-    "release:major:dry": "jiti scripts/release.ts major --dry-run",
-    "release:beta": "jiti scripts/release.ts --preRelease=beta",
-    "release:beta:dry": "jiti scripts/release.ts --preRelease=beta --dry-run",
-    "release:alpha": "jiti scripts/release.ts --preRelease=alpha",
-    "release:alpha:dry": "jiti scripts/release.ts --preRelease=alpha --dry-run",
-    "release:dry": "jiti scripts/release.ts patch --dry-run",
-    "test": "pnpm build && jiti scripts/test.ts node-ts",
-    "test:bun": "pnpm build && jiti scripts/test.ts bun-ts",
-    "test:deno": "pnpm build && jiti scripts/test.ts deno-ts",
-    "test:coverage": "pnpm build && jiti scripts/test.ts coverage",
-    "test:compat": "pnpm build && jiti scripts/test.ts node-js",
-    "validate": "pnpm typecheck && pnpm typecheck:strict && pnpm type-coverage && pnpm test && pnpm lint && pnpm lint:oxlint && pnpm pack:check",
-    "validate:compat": "pnpm typecheck && pnpm typecheck:strict && pnpm type-coverage && pnpm test:compat && pnpm lint && pnpm lint:oxlint && pnpm pack:check",
-    "typecheck:strict": "jiti scripts/build.ts strict",
+    "release": "nub --node scripts/release.ts",
+    "release:current": "nub --node scripts/release.ts --current",
+    "release:current:dry": "nub --node scripts/release.ts --current --dry-run",
+    "release:patch": "nub --node scripts/release.ts patch",
+    "release:patch:dry": "nub --node scripts/release.ts patch --dry-run",
+    "release:minor": "nub --node scripts/release.ts minor",
+    "release:minor:dry": "nub --node scripts/release.ts minor --dry-run",
+    "release:major": "nub --node scripts/release.ts major",
+    "release:major:dry": "nub --node scripts/release.ts major --dry-run",
+    "release:beta": "nub --node scripts/release.ts --preRelease=beta",
+    "release:beta:dry": "nub --node scripts/release.ts --preRelease=beta --dry-run",
+    "release:alpha": "nub --node scripts/release.ts --preRelease=alpha",
+    "release:alpha:dry": "nub --node scripts/release.ts --preRelease=alpha --dry-run",
+    "release:dry": "nub --node scripts/release.ts patch --dry-run",
+    "test": "nub run build && nub --node scripts/test.ts node-ts",
+    "test:bun": "nub run build && nub --node scripts/test.ts bun-ts",
+    "test:deno": "nub run build && nub --node scripts/test.ts deno-ts",
+    "test:coverage": "nub run build && nub --node scripts/test.ts coverage",
+    "test:compat": "nub run build && nub --node scripts/test.ts node-js",
+    "validate": "nub --node scripts/repoManager.ts validate",
+    "validate:compat": "nub --node scripts/repoManager.ts validate:compat",
+    "typecheck:strict": "nub --node scripts/build.ts strict",
     "type-coverage": "type-coverage --strict --at-least 99.5 -- src/index.ts src/constants.ts src/types.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
-    "@socketsecurity/bun-security-scanner": "^1.1.2",
-    "@types/node": "^25.9.1",
-    "codependence": "1.0.3",
+    "@nubjs/nub": "^0.7.0",
+    "@types/node": "^26.0.0",
+    "codependence": "1.0.8",
     "eslint": "^9.0.0",
-    "jiti": "^2.7.0",
     "merge-tsconfigs": "^0.2.4",
     "oxlint": "^1.0.0",
-    "pastoralist": "1.12.8",
-    "release-it": "20.2.1",
-    "type-coverage": "^2.29.7",
+    "pastoralist": "1.12.16",
+    "release-it": "^21.0.0",
+    "type-coverage": "^2.30.1",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.60.1"
   },
@@ -110,9 +121,9 @@
     "access": "public"
   },
   "release-it": {
-    "$schema": "https://unpkg.com/release-it@20/schema/release-it.json",
+    "$schema": "https://unpkg.com/release-it@21/schema/release-it.json",
     "hooks": {
-      "before:init": "pnpm validate"
+      "before:init": "nub run validate"
     },
     "git": {
       "requireBranch": "main",
@@ -134,6 +145,24 @@
     },
     "npm": {
       "publish": false
+    }
+  },
+  "dependencies": {},
+  "peerDependencies": {},
+  "optionalDependencies": {},
+  "pastoralist": {
+    "depPaths": [
+      "package.json"
+    ],
+    "security": {
+      "enabled": true,
+      "provider": "osv",
+      "autoFix": true,
+      "interactive": false,
+      "severityThreshold": "low",
+      "hasWorkspaceSecurityChecks": false,
+      "strict": true,
+      "preferLatest": true
     }
   }
 }

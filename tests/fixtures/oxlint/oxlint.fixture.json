@@ -6,6 +6,16 @@
     }
   ],
   "rules": {
+    "complexity": ["error", { "max": 2, "variant": "classic" }],
+    "max-lines-per-function": [
+      "error",
+      {
+        "max": 5,
+        "skipBlankLines": true,
+        "skipComments": true,
+        "IIFEs": true
+      }
+    ],
     "legibility/prefer-early-return": "error",
     "legibility/no-unmatched-comments": "error"
   }

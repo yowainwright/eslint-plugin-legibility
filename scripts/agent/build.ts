@@ -39,7 +39,7 @@ export function renderAgentSkill(definition = createAgentSkillDefinition()): str
 export function renderAgentRulePointer(target: "Claude" | "Codex"): string {
   const generatedSource = "`scripts/agent/constants.ts`";
   const sharedSkill = "`.agents/skills/eslint-plugin-legibility/SKILL.md`";
-  const command = "`pnpm build:agent -- --target agents`";
+  const command = "`nub run build:agent -- --target agents`";
   return [
     `# eslint-plugin-legibility ${target} Rules`,
     `Use ${sharedSkill} as the shared agent skill workflow.`,
