@@ -1,9 +1,10 @@
 import packageManifest from "../package.json" with { type: "json" };
 import type { RuleMeta } from "./types.js";
 
+const PACKAGE_NAME = packageManifest.name;
 const PACKAGE_VERSION = packageManifest.version;
 
-export { PACKAGE_VERSION };
+export { PACKAGE_NAME, PACKAGE_VERSION };
 
 export const PLUGIN_NAME = "legibility";
 
@@ -25,6 +26,14 @@ export const DEFAULT_ALLOWED_STANDALONE_FILENAMES = new Set([
   "index",
   "types",
   "utils",
+]);
+export const DEFAULT_INDEX_FILENAME_SCHEMA = new Set([
+  "index",
+  "utils",
+  "constants",
+  "types",
+  "index.test",
+  "utils.test",
 ]);
 export const DEFAULT_MAX_IF_OPERATORS = 0;
 export const DEFAULT_MAX_TERNARY_OPERATORS = 2;
@@ -173,7 +182,7 @@ export const SEARCH_METHODS = new Set(["filter", "find", "includes", "indexOf", 
 
 export const EQUALITY_OPERATORS = new Set(["==", "===", "!=", "!=="]);
 
-export const OBJECT_LOOKUP_OPERATORS = new Set(["==", "==="]);
+export const DEFAULT_OBJECT_LOOKUP_OPERATORS = new Set(["==", "==="]);
 
 export const ITERATION_METHODS = new Set([
   "every",
@@ -315,7 +324,6 @@ export const RECOMMENDED_RULE_NAMES = [
   "prefer-object-lookup",
   "prefer-positive-condition-names",
   "require-executable-shebang",
-  "require-filename-matches-dirname",
 ];
 
 export const COMMENT_RULE_NAMES = [
@@ -324,7 +332,44 @@ export const COMMENT_RULE_NAMES = [
   "require-jsdoc-multiline-comments",
 ];
 
+export const OPT_IN_RULE_NAMES = new Set([
+  "no-unmatched-comments",
+  "require-filename-matches-dirname",
+]);
+
 const STRING_ARRAY_SCHEMA = { type: "array", items: { type: "string" } };
+
+const FILENAME_MIN_DEPTH_SCHEMA = { type: "integer", minimum: 1 };
+const DIRNAME_FILENAME_SCHEMA = {
+  type: "object",
+  required: ["schema"],
+  properties: {
+    schema: { enum: ["dirname"] },
+    minDepth: FILENAME_MIN_DEPTH_SCHEMA,
+    allowedQualifiers: STRING_ARRAY_SCHEMA,
+    allowedFilenames: STRING_ARRAY_SCHEMA,
+  },
+  additionalProperties: false,
+};
+const INDEX_FILENAME_SCHEMA = {
+  type: "object",
+  required: ["schema"],
+  properties: {
+    schema: { enum: ["index"] },
+    minDepth: FILENAME_MIN_DEPTH_SCHEMA,
+  },
+  additionalProperties: false,
+};
+const CUSTOM_FILENAME_SCHEMA = {
+  type: "object",
+  required: ["schema", "patterns"],
+  properties: {
+    schema: { enum: ["custom"] },
+    minDepth: FILENAME_MIN_DEPTH_SCHEMA,
+    patterns: { type: "array", items: { type: "string" }, minItems: 1, uniqueItems: true },
+  },
+  additionalProperties: false,
+};
 
 const OPERATOR_COMPLEXITY_SCHEMA = {
   type: "object",
@@ -593,6 +638,7 @@ export const REQUIRE_JSDOC_MULTILINE_COMMENTS_META = defineMeta(
       description: "Require multiline block comments to use JSDoc syntax.",
       recommended: true,
     },
+    fixable: "code",
     schema: [],
     messages: {
       useJsdoc: "Multiline block comments must use JSDoc syntax (`/** ... */`).",
@@ -920,25 +966,17 @@ export const PREFER_OBJECT_LOOKUP_META = defineMeta("prefer-object-lookup", {
 export const REQUIRE_FILENAME_MATCHES_DIRNAME_META = defineMeta("require-filename-matches-dirname", {
   type: "suggestion",
   docs: {
-    description: "Require files in named subdirectories to match the directory name.",
-    recommended: true,
+    description: "Require filenames to match an explicitly selected schema.",
+    recommended: false,
   },
   schema: [
     {
-      type: "object",
-      properties: {
-        minDepth: { type: "integer", minimum: 1 },
-        allowedQualifiers: STRING_ARRAY_SCHEMA,
-        allowedFilenames: STRING_ARRAY_SCHEMA,
-      },
-      additionalProperties: false,
+      oneOf: [DIRNAME_FILENAME_SCHEMA, INDEX_FILENAME_SCHEMA, CUSTOM_FILENAME_SCHEMA],
     },
   ],
   messages: {
-    mismatch:
-      "Filename \"{{name}}\" does not match parent directory \"{{dir}}\". Use {{dir}}.ts, {{dir}}.{qualifier}.ts, or a known filename (index, types, constants, utils).",
-    unknownQualifier:
-      "Qualifier \"{{qualifier}}\" in \"{{name}}\" is not in the allowed list: {{allowed}}.",
+    missingSchema: "Choose a filename schema: dirname, index, or custom.",
+    mismatch: "Filename \"{{name}}\" does not match the {{schema}} schema. Allowed basenames: {{allowed}}.",
   },
 });
 

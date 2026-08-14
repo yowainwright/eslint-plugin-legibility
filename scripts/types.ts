@@ -1,5 +1,20 @@
 export type PreRelease = "alpha" | "beta" | "rc";
 export type ReleaseIncrement = "major" | "minor" | "patch";
+export type E2eMode = "benchmark" | "test";
+
+export interface E2eRunPlan {
+  args: string[];
+  command: "docker";
+}
+
+export interface E2eCommandResult {
+  status: number | null;
+}
+
+export type E2eCommandRunner = (
+  command: string,
+  args: readonly string[],
+) => E2eCommandResult;
 
 export interface ReleaseArgs {
   current: boolean;
@@ -49,10 +64,9 @@ export type RepoCommandRunner = (
   args: readonly string[],
 ) => RepoCommandResult;
 
-export type RepoManagerTarget = "pack" | "validate" | "validate:compat";
-export type ValidateMode = "compat" | "default";
+export type RepoManagerTarget = "pack" | "validate";
 
-export type TestRunMode = "bun-ts" | "coverage" | "deno-ts" | "node-js" | "node-ts";
+export type TestRunMode = "bun-ts" | "coverage" | "deno-ts" | "node-ts";
 
 export interface TestRunPlan {
   command: string;

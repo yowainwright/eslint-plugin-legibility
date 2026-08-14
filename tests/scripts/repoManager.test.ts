@@ -13,17 +13,14 @@ import type { RepoCommandRunner } from "../../scripts/types.ts";
 test("parses repository manager targets", () => {
   assert.equal(parseRepoManagerTarget(["pack"]), "pack");
   assert.equal(parseRepoManagerTarget(["validate"]), "validate");
-  assert.equal(parseRepoManagerTarget(["validate:compat"]), "validate:compat");
   assert.throws(() => parseRepoManagerTarget([]), /Invalid repository manager target/);
 });
 
-test("builds default and compatibility validation steps", () => {
-  const defaultSteps = getValidationSteps("default");
-  const compatSteps = getValidationSteps("compat");
+test("builds validation steps", () => {
+  const steps = getValidationSteps();
 
-  assert.deepEqual(defaultSteps[3], ["run", "test"]);
-  assert.deepEqual(compatSteps[3], ["run", "test:compat"]);
-  assert.deepEqual(defaultSteps.at(-1), ["run", "pack:check"]);
+  assert.deepEqual(steps[3], ["run", "test"]);
+  assert.deepEqual(steps.at(-1), ["run", "pack:check"]);
 });
 
 test("Pack runs Nub pack with the repository cache destination", () => {
@@ -42,14 +39,6 @@ test("Validate stops on the first failed Nub step", () => {
     return { status: isTestStep ? 7 : 0 };
   };
 
-  assert.equal(new Validate("default", runner).run(), 7);
-});
-
-test("runs compatibility validation through the repository manager", () => {
-  const runner: RepoCommandRunner = (_command, args) => {
-    const isCompatTest = args[1] === "test:compat";
-    return { status: isCompatTest ? 5 : 0 };
-  };
-
-  assert.equal(runRepoManager("validate:compat", runner), 5);
+  assert.equal(new Validate(runner).run(), 7);
+  assert.equal(runRepoManager("validate", runner), 7);
 });

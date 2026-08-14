@@ -33,7 +33,7 @@ npm add -D eslint-plugin-legibility
 
 ## Configs
 
-Choose one flat config preset.
+Choose the preset for your linter and severity.
 
 ### `flat/recommended`
 
@@ -55,7 +55,29 @@ import legibility from "eslint-plugin-legibility";
 export default [legibility.configs["flat/strict"]];
 ```
 
-Both presets configure these ESLint core rules:
+### `oxlint/recommended`
+
+Enables the same rules as warnings in `oxlint.config.ts`.
+
+```ts
+import { defineConfig } from "oxlint";
+import legibility from "eslint-plugin-legibility";
+
+export default defineConfig(legibility.configs["oxlint/recommended"]);
+```
+
+### `oxlint/strict`
+
+Enables the same rules as errors in `oxlint.config.ts`.
+
+```ts
+import { defineConfig } from "oxlint";
+import legibility from "eslint-plugin-legibility";
+
+export default defineConfig(legibility.configs["oxlint/strict"]);
+```
+
+All presets explicitly configure these core rules because ESLint's recommended config does not enable them:
 
 - `complexity`: `max: 20`, using the `classic` variant.
 - `max-lines-per-function`: `max: 40`, excluding blank lines and comments and including IIFEs.
@@ -71,11 +93,29 @@ nub install --frozen-lockfile
 nub run validate
 ```
 
+### Docker end-to-end tests
+
+<!-- Docker end-to-end commands and matrix from package.json and tests/e2e/docker/compose.yml -->
+
+Build the package tarball, install it in an isolated Node 26 consumer, and test ESLint and Oxlint with the `default`, `opt-in`, `recommended`, and `strict` fixtures:
+
+```sh
+nub run test:e2e
+```
+
+Benchmark every engine and fixture setup against one file and a generated 100-file project:
+
+```sh
+nub run benchmark:e2e
+```
+
+The benchmark reports JSON with mean, median, p95, minimum, maximum, and mean-per-file duration. Adjust its sample counts with `BENCHMARK_WARMUPS` and `BENCHMARK_ITERATIONS`. Benchmarks report measurements without enforcing timing thresholds. Both commands remove their Compose containers, networks, volumes, and local e2e image after success or failure.
+
 ---
 
 ## Rules
 
-Both presets enable the same rules. `flat/recommended` uses warnings; `flat/strict` uses errors. `no-unmatched-comments` is opt-in because it is intended for temporary no-comment sessions and repositories that define an explicit comment allow list.
+Both presets enable the same rules. `flat/recommended` uses warnings; `flat/strict` uses errors. Filename schemas and `no-unmatched-comments` are opt-in because they require a project policy.
 
 <!-- rule section links grouped by preset membership from src/constants.ts -->
 <details>
@@ -113,8 +153,11 @@ Both presets enable the same rules. `flat/recommended` uses warnings; `flat/stri
 - [`legibility/prefer-object-lookup`](#prefer-object-lookup)
 - [`legibility/prefer-positive-condition-names`](#prefer-positive-condition-names)
 - [`legibility/require-executable-shebang`](#require-executable-shebang)
-- [`legibility/require-filename-matches-dirname`](#require-filename-matches-dirname)
 - [`legibility/require-jsdoc-multiline-comments`](#require-jsdoc-multiline-comments)
+
+**Opt-in filename policy**
+
+- [`legibility/require-filename-matches-dirname`](#require-filename-matches-dirname)
 
 **Opt-in comment policy**
 
@@ -362,6 +405,21 @@ Reject `map` and `filter` callbacks that keep every item unchanged.
 <!-- no-mixed-filename-casing behavior from src/constants.ts and src/index.ts -->
 Use one filename convention: kebab-case, camelCase, PascalCase, or snake_case. Leading dots and file extensions are ignored.
 
+This rule has no options. It rejects conventions mixed within one filename; it does not require every file in the project to use the same convention. For example, `user-profile.ts`, `userProfile.ts`, `UserProfile.ts`, and `user_profile.ts` are all valid.
+
+#### do / don't
+
+```diff
+- my-File.ts
++ my-file.ts
+
+- user_profile-card.test.ts
++ user_profile_card.test.ts
+
+- accountSettings-helper.ts
++ account-settings-helper.ts
+```
+
 ---
 
 <a id="no-quadratic-patterns"></a>
@@ -598,6 +656,8 @@ Reject comments that explicitly attribute authorship to an automated tool. The r
 
 Require block comments spanning multiple lines to use `/** ... */` JSDoc syntax. Line comments and single-line block comments are unchanged.
 
+This formatting rule does not permit agents to add comments. During an agent session, `npx lint-changed --comments=forbid` rejects every added comment, including separated comments. Outside that session policy, ESLint and Oxlint can autofix this rule by adding the missing `*` to the block opener.
+
 #### do / don't
 
 ```diff
@@ -611,7 +671,7 @@ Require block comments spanning multiple lines to use `/** ... */` JSDoc syntax.
 +  */
 ```
 
-This rule has no options and no autofix.
+This rule has no options. Run ESLint or Oxlint with `--fix` to apply the autofix.
 
 ---
 
@@ -811,19 +871,52 @@ Require configured CLI entry source files to include a Node, Bun, or Deno sheban
 ### `legibility/require-filename-matches-dirname({options})`
 
 <!-- require-filename-matches-dirname defaults and behavior from src/constants.ts and src/index.ts -->
-Require files in named subdirectories to match their parent directory. Known standalone filenames and approved qualifiers remain available.
+Require filenames to match an explicitly selected schema. The rule is not included in a preset because projects must choose `dirname`, `index`, or a custom schema.
 
 #### options
 
+- `{schema: "dirname" | "index" | "custom"}`: required filename schema.
 - `{minDepth: number}`: minimum parent depth to check. Default: `3`.
-- `{allowedQualifiers: string[]}`: suffixes allowed after the directory name.
-- `{allowedFilenames: string[]}`: standalone filenames that do not need to match the directory.
+- `{allowedQualifiers: string[]}`: `dirname` schema suffixes.
+- `{allowedFilenames: string[]}`: `dirname` schema standalone basenames.
+- `{patterns: string[]}`: required exact basenames for a `custom` schema. Use `{dirname}` as the parent-directory placeholder.
 
-The default qualifiers are `constants`, `helpers`, `spec`, `styles`, `test`, `types`, and `utils`. The default standalone filenames are `constants`, `index`, `types`, and `utils`.
+The rule ignores the final JavaScript or TypeScript extension, so the same schema covers `.js`, `.jsx`, `.ts`, and `.tsx` files.
 
-#### do / don't
+#### index schema
 
-For a file under `src/components/button/`, the basename must be `button`, an approved qualified form such as `button.test`, or a standalone filename such as `index`:
+The `index` schema allows only `constants`, `index`, `index.test`, `types`, `utils`, and `utils.test`:
+
+```js
+const filenameSchema = { schema: "index", minDepth: 3 };
+const filenameRules = {
+  "legibility/require-filename-matches-dirname": ["error", filenameSchema],
+};
+
+export default [
+  legibility.configs["flat/recommended"],
+  { rules: filenameRules },
+];
+```
+
+```diff
+- src/components/button/button.ts
+- src/components/button/button.test.ts
++ src/components/button/index.ts
++ src/components/button/index.test.tsx
++ src/components/button/utils.ts
+```
+
+#### dirname schema
+
+The `dirname` schema keeps the existing directory-name convention. It allows `button`, qualified forms such as `button.test`, and standalone filenames such as `index` under `src/components/button/`:
+
+```js
+const filenameSchema = { schema: "dirname", minDepth: 3 };
+const filenameRules = {
+  "legibility/require-filename-matches-dirname": ["error", filenameSchema],
+};
+```
 
 ```diff
 - src/components/button/useButton.ts
@@ -833,30 +926,21 @@ For a file under `src/components/button/`, the basename must be `button`, an app
 + src/components/button/index.ts
 ```
 
-The option arrays replace the defaults. Include the defaults when adding project-specific values such as `effect` and `schema`:
+The default qualifiers are `constants`, `helpers`, `spec`, `styles`, `test`, `types`, and `utils`. The default standalone filenames are `constants`, `index`, `types`, and `utils`. The option arrays replace those defaults.
+
+#### custom schema
+
+Custom patterns match the basename exactly after replacing `{dirname}`:
 
 ```js
-{
-  rules: {
-    "legibility/require-filename-matches-dirname": [
-      "error",
-      {
-        minDepth: 3,
-        allowedQualifiers: [
-          "constants",
-          "effect",
-          "helpers",
-          "spec",
-          "styles",
-          "test",
-          "types",
-          "utils"
-        ],
-        allowedFilenames: ["constants", "index", "schema", "types", "utils"]
-      }
-    ]
-  }
-}
+const filenameSchema = {
+  schema: "custom",
+  minDepth: 3,
+  patterns: ["{dirname}", "{dirname}.test", "index", "index.test", "schema"],
+};
+const filenameRules = {
+  "legibility/require-filename-matches-dirname": ["error", filenameSchema],
+};
 ```
 
 ---
@@ -962,15 +1046,21 @@ Configure `no-unmatched-comments` directly when a repository permits a small set
   const retryDelayMs = 30_000;
 ```
 
-### Enforce the session policy in CI
+### Keep CI and pre-commit on repository policy
 
-Use the same flag in a commit or pull-request gate:
+Omit the session flag from commit and pull-request gates:
 
 ```sh
-npx lint-changed origin/main --comments=forbid
+npx lint-changed origin/main
 ```
 
-The flag forces comment violations to error severity even when the project uses `flat/recommended`.
+Run the same project policy in pre-commit checks:
+
+```sh
+npx lint-changed
+```
+
+These checks allow comments unless the project config explicitly restricts them. The bundled comment-quality rules still apply. Reserve `--comments=forbid` for active agent sessions.
 
 ---
 
@@ -1012,6 +1102,7 @@ const legibility = require("eslint-plugin-legibility");
 ### Usage With Oxlint
 
 Oxlint JavaScript plugins use the same ESLint-compatible rule API.
+Use an `oxlint/*` preset above with `oxlint.config.ts`. For `.oxlintrc.json`, register the plugin and configure rules explicitly:
 
 ```json
 {
@@ -1079,46 +1170,6 @@ Rules are configured through ESLint or Oxlint `rules`.
 - Releases are tag-triggered and publish GitHub release assets.
 - npm publishing uses GitHub Actions trusted publishing with provenance.
 <!-- runtime compatibility coverage from .github/workflows/ci.yml -->
-- CI runs validation on Node 26, plus compatibility suites on Bun and Deno.
+- CI runs validation on Node 26, Docker package-consumer end-to-end tests, and compatibility suites on Bun and Deno.
 - Codependence maintains pnpm dependencies, GitHub Actions, and Docker image pins.
 - Pastoralist audits CVE overrides in `pnpm-workspace.yaml` and records their metadata in `package.json`.
-- Dependabot alerts, security updates, and version updates are disabled.
-
-## GitHub Secrets
-
-| Secret | Location | Used by | Required when |
-| --- | --- | --- | --- |
-| `CODECOV_TOKEN` | Repository Actions secret | `.github/workflows/codecov.yml` | Codecov uploads run on protected branches or token authentication is required in Codecov. |
-
-`GITHUB_TOKEN` is provided by GitHub Actions automatically and does not need to be added manually.
-
-npm publishing does not use `NPM_TOKEN` or `NODE_AUTH_TOKEN`. Configure npm trusted publishing for:
-
-| Field | Value |
-| --- | --- |
-| Provider | GitHub Actions |
-| Repository owner | `yowainwright` |
-| Repository name | `eslint-plugin-legibility` |
-| Workflow filename | `publish.yml` |
-| Environment | blank |
-| Allowed action | `npm publish` |
-
-## Releases
-
-Releases use a local release wrapper around `release-it`. Run release commands from a clean, up-to-date `main` branch. Use `nub run release:current` for the first publish of the current package version, then use the patch, minor, major, alpha, or beta commands for later releases. The wrapper resolves the exact version, verifies local `main` matches `origin/main`, and asks for confirmation before `release-it` pushes the tag that triggers npm publishing.
-
-The publish confirmation question is:
-
-```text
-Publish eslint-plugin-legibility@<version> from GitHub Actions trusted publishing? This will push v<version> and npm <dist-tag> will update if the workflow succeeds. Continue? [y/N]
-```
-
-Answer `y` or `yes` to continue. Any other answer aborts before the release tag is pushed. For intentional noninteractive release automation, pass `--yes` to the release wrapper.
-
-After confirmation, `release-it` runs `nub run validate`, bumps `package.json` when incrementing, creates the release commit, creates `v${version}`, and pushes the branch with tags. The pushed tag triggers npm publishing and GitHub release asset upload through `.github/workflows/publish.yml`.
-
-Before publishing, configure npm trusted publishing for `publish.yml`. Leave the environment field blank because the publish workflow does not use a GitHub environment.
-
-## Attribution
-
-The first rules were adapted from the [Pastoralist](https://github.com/yowainwright/pastoralist) `scripts/oxlint-plugin` rule set, then packaged for ESLint and Oxlint with additional legibility and performance rules.

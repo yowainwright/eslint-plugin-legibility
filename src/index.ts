@@ -15,6 +15,7 @@ import {
   DEFAULT_DIRECT_BIN_ENTRY_PATTERNS,
   DEFAULT_EXECUTABLE_ENTRY_PATTERNS,
   DEFAULT_EXECUTABLE_RUNTIMES,
+  DEFAULT_INDEX_FILENAME_SCHEMA,
   DEFAULT_IF_CONDITION_OPERATOR_COMPLEXITY,
   DEFAULT_MAX_ARRAY_CHAIN_DEPTH,
   DEFAULT_MAX_COMPUTED_VALUE_OPERATORS,
@@ -31,6 +32,7 @@ import {
   DEFAULT_MAX_TERNARY_OPERATORS,
   DEFAULT_MIN_LOOKUP_COLLECTION_SIZE,
   DEFAULT_MIN_OBJECT_LOOKUP_CHAIN_LENGTH,
+  DEFAULT_OBJECT_LOOKUP_OPERATORS,
   DEFAULT_READABILITY_OPERATOR_COMPLEXITY,
   EQUALITY_OPERATORS,
   EXPRESSION_CONTAINER_NODE_TYPES,
@@ -67,7 +69,8 @@ import {
   NO_UNMATCHED_COMMENTS_META,
   NO_UNNECESSARY_ASYNC_META,
   NO_UNNECESSARY_BLOCK_CALLBACK_META,
-  OBJECT_LOOKUP_OPERATORS,
+  OPT_IN_RULE_NAMES,
+  PACKAGE_NAME,
   PACKAGE_VERSION,
   PLUGIN_NAME,
   PREFER_CONCAT_OBJECT_ASSIGN_META,
@@ -94,6 +97,8 @@ import type {
   AstNode,
   AstValue,
   ControlFlowState,
+  FilenameDetails,
+  FilenameSchema,
   LegibilityPlugin,
   LoopStack,
   LookupPart,
@@ -101,12 +106,17 @@ import type {
   NodePredicate,
   NodeScope,
   OperatorComplexity,
+  OxlintConfig,
+  OxlintRules,
   RuleContext,
   RuleConfig,
   RuleCreate,
+  RuleCreateOnce,
+  RuleFixCallback,
   RuleLevel,
   RuleListener,
   RuleMeta,
+  RuleReport,
   ScopeCallback,
   ScopeStack,
   SourceCodeLike,
@@ -114,8 +124,18 @@ import type {
   TraversableEntry,
 } from "./types.js";
 
-function defineRule(meta: RuleMeta, create: RuleCreate): { meta: RuleMeta; create: RuleCreate } {
+function defineRule(
+  meta: RuleMeta,
+  create: RuleCreate,
+): { meta: RuleMeta; create: RuleCreate } {
   return { meta, create };
+}
+
+function defineCreateOnceRule(
+  meta: RuleMeta,
+  create: RuleCreateOnce,
+): { meta: RuleMeta; create: RuleCreate; createOnce: RuleCreateOnce } {
+  return { meta, create, createOnce: create };
 }
 
 function isRecord(value: unknown): value is AstNode {
@@ -156,7 +176,12 @@ function isExpressionContainer(node: MaybeAstNode): node is AstNode {
 }
 
 function getTraversableEntries(node: AstNode): TraversableEntry[] {
-  const traversableEntries = Object.entries(node).filter(([key]) => !SKIP_KEYS.has(key));
+  const traversableEntries: TraversableEntry[] = [];
+  const keys = Object.keys(node);
+  for (const key of keys) {
+    if (SKIP_KEYS.has(key)) continue;
+    traversableEntries[traversableEntries.length] = [key, node[key]];
+  }
   return traversableEntries;
 }
 
@@ -579,6 +604,18 @@ function getConfiguredNumber(context: RuleContext, key: string, fallback: number
   const hasNumberValue = typeof configuredValue === "number";
   if (!hasNumberValue) return fallback;
 
+  return configuredValue;
+}
+
+function getConfiguredString(context: RuleContext, key: string): string | null {
+  const options = context.options ?? [];
+  const value = options[0];
+  const hasOptionsObject = isRecord(value);
+  if (!hasOptionsObject) return null;
+
+  const configuredValue = value[key];
+  const isStringValue = typeof configuredValue === "string";
+  if (!isStringValue) return null;
   return configuredValue;
 }
 
@@ -1131,6 +1168,18 @@ function isJsdocComment(context: RuleContext, comment: AstNode): boolean {
   return getCommentValue(comment).startsWith("*");
 }
 
+function createJsdocCommentFix(
+  context: RuleContext,
+  comment: AstNode,
+): RuleFixCallback | undefined {
+  const commentText = getNodeText(context, comment);
+  const hasBlockOpener = commentText.startsWith("/*");
+  if (!hasBlockOpener) return undefined;
+
+  const jsdocText = `/**${commentText.slice(2)}`;
+  return (fixer) => fixer.replaceText(comment, jsdocText);
+}
+
 function createRequireJsdocMultilineComments(context: RuleContext): RuleListener {
   return {
     Program() {
@@ -1140,7 +1189,11 @@ function createRequireJsdocMultilineComments(context: RuleContext): RuleListener
 
         const hasJsdocSyntax = isJsdocComment(context, comment);
         if (hasJsdocSyntax) return;
-        context.report({ node: comment, messageId: "useJsdoc" });
+
+        const report: RuleReport = { node: comment, messageId: "useJsdoc" };
+        const fix = createJsdocCommentFix(context, comment);
+        if (fix) report.fix = fix;
+        context.report(report);
       });
     },
   };
@@ -3221,7 +3274,11 @@ function collectEqualityLookupParts(node: MaybeAstNode, operators: StringSet): L
 
 function createPreferObjectLookup(context: RuleContext): RuleListener {
   const min = getConfiguredNumber(context, "min", DEFAULT_MIN_OBJECT_LOOKUP_CHAIN_LENGTH);
-  const operators = getConfiguredStringSet(context, "operators", OBJECT_LOOKUP_OPERATORS);
+  const operators = getConfiguredStringSet(
+    context,
+    "operators",
+    DEFAULT_OBJECT_LOOKUP_OPERATORS,
+  );
   return {
     LogicalExpression(node) {
       checkObjectLookupPreference(context, node, operators, min);
@@ -3265,53 +3322,93 @@ function checkObjectLookupPreference(
   });
 }
 
+function getFilenameSchema(context: RuleContext): FilenameSchema | null {
+  const schema = getConfiguredString(context, "schema");
+  const isCustom = schema === "custom";
+  const isDirname = schema === "dirname";
+  const isIndex = schema === "index";
+  if (isCustom) return schema;
+  if (isDirname) return schema;
+  if (isIndex) return schema;
+  return null;
+}
+
+function getFilenameStem(filename: string): string {
+  const rawBasename = basename(filename);
+  const withoutLeadingDot = rawBasename.startsWith(".") ? rawBasename.slice(1) : rawBasename;
+  const lastDot = withoutLeadingDot.lastIndexOf(".");
+  const hasExtension = lastDot >= 0;
+  if (!hasExtension) return withoutLeadingDot;
+  return withoutLeadingDot.slice(0, lastDot);
+}
+
+function getFilenameDetails(context: RuleContext): FilenameDetails | null {
+  const cwd = context.cwd;
+  const filename = context.filename;
+  if (!cwd) return null;
+  if (!filename) return null;
+
+  const parts = relative(cwd, filename).split(/[/\\]/);
+  const parentDepth = parts.length - 1;
+  const parentDirName = parts[parentDepth - 1];
+  const stem = getFilenameStem(filename);
+  if (!parentDirName) return null;
+  if (!stem) return null;
+  return { parentDepth, parentDirName, stem };
+}
+
+function getDirnameFilenamePatterns(context: RuleContext, dirname: string): StringSet {
+  const qualifiers = getConfiguredStringArray(
+    context,
+    "allowedQualifiers",
+    Array.from(DEFAULT_ALLOWED_FILENAME_QUALIFIERS),
+  );
+  const filenames = getConfiguredStringArray(
+    context,
+    "allowedFilenames",
+    Array.from(DEFAULT_ALLOWED_STANDALONE_FILENAMES),
+  );
+  const qualifiedNames = qualifiers.map((qualifier) => `${dirname}.${qualifier}`);
+  return new Set([dirname].concat(qualifiedNames, filenames));
+}
+
+function getCustomFilenamePatterns(context: RuleContext, dirname: string): StringSet {
+  const patterns = getConfiguredStringArray(context, "patterns", []);
+  const expandedPatterns = patterns.map((pattern) => pattern.replaceAll("{dirname}", dirname));
+  return new Set(expandedPatterns);
+}
+
+function getFilenamePatterns(
+  context: RuleContext,
+  schema: FilenameSchema,
+  dirname: string,
+): StringSet {
+  if (schema === "dirname") return getDirnameFilenamePatterns(context, dirname);
+  if (schema === "index") return DEFAULT_INDEX_FILENAME_SCHEMA;
+  return getCustomFilenamePatterns(context, dirname);
+}
+
+function checkFilenameSchema(context: RuleContext, node: AstNode): void {
+  const schema = getFilenameSchema(context);
+  if (!schema) {
+    context.report({ node, messageId: "missingSchema" });
+    return;
+  }
+
+  const details = getFilenameDetails(context);
+  if (!details) return;
+  const minDepth = getConfiguredNumber(context, "minDepth", DEFAULT_MIN_DIRNAME_MATCH_DEPTH);
+  if (details.parentDepth < minDepth) return;
+
+  const patterns = getFilenamePatterns(context, schema, details.parentDirName);
+  if (patterns.has(details.stem)) return;
+  const allowed = Array.from(patterns).toSorted().join(", ");
+  const data = { allowed, name: details.stem, schema };
+  context.report({ node, messageId: "mismatch", data });
+}
+
 function createRequireFilenameMatchesDirname(context: RuleContext): RuleListener {
-  return {
-    Program(node: AstNode) {
-      const minDepth = getConfiguredNumber(context, "minDepth", DEFAULT_MIN_DIRNAME_MATCH_DEPTH);
-      const allowedQualifiers = getConfiguredStringSet(context, "allowedQualifiers", DEFAULT_ALLOWED_FILENAME_QUALIFIERS);
-      const allowedFilenames = getConfiguredStringSet(context, "allowedFilenames", DEFAULT_ALLOWED_STANDALONE_FILENAMES);
-
-      const cwd = context.cwd;
-      const filename = context.filename;
-      if (!cwd) return;
-      if (!filename) return;
-
-      const relativePath = relative(cwd, filename);
-      const parts = relativePath.split(/[/\\]/);
-      const parentDepth = parts.length - 1;
-
-      const isTooShallow = parentDepth < minDepth;
-      if (isTooShallow) return;
-
-      const parentDirName = parts[parentDepth - 1];
-      if (!parentDirName) return;
-
-      const rawBasename = basename(filename);
-      const withoutLeadingDot = rawBasename.startsWith(".") ? rawBasename.slice(1) : rawBasename;
-      const lastDot = withoutLeadingDot.lastIndexOf(".");
-      const withoutLastExt = lastDot >= 0 ? withoutLeadingDot.slice(0, lastDot) : withoutLeadingDot;
-      const nameParts = withoutLastExt.split(".");
-      const baseName = nameParts[0];
-      if (!baseName) return;
-      const qualifiers = nameParts.slice(1);
-
-      const isAllowedFilename = allowedFilenames.has(baseName);
-      if (isAllowedFilename) return;
-
-      const matchesDirName = baseName === parentDirName;
-      if (!matchesDirName) {
-        context.report({ node, messageId: "mismatch", data: { name: withoutLastExt, dir: parentDirName } });
-        return;
-      }
-
-      const unknownQualifier = qualifiers.find((q) => !allowedQualifiers.has(q));
-      if (!unknownQualifier) return;
-
-      const allowed = Array.from(allowedQualifiers).join(", ");
-      context.report({ node, messageId: "unknownQualifier", data: { qualifier: unknownQualifier, name: withoutLastExt, allowed } });
-    },
-  };
+  return { Program: (node) => checkFilenameSchema(context, node) };
 }
 
 function createNoMixedFilenameCasing(context: RuleContext): RuleListener {
@@ -3360,8 +3457,11 @@ const rules = {
   "no-computed-values": defineRule(NO_COMPUTED_VALUES_META, createNoComputedValues),
   "no-direct-node-bin-smoke": defineRule(NO_DIRECT_NODE_BIN_SMOKE_META, createNoDirectNodeBinSmoke),
   "no-hidden-side-effects": defineRule(NO_HIDDEN_SIDE_EFFECTS_META, createNoHiddenSideEffects),
-  "no-mixed-filename-casing": defineRule(NO_MIXED_FILENAME_CASING_META, createNoMixedFilenameCasing),
-  "no-identity-array-callback": defineRule(
+  "no-mixed-filename-casing": defineCreateOnceRule(
+    NO_MIXED_FILENAME_CASING_META,
+    createNoMixedFilenameCasing,
+  ),
+  "no-identity-array-callback": defineCreateOnceRule(
     NO_IDENTITY_ARRAY_CALLBACK_META,
     createNoIdentityArrayCallback,
   ),
@@ -3370,7 +3470,7 @@ const rules = {
     NO_REDUNDANT_BOOLEAN_LOGIC_META,
     createNoRedundantBooleanLogic,
   ),
-  "no-redundant-nullish-fallback": defineRule(
+  "no-redundant-nullish-fallback": defineCreateOnceRule(
     NO_REDUNDANT_NULLISH_FALLBACK_META,
     createNoRedundantNullishFallback,
   ),
@@ -3382,7 +3482,7 @@ const rules = {
     NO_REPEATED_COLLECTION_SEARCH_META,
     createNoRepeatedCollectionSearch,
   ),
-  "no-trivial-wrapper-functions": defineRule(
+  "no-trivial-wrapper-functions": defineCreateOnceRule(
     NO_TRIVIAL_WRAPPER_FUNCTIONS_META,
     createNoTrivialWrapperFunctions,
   ),
@@ -3390,7 +3490,7 @@ const rules = {
     NO_UNMATCHED_COMMENTS_META,
     createNoUnmatchedComments,
   ),
-  "no-unnecessary-block-callback": defineRule(
+  "no-unnecessary-block-callback": defineCreateOnceRule(
     NO_UNNECESSARY_BLOCK_CALLBACK_META,
     createNoUnnecessaryBlockCallback,
   ),
@@ -3399,18 +3499,30 @@ const rules = {
     NO_SINGLE_USE_RENAMING_ALIAS_META,
     createNoSingleUseRenamingAlias,
   ),
-  "no-stacked-comments": defineRule(NO_STACKED_COMMENTS_META, createNoStackedComments),
+  "no-stacked-comments": defineCreateOnceRule(
+    NO_STACKED_COMMENTS_META,
+    createNoStackedComments,
+  ),
   "no-standalone-array-mutations": defineRule(
     NO_STANDALONE_ARRAY_MUTATIONS_META,
     createNoStandaloneArrayMutations,
   ),
-  "prefer-concat-object-assign": defineRule(
+  "prefer-concat-object-assign": defineCreateOnceRule(
     PREFER_CONCAT_OBJECT_ASSIGN_META,
     createPreferConcatObjectAssign,
   ),
-  "prefer-early-return": defineRule(PREFER_EARLY_RETURN_META, createPreferEarlyReturn),
-  "prefer-flat-map": defineRule(PREFER_FLAT_MAP_META, createPreferFlatMap),
-  "prefer-guard-clauses": defineRule(PREFER_GUARD_CLAUSES_META, createPreferGuardClauses),
+  "prefer-early-return": defineCreateOnceRule(
+    PREFER_EARLY_RETURN_META,
+    createPreferEarlyReturn,
+  ),
+  "prefer-flat-map": defineCreateOnceRule(
+    PREFER_FLAT_MAP_META,
+    createPreferFlatMap,
+  ),
+  "prefer-guard-clauses": defineCreateOnceRule(
+    PREFER_GUARD_CLAUSES_META,
+    createPreferGuardClauses,
+  ),
   "prefer-object-lookup": defineRule(PREFER_OBJECT_LOOKUP_META, createPreferObjectLookup),
   "prefer-positive-condition-names": defineRule(
     PREFER_POSITIVE_CONDITION_NAMES_META,
@@ -3420,11 +3532,11 @@ const rules = {
     REQUIRE_EXECUTABLE_SHEBANG_META,
     createRequireExecutableShebang,
   ),
-  "require-filename-matches-dirname": defineRule(
+  "require-filename-matches-dirname": defineCreateOnceRule(
     REQUIRE_FILENAME_MATCHES_DIRNAME_META,
     createRequireFilenameMatchesDirname,
   ),
-  "require-jsdoc-multiline-comments": defineRule(
+  "require-jsdoc-multiline-comments": defineCreateOnceRule(
     REQUIRE_JSDOC_MULTILINE_COMMENTS_META,
     createRequireJsdocMultilineComments,
   ),
@@ -3453,14 +3565,22 @@ function buildCoreRuleConfig(level: RuleLevel): Record<string, RuleConfig> {
   return { complexity, "max-lines-per-function": maxLines };
 }
 
+function buildOxlintConfig(rules: Record<string, RuleConfig>): OxlintConfig {
+  const jsPlugin = { name: PLUGIN_NAME, specifier: PACKAGE_NAME };
+  const configRules = Object.assign({}, rules) as OxlintRules;
+  return { jsPlugins: [jsPlugin], rules: configRules };
+}
+
 const recommendedRuleNames = RECOMMENDED_RULE_NAMES.concat(COMMENT_RULE_NAMES);
 const recommendedPluginRules = buildRuleConfig(recommendedRuleNames, "warn");
 const recommendedCoreRules = buildCoreRuleConfig("warn");
 const recommendedRules = Object.assign({}, recommendedPluginRules, recommendedCoreRules);
-const strictRuleNames = Object.keys(rules).filter((ruleName) => ruleName !== "no-unmatched-comments");
+const strictRuleNames = Object.keys(rules).filter((ruleName) => !OPT_IN_RULE_NAMES.has(ruleName));
 const strictPluginRules = buildRuleConfig(strictRuleNames, "error");
 const strictCoreRules = buildCoreRuleConfig("error");
 const strictRules = Object.assign({}, strictPluginRules, strictCoreRules);
+const oxlintRecommendedConfig = buildOxlintConfig(recommendedRules);
+const oxlintStrictConfig = buildOxlintConfig(strictRules);
 
 const plugin: LegibilityPlugin = {
   meta: {
@@ -3484,6 +3604,9 @@ plugin.configs["flat/strict"] = {
   },
   rules: strictRules,
 };
+
+plugin.configs["oxlint/recommended"] = oxlintRecommendedConfig;
+plugin.configs["oxlint/strict"] = oxlintStrictConfig;
 
 export default plugin;
 export { plugin as "module.exports" };

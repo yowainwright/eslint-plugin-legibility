@@ -1,0 +1,10 @@
+.agents
+.build
+.claude
+.codex
+.git
+.npm-cache
+bin
+coverage
+dist
+node_modules
