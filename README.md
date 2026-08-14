@@ -98,7 +98,9 @@ Both presets enable the same rules. `flat/recommended` uses warnings; `flat/stri
 - [`legibility/no-quadratic-patterns`](#no-quadratic-patterns)
 - [`legibility/no-redundant-boolean-logic`](#no-redundant-boolean-logic)
 - [`legibility/no-redundant-nullish-fallback`](#no-redundant-nullish-fallback)
+- [`legibility/no-repeated-collection-search`](#no-repeated-collection-search)
 - [`legibility/no-small-collection-conversion`](#no-small-collection-conversion)
+- [`legibility/no-single-use-renaming-alias`](#no-single-use-renaming-alias)
 - [`legibility/no-standalone-array-mutations`](#no-standalone-array-mutations)
 - [`legibility/no-stacked-comments`](#no-stacked-comments)
 - [`legibility/no-trivial-wrapper-functions`](#no-trivial-wrapper-functions)
@@ -109,15 +111,10 @@ Both presets enable the same rules. `flat/recommended` uses warnings; `flat/stri
 - [`legibility/prefer-flat-map`](#prefer-flat-map)
 - [`legibility/prefer-guard-clauses`](#prefer-guard-clauses)
 - [`legibility/prefer-object-lookup`](#prefer-object-lookup)
+- [`legibility/prefer-positive-condition-names`](#prefer-positive-condition-names)
 - [`legibility/require-executable-shebang`](#require-executable-shebang)
 - [`legibility/require-filename-matches-dirname`](#require-filename-matches-dirname)
 - [`legibility/require-jsdoc-multiline-comments`](#require-jsdoc-multiline-comments)
-
-**Strict only**
-
-- [`legibility/no-repeated-collection-search`](#no-repeated-collection-search)
-- [`legibility/no-single-use-renaming-alias`](#no-single-use-renaming-alias)
-- [`legibility/prefer-positive-condition-names`](#prefer-positive-condition-names)
 
 **Opt-in comment policy**
 
@@ -824,6 +821,44 @@ Require files in named subdirectories to match their parent directory. Known sta
 
 The default qualifiers are `constants`, `helpers`, `spec`, `styles`, `test`, `types`, and `utils`. The default standalone filenames are `constants`, `index`, `types`, and `utils`.
 
+#### do / don't
+
+For a file under `src/components/button/`, the basename must be `button`, an approved qualified form such as `button.test`, or a standalone filename such as `index`:
+
+```diff
+- src/components/button/useButton.ts
+- src/components/button/button.effect.ts
++ src/components/button/button.ts
++ src/components/button/button.test.ts
++ src/components/button/index.ts
+```
+
+The option arrays replace the defaults. Include the defaults when adding project-specific values such as `effect` and `schema`:
+
+```js
+{
+  rules: {
+    "legibility/require-filename-matches-dirname": [
+      "error",
+      {
+        minDepth: 3,
+        allowedQualifiers: [
+          "constants",
+          "effect",
+          "helpers",
+          "spec",
+          "styles",
+          "test",
+          "types",
+          "utils"
+        ],
+        allowedFilenames: ["constants", "index", "schema", "types", "utils"]
+      }
+    ]
+  }
+}
+```
+
 ---
 
 ### Operator Options
@@ -882,7 +917,7 @@ Pass `--comments=forbid` to the changed-file lint command:
 npx lint-changed --comments=forbid
 ```
 
-The flag enables `legibility/no-unmatched-comments` as an error for that invocation. It does not change the project config. New and modified files fail when the linter reports a comment.
+The flag enables `legibility/no-unmatched-comments` as an error for that invocation. It does not change the project config. Every comment in a new file fails. In modified files, only comments that intersect added lines fail, so existing comments outside the session diff remain untouched.
 
 Pass the base branch before or after the flag:
 

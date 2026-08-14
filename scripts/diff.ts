@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { relative, resolve } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { isAbsolute, relative, resolve, win32 } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const JS_EXTENSIONS = new Set(['.js', '.ts', '.jsx', '.tsx', '.mjs', '.cjs', '.mts', '.cts']);
@@ -53,12 +53,19 @@ interface EslintResult {
 interface OxlintDiagnostic {
   code: string;
   filename: string;
-  labels: Array<{ span: { column: number; line: number } }>;
+  labels: Array<{ span: OxlintSpan }>;
   message: string;
 }
 
 interface OxlintResult {
   diagnostics: OxlintDiagnostic[];
+}
+
+interface OxlintSpan {
+  column: number;
+  length: number;
+  line: number;
+  offset: number;
 }
 
 function parseLintChangedArgs(args: readonly string[]): LintChangedOptions {
@@ -96,9 +103,17 @@ function readGitFiles(args: string[]): string[] | null {
   return lines.filter(line => line && isLintable(line));
 }
 
+function resolveMergeBase(base: string): string {
+  const result = spawnSync('git', ['merge-base', base, 'HEAD'], { encoding: 'utf8' });
+  const succeeded = !result.error && result.status === 0;
+  if (!succeeded) return base;
+  return result.stdout.trim();
+}
+
 function changedFiles(filter: string, base: string): string[] | null {
   const diffFilter = `--diff-filter=${filter}`;
-  const trackedFiles = readGitFiles(['diff', '--name-only', diffFilter, base, '--']);
+  const mergeBase = resolveMergeBase(base);
+  const trackedFiles = readGitFiles(['diff', '--name-only', diffFilter, mergeBase, '--']);
   if (trackedFiles === null) return null;
   if (!filter.includes('A')) return trackedFiles;
 
@@ -144,7 +159,8 @@ function parseAddedLines(diff: string): Map<string, Set<number>> {
 function changedLineNumbers(base: string, files: string[]): Map<string, Set<number>> | null {
   if (files.length === 0) return new Map();
 
-  const args = ['diff', '--unified=0', '--no-color', base, '--'].concat(files);
+  const mergeBase = resolveMergeBase(base);
+  const args = ['diff', '--unified=0', '--no-color', mergeBase, '--'].concat(files);
   const result = spawnSync('git', args, { encoding: 'utf8' });
   const failed = result.error || result.status !== 0;
   if (failed) return null;
@@ -170,10 +186,17 @@ function getCommentPolicyArgs(bin: string, files: string[]): string[] {
   return formatArgs.concat(commentRuleArgs, files);
 }
 
-function normalizeDiagnosticFile(file: string): string {
-  const isAbsolute = file.startsWith('/');
-  if (!isAbsolute) return file;
-  return relative(process.cwd(), file);
+function normalizeSeparators(file: string): string {
+  return file.replaceAll('\\', '/');
+}
+
+function normalizeDiagnosticFile(file: string, cwd = process.cwd()): string {
+  const isWindowsAbsolute = win32.isAbsolute(file);
+  const isFileAbsolute = isWindowsAbsolute || isAbsolute(file);
+  if (!isFileAbsolute) return normalizeSeparators(file);
+
+  const relativeFile = isWindowsAbsolute ? win32.relative(cwd, file) : relative(cwd, file);
+  return normalizeSeparators(relativeFile);
 }
 
 function toEslintDiagnostic(result: EslintResult, message: EslintMessage): CommentDiagnostic {
@@ -202,15 +225,33 @@ function parseEslintDiagnostics(output: string): CommentDiagnostic[] {
   }, []);
 }
 
-function toOxlintDiagnostic(diagnostic: OxlintDiagnostic): CommentDiagnostic {
-  const span = diagnostic.labels[0].span;
-  return {
+function getSpanEndLine(source: Buffer, span: OxlintSpan): number {
+  const spanEnd = span.offset + span.length;
+  const spanSource = source.subarray(span.offset, spanEnd).toString('utf8');
+  const addedLineCount = spanSource.split('\n').length - 1;
+  return span.line + addedLineCount;
+}
+
+function getOxlintEndLine(filename: string, span: OxlintSpan): number {
+  try {
+    return getSpanEndLine(readFileSync(filename), span);
+  } catch {
+    return span.line;
+  }
+}
+
+function toOxlintDiagnostic(diagnostic: OxlintDiagnostic): CommentDiagnostic[] {
+  const span = diagnostic.labels[0]?.span;
+  if (!span) return [];
+
+  const commentDiagnostic = {
     column: span.column,
-    endLine: span.line,
+    endLine: getOxlintEndLine(diagnostic.filename, span),
     file: normalizeDiagnosticFile(diagnostic.filename),
     line: span.line,
     message: diagnostic.message,
   };
+  return [commentDiagnostic];
 }
 
 function parseOxlintDiagnostics(output: string): CommentDiagnostic[] {
@@ -218,7 +259,7 @@ function parseOxlintDiagnostics(output: string): CommentDiagnostic[] {
   const diagnostics = result.diagnostics.filter(
     (diagnostic) => diagnostic.code === 'legibility(no-unmatched-comments)',
   );
-  return diagnostics.map(toOxlintDiagnostic);
+  return diagnostics.flatMap(toOxlintDiagnostic);
 }
 
 function parseCommentDiagnostics(bin: string, output: string): CommentDiagnostic[] {
@@ -292,11 +333,14 @@ export {
   changedFiles,
   changedLineNumbers,
   getCommentPolicyArgs,
+  getSpanEndLine,
   isDirectRun,
   isLintable,
+  normalizeDiagnosticFile,
   parseAddedLines,
   parseLintChangedArgs,
   resolveExecutable,
+  resolveMergeBase,
   runLinter,
 };
 

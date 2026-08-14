@@ -14,12 +14,12 @@ Use this as the shared workflow for Codex, Claude, and generic agent skill roots
 
 ## Comments
 
-Both presets enforce the same comment-quality rules. Use the session flag to reject all comments while an agent works.
+Both presets enforce the same comment-quality rules. Use the session flag to reject comments added while an agent works.
 
 - Agents do not add source comments by default.
 - Run `npx lint-changed --comments=forbid` during agent sessions.
 - `legibility/no-stacked-comments` rejects adjacent comments.
-- The session flag enables `legibility/no-unmatched-comments` as an error.
+- The session flag enables `legibility/no-unmatched-comments` as an error for new files and added lines.
 - A configured `prefixIdentifiers` or `suffixIdentifiers` value lets ESLint allow a matching comment.
 - An adjacent comment should be updated or removed instead of stacking another comment.
 
