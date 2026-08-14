@@ -23,6 +23,7 @@ const gitEnvironmentVariables = [
   'GIT_SHALLOW_FILE',
   'GIT_WORK_TREE',
 ];
+const gitIdentityArgs = ['-c', 'user.name=Test', '-c', 'user.email=test@example.com'];
 gitEnvironmentVariables.forEach((variable) => delete process.env[variable]);
 const {
   changedFiles,
@@ -55,10 +56,7 @@ function createCleanRepository(): string {
   runGit(repository, ['init', '--quiet']);
   writeFileSync(join(repository, 'check.ts'), 'export const ready = true;\n');
   runGit(repository, ['add', 'check.ts']);
-  const commitArgs = [
-    '-c', 'user.name=Test', '-c', 'user.email=test@example.com',
-    'commit', '--quiet', '-m', 'initial',
-  ];
+  const commitArgs = gitIdentityArgs.concat(['commit', '--quiet', '-m', 'initial']);
   runGit(repository, commitArgs);
   return repository;
 }
@@ -260,7 +258,8 @@ test('lint-changed permits existing comments in pure renames', (context) => {
   context.after(() => rmSync(repository, { recursive: true }));
   writeFileSync(join(repository, 'check.ts'), '// existing context\nexport const ready = true;\n');
   runGit(repository, ['add', 'check.ts']);
-  runGit(repository, ['commit', '--quiet', '--amend', '--no-edit']);
+  const amendArgs = gitIdentityArgs.concat(['commit', '--quiet', '--amend', '--no-edit']);
+  runGit(repository, amendArgs);
   runGit(repository, ['mv', 'check.ts', 'renamed.ts']);
 
   const result = spawnSync(process.execPath, [binPath, 'HEAD', '--comments=forbid'], {
