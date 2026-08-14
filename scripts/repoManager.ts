@@ -6,11 +6,10 @@ import type {
   RepoCommandResult,
   RepoCommandRunner,
   RepoManagerTarget,
-  ValidateMode,
 } from "./types.ts";
 
 const packArgs = ["pack", "--json", "--pack-destination", "./.npm-cache"];
-const repoManagerTargets: ReadonlySet<string> = new Set(["pack", "validate", "validate:compat"]);
+const repoManagerTargets: ReadonlySet<string> = new Set(["pack", "validate"]);
 const validationStart = [
   ["run", "typecheck"],
   ["run", "typecheck:strict"],
@@ -42,9 +41,8 @@ function runNubSteps(
   return runNubSteps(steps, runner, index + 1);
 }
 
-export function getValidationSteps(mode: ValidateMode): string[][] {
-  const testStep = mode === "compat" ? ["run", "test:compat"] : ["run", "test"];
-  return validationStart.concat([testStep], validationEnd);
+export function getValidationSteps(): string[][] {
+  return validationStart.concat([["run", "test"]], validationEnd);
 }
 
 export class Pack {
@@ -60,16 +58,14 @@ export class Pack {
 }
 
 export class Validate {
-  private readonly mode: ValidateMode;
   private readonly runner: RepoCommandRunner;
 
-  constructor(mode: ValidateMode = "default", runner: RepoCommandRunner = runCommand) {
-    this.mode = mode;
+  constructor(runner: RepoCommandRunner = runCommand) {
     this.runner = runner;
   }
 
   run(): number {
-    const steps = getValidationSteps(this.mode);
+    const steps = getValidationSteps();
     return runNubSteps(steps, this.runner);
   }
 }
@@ -90,9 +86,7 @@ export function runRepoManager(
   runner: RepoCommandRunner = runCommand,
 ): number {
   if (target === "pack") return new Pack(runner).run();
-
-  const mode = target === "validate:compat" ? "compat" : "default";
-  return new Validate(mode, runner).run();
+  return new Validate(runner).run();
 }
 
 export function isDirectRun(metaUrl: string, argvPath: string | undefined): boolean {

@@ -33,7 +33,8 @@ function getDenoShebangReports(): RuleReport[] {
 }
 
 test("Deno imports the built plugin", () => {
-  assert.equal(plugin.meta.name, "legibility");
+  assert.equal(plugin.meta.name, "eslint-plugin-legibility");
+  assert.equal(plugin.meta.namespace, "legibility");
   assert.ok(plugin.configs["flat/recommended"].plugins.legibility);
 });
 

@@ -1,13 +1,98 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { isAbsolute, relative, resolve, win32 } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const JS_EXTENSIONS = new Set(['.js', '.ts', '.jsx', '.tsx', '.mjs', '.cjs', '.mts', '.cts']);
 const DEFAULT_DIFF_BASE = 'origin/main';
+const FORBID_COMMENTS_ARG = '--comments=forbid';
+const COMMENTS_ARG_PREFIX = '--comments=';
+const FORBID_COMMENTS_RULE = 'legibility/no-unmatched-comments';
 const NO_LINTERS_MSG = 'lint-changed: no linters found (eslint, oxlint)\n';
 const NO_FILES_MSG = 'No changed JS/TS files.\n';
+
+interface LintChangedOptions {
+  base: string;
+  forbidComments: boolean;
+}
+
+interface SessionPolicyInput {
+  comments: LintChangedOptions;
+  files: {
+    modified: string[];
+    new: string[];
+  };
+  linters: {
+    eslint: string | null;
+    oxlint: string | null;
+  };
+}
+
+interface CommentDiagnostic {
+  column: number;
+  endLine: number;
+  file: string;
+  line: number;
+  message: string;
+}
+
+interface EslintMessage {
+  column: number;
+  endLine?: number;
+  fatal?: boolean;
+  line: number;
+  message: string;
+  ruleId: string | null;
+}
+
+interface EslintResult {
+  filePath: string;
+  messages: EslintMessage[];
+}
+
+interface OxlintDiagnostic {
+  code: string;
+  filename: string;
+  labels: Array<{ span: OxlintSpan }>;
+  message: string;
+  severity: string;
+}
+
+interface OxlintResult {
+  diagnostics: OxlintDiagnostic[];
+}
+
+interface OxlintSpan {
+  column: number;
+  length: number;
+  line: number;
+  offset: number;
+}
+
+interface ParsedCommentPolicy {
+  diagnostics: CommentDiagnostic[];
+  hasFatalError: boolean;
+}
+
+interface CommentPolicyEvaluation {
+  changedLines: ReadonlyMap<string, Set<number>>;
+  newFiles: ReadonlySet<string>;
+  policy: ParsedCommentPolicy;
+  status: number | null;
+  stderr: string;
+}
+
+function parseLintChangedArgs(args: readonly string[]): LintChangedOptions {
+  const commentsArg = args.find((arg) => arg.startsWith(COMMENTS_ARG_PREFIX));
+  const hasUnknownPolicy = commentsArg !== undefined && commentsArg !== FORBID_COMMENTS_ARG;
+  if (hasUnknownPolicy) throw new Error(`Unknown comment policy: ${commentsArg}`);
+
+  const forbidComments = args.includes(FORBID_COMMENTS_ARG);
+  const positionalArgs = args.filter((arg) => !arg.startsWith('--'));
+  const base = positionalArgs[0] ?? DEFAULT_DIFF_BASE;
+  return { base, forbidComments };
+}
 
 function resolveExecutable(name: string): string | null {
   const local = `./node_modules/.bin/${name}`;
@@ -23,20 +108,269 @@ function isLintable(file: string): boolean {
   return JS_EXTENSIONS.has(ext);
 }
 
-function changedFiles(filter: string, base: string): string[] | null {
-  const diffFilter = `--diff-filter=${filter}`;
-  const diffRange = `${base}...HEAD`;
-  const result = spawnSync('git', ['diff', '--name-only', diffFilter, diffRange], { encoding: 'utf8' });
+function readGitFiles(args: string[]): string[] | null {
+  const result = spawnSync('git', args, { encoding: 'utf8' });
   const failed = result.error || result.status !== 0;
   if (failed) return null;
+
   const raw = (result.stdout || '').trim();
   const lines = raw.split('\n');
   return lines.filter(line => line && isLintable(line));
 }
 
+function resolveMergeBase(base: string): string {
+  const result = spawnSync('git', ['merge-base', base, 'HEAD'], { encoding: 'utf8' });
+  const succeeded = !result.error && result.status === 0;
+  if (!succeeded) return base;
+  return result.stdout.trim();
+}
+
+function changedFiles(filter: string, base: string): string[] | null {
+  const diffFilter = `--diff-filter=${filter}`;
+  const mergeBase = resolveMergeBase(base);
+  const trackedFiles = readGitFiles(['diff', '--name-only', diffFilter, mergeBase, '--']);
+  if (trackedFiles === null) return null;
+  if (!filter.includes('A')) return trackedFiles;
+
+  const untrackedFiles = readGitFiles(['ls-files', '--others', '--exclude-standard']);
+  if (untrackedFiles === null) return null;
+  return Array.from(new Set(trackedFiles.concat(untrackedFiles)));
+}
+
+function getHunkLines(line: string): number[] {
+  const hunk = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/);
+  if (!hunk) return [];
+
+  const start = Number(hunk[1]);
+  const count = hunk[2] === undefined ? 1 : Number(hunk[2]);
+  return Array.from({ length: count }, (_, index) => start + index);
+}
+
+function addHunkLines(addedLines: Map<string, Set<number>>, file: string, line: string): void {
+  const hunkLines = getHunkLines(line);
+  const hasHunk = file.length > 0 && hunkLines.length > 0;
+  if (!hasHunk) return;
+
+  const fileLines = new Set(addedLines.get(file));
+  const mergedLines = hunkLines.reduce((lines, lineNumber) => {
+    lines.add(lineNumber);
+    return lines;
+  }, fileLines);
+  addedLines.set(file, mergedLines);
+}
+
+function parseAddedLines(diff: string): Map<string, Set<number>> {
+  const addedLines = new Map<string, Set<number>>();
+  let file = '';
+
+  diff.split('\n').forEach((line) => {
+    if (line.startsWith('+++ b/')) file = line.slice(6);
+    addHunkLines(addedLines, file, line);
+  });
+  return addedLines;
+}
+
+function changedLineNumbers(base: string, files: string[]): Map<string, Set<number>> | null {
+  if (files.length === 0) return new Map();
+
+  const mergeBase = resolveMergeBase(base);
+  const args = ['diff', '--find-renames', '--unified=0', '--no-color', mergeBase, '--'];
+  const result = spawnSync('git', args, { encoding: 'utf8' });
+  const failed = result.error || result.status !== 0;
+  if (failed) return null;
+
+  const changedLines = parseAddedLines(result.stdout || '');
+  const requestedFiles = new Set(files.map(normalizeSeparators));
+  const selectedLines = Array.from(changedLines).filter(([file]) => requestedFiles.has(file));
+  return new Map(selectedLines);
+}
+
 function runLinter(bin: string, args: string[]): number {
   const result = spawnSync(bin, args, { stdio: 'inherit' });
   return result.status ?? 1;
+}
+
+function getCommentRuleArgs(bin: string, forbidComments: boolean): string[] {
+  if (!forbidComments) return [];
+
+  const isOxlint = bin.endsWith('/oxlint') || bin === 'oxlint';
+  if (isOxlint) return ['--deny', FORBID_COMMENTS_RULE];
+  return ['--rule', `${FORBID_COMMENTS_RULE}:error`];
+}
+
+function getCommentPolicyArgs(bin: string, files: string[]): string[] {
+  const isOxlint = bin.endsWith('/oxlint') || bin === 'oxlint';
+  const policyArgs = isOxlint
+    ? ['--no-ignore']
+    : ['--no-ignore', '--no-inline-config', '--exit-on-fatal-error'];
+  const formatArgs = ['--format', 'json'];
+  const commentRuleArgs = getCommentRuleArgs(bin, true);
+  return policyArgs.concat(formatArgs, commentRuleArgs, files);
+}
+
+function normalizeSeparators(file: string): string {
+  return file.replaceAll('\\', '/');
+}
+
+function normalizeDiagnosticFile(file: string, cwd = process.cwd()): string {
+  const isWindowsAbsolute = win32.isAbsolute(file);
+  const isFileAbsolute = isWindowsAbsolute || isAbsolute(file);
+  if (!isFileAbsolute) return normalizeSeparators(file);
+
+  const relativeFile = isWindowsAbsolute ? win32.relative(cwd, file) : relative(cwd, file);
+  return normalizeSeparators(relativeFile);
+}
+
+function toEslintDiagnostic(result: EslintResult, message: EslintMessage): CommentDiagnostic {
+  return {
+    column: message.column,
+    endLine: message.endLine ?? message.line,
+    file: normalizeDiagnosticFile(result.filePath),
+    line: message.line,
+    message: message.message,
+  };
+}
+
+function parseEslintResult(result: EslintResult): CommentDiagnostic[] {
+  return result.messages.flatMap((message) => {
+    const isCommentDiagnostic = message.ruleId === FORBID_COMMENTS_RULE;
+    if (!isCommentDiagnostic) return [];
+    return [toEslintDiagnostic(result, message)];
+  });
+}
+
+function parseEslintPolicy(output: string): ParsedCommentPolicy {
+  const results = JSON.parse(output) as EslintResult[];
+  const diagnostics = results.reduce<CommentDiagnostic[]>((current, result) => {
+    const fileDiagnostics = parseEslintResult(result);
+    return current.concat(fileDiagnostics);
+  }, []);
+  const messages = results.flatMap((result) => result.messages);
+  const hasFatalError = messages.some((message) => message.fatal);
+  return { diagnostics, hasFatalError };
+}
+
+function getSpanEndLine(source: Buffer, span: OxlintSpan): number {
+  const spanEnd = span.offset + span.length;
+  const spanSource = source.subarray(span.offset, spanEnd).toString('utf8');
+  const addedLineCount = spanSource.split('\n').length - 1;
+  return span.line + addedLineCount;
+}
+
+function getOxlintEndLine(filename: string, span: OxlintSpan): number {
+  try {
+    return getSpanEndLine(readFileSync(filename), span);
+  } catch {
+    return span.line;
+  }
+}
+
+function toOxlintDiagnostic(diagnostic: OxlintDiagnostic): CommentDiagnostic[] {
+  const span = diagnostic.labels[0]?.span;
+  if (!span) return [];
+
+  const commentDiagnostic = {
+    column: span.column,
+    endLine: getOxlintEndLine(diagnostic.filename, span),
+    file: normalizeDiagnosticFile(diagnostic.filename),
+    line: span.line,
+    message: diagnostic.message,
+  };
+  return [commentDiagnostic];
+}
+
+function parseOxlintPolicy(output: string): ParsedCommentPolicy {
+  const result = JSON.parse(output) as OxlintResult;
+  const commentDiagnostics = result.diagnostics.filter(
+    (diagnostic) => diagnostic.code === 'legibility(no-unmatched-comments)',
+  );
+  const diagnostics = commentDiagnostics.flatMap(toOxlintDiagnostic);
+  const hasFatalError = result.diagnostics.some((diagnostic) => {
+    const isCommentDiagnostic = diagnostic.code === 'legibility(no-unmatched-comments)';
+    const isError = diagnostic.severity === 'error';
+    const isFatalError = isError && !isCommentDiagnostic;
+    return isFatalError;
+  });
+  return { diagnostics, hasFatalError };
+}
+
+function parseCommentPolicy(bin: string, output: string): ParsedCommentPolicy {
+  const isOxlint = bin.endsWith('/oxlint') || bin === 'oxlint';
+  if (isOxlint) return parseOxlintPolicy(output);
+  return parseEslintPolicy(output);
+}
+
+function intersectsAddedLine(diagnostic: CommentDiagnostic, addedLines: Set<number>): boolean {
+  const lineCount = diagnostic.endLine - diagnostic.line + 1;
+  const lines = Array.from({ length: lineCount }, (_, index) => diagnostic.line + index);
+  return lines.some((line) => addedLines.has(line));
+}
+
+function isSessionComment(
+  diagnostic: CommentDiagnostic,
+  newFiles: ReadonlySet<string>,
+  changedLines: ReadonlyMap<string, Set<number>>,
+): boolean {
+  if (newFiles.has(diagnostic.file)) return true;
+
+  const addedLines = changedLines.get(diagnostic.file) ?? new Set<number>();
+  return intersectsAddedLine(diagnostic, addedLines);
+}
+
+function printCommentDiagnostic(diagnostic: CommentDiagnostic): void {
+  const location = `${diagnostic.file}:${diagnostic.line}:${diagnostic.column}`;
+  process.stderr.write(`${location} ${diagnostic.message}\n`);
+}
+
+function selectCommentViolations(
+  diagnostics: CommentDiagnostic[],
+  newFiles: ReadonlySet<string>,
+  changedLines: ReadonlyMap<string, Set<number>>,
+): CommentDiagnostic[] {
+  return diagnostics.filter((diagnostic) =>
+    isSessionComment(diagnostic, newFiles, changedLines),
+  );
+}
+
+function evaluateCommentPolicy(input: CommentPolicyEvaluation): number {
+  const { changedLines, newFiles, policy, status, stderr } = input;
+  const hasUnexpectedStatus = status === null || status > 1;
+  const hasPolicyFailure = policy.hasFatalError || hasUnexpectedStatus;
+  if (hasPolicyFailure) {
+    process.stderr.write(stderr || 'lint-changed: comment policy failed\n');
+    return 1;
+  }
+
+  const violations = selectCommentViolations(policy.diagnostics, newFiles, changedLines);
+  violations.forEach(printCommentDiagnostic);
+  const hasViolations = violations.length > 0;
+  return Number(hasViolations);
+}
+
+function runCommentPolicy(
+  bin: string,
+  files: string[],
+  newFiles: ReadonlySet<string>,
+  changedLines: ReadonlyMap<string, Set<number>>,
+): number {
+  const args = getCommentPolicyArgs(bin, files);
+  const result = spawnSync(bin, args, { encoding: 'utf8' });
+  if (result.error) return 1;
+
+  try {
+    const policy = parseCommentPolicy(bin, result.stdout || '');
+    const evaluation = {
+      changedLines,
+      newFiles,
+      policy,
+      status: result.status,
+      stderr: result.stderr || '',
+    };
+    return evaluateCommentPolicy(evaluation);
+  } catch {
+    process.stderr.write(result.stderr || 'lint-changed: comment policy failed\n');
+    return 1;
+  }
 }
 
 function isDirectRun(metaUrl: string, argvPath: string | undefined): boolean {
@@ -46,11 +380,54 @@ function isDirectRun(metaUrl: string, argvPath: string | undefined): boolean {
   return argvUrl === metaUrl;
 }
 
-export { isLintable, resolveExecutable, changedFiles, runLinter, isDirectRun };
+export {
+  changedFiles,
+  changedLineNumbers,
+  getCommentPolicyArgs,
+  getSpanEndLine,
+  isDirectRun,
+  isLintable,
+  normalizeDiagnosticFile,
+  parseAddedLines,
+  parseLintChangedArgs,
+  resolveExecutable,
+  resolveMergeBase,
+  runLinter,
+};
+
+function runNewFileLinters(linters: string[], files: string[]): number {
+  if (files.length === 0) return 0;
+
+  process.stdout.write(`+ ${files.length} new file(s) — strict\n`);
+  const codes = linters.map((bin) => runLinter(bin, ['--max-warnings', '0'].concat(files)));
+  return codes.some((code) => code !== 0) ? 1 : 0;
+}
+
+function runModifiedFileLinters(linters: string[], files: string[]): number {
+  if (files.length === 0) return 0;
+
+  process.stdout.write(`~ ${files.length} modified file(s) — warn\n`);
+  const codes = linters.map((bin) => runLinter(bin, files));
+  return codes.some((code) => code !== 0) ? 1 : 0;
+}
+
+function runSessionPolicy(input: SessionPolicyInput): number {
+  const { comments, files, linters } = input;
+  if (!comments.forbidComments) return 0;
+
+  const changedLines = changedLineNumbers(comments.base, files.modified);
+  if (changedLines === null) return 1;
+
+  const policyLinter = linters.eslint ?? linters.oxlint;
+  if (!policyLinter) return 1;
+  const lintFiles = files.new.concat(files.modified);
+  return runCommentPolicy(policyLinter, lintFiles, new Set(files.new), changedLines);
+}
 
 const isMain = isDirectRun(import.meta.url, process.argv[1]);
 if (isMain) {
-  const base = process.argv[2] || DEFAULT_DIFF_BASE;
+  const options = parseLintChangedArgs(process.argv.slice(2));
+  const { base } = options;
   const eslint = resolveExecutable('eslint');
   const oxlint = resolveExecutable('oxlint');
   const linters = [eslint, oxlint].filter((x): x is string => x !== null);
@@ -70,10 +447,8 @@ if (isMain) {
     process.exit(1);
   }
 
-  const newFileCount = newFiles.length;
-  const modifiedFileCount = modifiedFiles.length;
-  const hasNewFiles = newFileCount > 0;
-  const hasModifiedFiles = modifiedFileCount > 0;
+  const hasNewFiles = newFiles.length > 0;
+  const hasModifiedFiles = modifiedFiles.length > 0;
   const hasFiles = hasNewFiles || hasModifiedFiles;
 
   if (!hasFiles) {
@@ -81,21 +456,13 @@ if (isMain) {
     process.exit(0);
   }
 
-  let exitCode = 0;
-
-  if (hasNewFiles) {
-    const newFilesMsg = `+ ${newFileCount} new file(s) — strict\n`;
-    process.stdout.write(newFilesMsg);
-    const codes = linters.map(bin => runLinter(bin, ['--max-warnings', '0'].concat(newFiles)));
-    const anyFailed = codes.some(code => code !== 0);
-    if (anyFailed) exitCode = 1;
-  }
-
-  if (hasModifiedFiles) {
-    const modifiedFilesMsg = `~ ${modifiedFileCount} modified file(s) — warn\n`;
-    process.stdout.write(modifiedFilesMsg);
-    linters.forEach(bin => runLinter(bin, modifiedFiles));
-  }
-
-  process.exit(exitCode);
+  const newFileExitCode = runNewFileLinters(linters, newFiles);
+  const modifiedFileExitCode = runModifiedFileLinters(linters, modifiedFiles);
+  const sessionPolicyInput = {
+    comments: options,
+    files: { modified: modifiedFiles, new: newFiles },
+    linters: { eslint, oxlint },
+  };
+  const policyExitCode = runSessionPolicy(sessionPolicyInput);
+  process.exit(Math.max(newFileExitCode, modifiedFileExitCode, policyExitCode));
 }

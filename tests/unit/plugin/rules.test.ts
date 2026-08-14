@@ -1,11 +1,19 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { readdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
-import test from "node:test";
+import test, { type TestContext } from "node:test";
 import { pathToFileURL } from "node:url";
 
 import manifest from "../../../package.json" with { type: "json" };
+import {
+  COMMENT_RULE_NAMES,
+  OPT_IN_RULE_NAMES,
+  RECOMMENDED_RULE_NAMES,
+  STRICT_ONLY_RULE_NAMES,
+} from "../../../dist/constants.js";
+import type { RuleModule } from "../../../src/types.ts";
 
 const require = createRequire(import.meta.url);
 const plugin = (await import(pathToFileURL(join(process.cwd(), "dist", "index.js")).href))
@@ -232,7 +240,8 @@ function arrow(params: any[], body: any): any {
 }
 
 test("exports an ESLint and Oxlint compatible plugin shape", () => {
-  assert.equal(plugin.meta.name, "legibility");
+  assert.equal(plugin.meta.name, "eslint-plugin-legibility");
+  assert.equal(plugin.meta.namespace, "legibility");
   assert.equal(plugin.meta.version, manifest.version);
   assert.ok(plugin.rules["max-expression-operators"]);
   assert.ok(plugin.rules["max-function-parameters"]);
@@ -254,11 +263,11 @@ test("exports an ESLint and Oxlint compatible plugin shape", () => {
   );
   assert.deepEqual(plugin.configs["flat/recommended"].rules.complexity, [
     "warn",
-    { max: 20, variant: "classic" },
+    20,
   ]);
   assert.deepEqual(plugin.configs["flat/strict"].rules.complexity, [
     "error",
-    { max: 20, variant: "classic" },
+    20,
   ]);
   const maxLinesOptions = {
     max: 40,
@@ -274,21 +283,75 @@ test("exports an ESLint and Oxlint compatible plugin shape", () => {
     "error",
     maxLinesOptions,
   ]);
-  const commentRuleNames = [
-    "no-automated-comment-attribution",
-    "no-stacked-comments",
-    "no-unmatched-comments",
-    "require-jsdoc-multiline-comments",
-  ];
-  commentRuleNames.forEach((ruleName) => {
+  COMMENT_RULE_NAMES.forEach((ruleName) => {
+    const ruleId = `legibility/${ruleName}`;
+    assert.equal(plugin.rules[ruleName].meta.docs.recommended, true);
+    assert.equal(plugin.configs["flat/recommended"].rules[ruleId], "warn");
+    assert.equal(plugin.configs["flat/strict"].rules[ruleId], "error");
+  });
+  OPT_IN_RULE_NAMES.forEach((ruleName) => {
     const ruleId = `legibility/${ruleName}`;
     assert.equal(plugin.rules[ruleName].meta.docs.recommended, false);
     assert.equal(plugin.configs["flat/recommended"].rules[ruleId], undefined);
     assert.equal(plugin.configs["flat/strict"].rules[ruleId], undefined);
   });
-  assert.equal(plugin.configs.recommended.plugins[0], "legibility");
+  RECOMMENDED_RULE_NAMES.forEach((ruleName) => {
+    const ruleId = `legibility/${ruleName}`;
+    assert.equal(plugin.rules[ruleName].meta.docs.recommended, true);
+    assert.equal(plugin.configs["flat/recommended"].rules[ruleId], "warn");
+    assert.equal(plugin.configs["flat/strict"].rules[ruleId], "error");
+  });
+  STRICT_ONLY_RULE_NAMES.forEach((ruleName) => {
+    const ruleId = `legibility/${ruleName}`;
+    assert.equal(plugin.rules[ruleName].meta.docs.recommended, false);
+    assert.equal(plugin.configs["flat/recommended"].rules[ruleId], undefined);
+    assert.equal(plugin.configs["flat/strict"].rules[ruleId], "error");
+  });
+  const categorizedRules = RECOMMENDED_RULE_NAMES.concat(
+    COMMENT_RULE_NAMES,
+    STRICT_ONLY_RULE_NAMES,
+    Array.from(OPT_IN_RULE_NAMES),
+  ).toSorted();
+  assert.deepEqual(categorizedRules, Object.keys(plugin.rules).toSorted());
+  assert.deepEqual(Object.keys(plugin.configs).sort(), [
+    "flat/recommended",
+    "flat/strict",
+    "oxlint/recommended",
+    "oxlint/strict",
+  ]);
   assert.equal(requiredPlugin, plugin);
-  assert.equal(requiredPlugin.meta.name, "legibility");
+  assert.equal(requiredPlugin.meta.name, "eslint-plugin-legibility");
+  assert.equal(requiredPlugin.meta.namespace, "legibility");
+});
+
+test("Oxlint presets mirror the ESLint rules and register the plugin", () => {
+  const recommended = plugin.configs["oxlint/recommended"];
+  const strict = plugin.configs["oxlint/strict"];
+  const jsPlugins = [{ name: "legibility", specifier: "eslint-plugin-legibility" }];
+
+  assert.deepEqual(recommended.jsPlugins, jsPlugins);
+  assert.deepEqual(strict.jsPlugins, jsPlugins);
+  assert.deepEqual(recommended.rules, plugin.configs["flat/recommended"].rules);
+  assert.deepEqual(strict.rules, plugin.configs["flat/strict"].rules);
+  assert.notEqual(recommended.rules, plugin.configs["flat/recommended"].rules);
+  assert.notEqual(strict.rules, plugin.configs["flat/strict"].rules);
+});
+
+test("createOnce exposes the same visitor events as ESLint create", () => {
+  const pluginRules = plugin.rules as Record<string, RuleModule>;
+  const createOnceRules = Object.values(pluginRules).filter((rule) => rule.createOnce);
+
+  createOnceRules.forEach((rule) => {
+    const { context } = createContext();
+    const createOnce = rule.createOnce;
+    assert.ok(createOnce);
+    const eslintListenerNames = Object.keys(rule.create(context)).toSorted();
+    const oxlintListenerNames = Object.keys(createOnce(context)).toSorted();
+
+    assert.deepEqual(oxlintListenerNames, eslintListenerNames);
+  });
+
+  assert.equal(createOnceRules.length, 12);
 });
 
 test("max-function-parameters reports functions with too many positional parameters", () => {
@@ -486,6 +549,25 @@ test("require-jsdoc-multiline-comments reports ordinary multiline blocks", () =>
 
   assert.equal(reports.length, 1);
   assert.equal(reports[0].messageId, "useJsdoc");
+  assert.equal(typeof reports[0].fix, "function");
+  assert.equal(plugin.rules["require-jsdoc-multiline-comments"].meta.fixable, "code");
+});
+
+test("require-jsdoc-multiline-comments autofixes the block opener", async () => {
+  const { Linter } = await import("eslint");
+  const linter = new Linter({ configType: "flat" });
+  const source = ["/*", " * Explain the API contract.", " */", "const value = true;"].join("\n");
+  const rules: Record<string, "error"> = {
+    "legibility/require-jsdoc-multiline-comments": "error",
+  };
+  const config = [{ plugins: { legibility: plugin }, rules }];
+
+  const result = linter.verifyAndFix(source, config, { filename: "src/check.js" });
+  const expected = ["/**", " * Explain the API contract.", " */", "const value = true;"].join("\n");
+
+  assert.equal(result.fixed, true);
+  assert.equal(result.output, expected);
+  assert.equal(result.messages.length, 0);
 });
 
 test("no-automated-comment-attribution reports signatures and prohibited authors", () => {
@@ -537,70 +619,108 @@ test("no-automated-comment-attribution supports custom identifiers", () => {
   assert.equal(reports[0].data.identifier, "robot");
 });
 
-test("require-filename-matches-dirname reports filename unrelated to parent dir", () => {
-  const { visitor, reports } = createRule("require-filename-matches-dirname", [{ minDepth: 2 }], {
-    filename: "/repo/src/components/foo/useAuth.ts",
+function lintFilename(filename: string, options: any): any[] {
+  const { visitor, reports } = createRule("require-filename-matches-dirname", [options], {
     cwd: "/repo",
+    filename,
   });
   visitor.Program({ type: "Program" });
+  return reports;
+}
+
+test("require-filename-matches-dirname requires a schema", () => {
+  const reports = lintFilename("/repo/src/components/foo/index.ts", { minDepth: 2 });
+
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].messageId, "missingSchema");
+});
+
+test("require-filename-matches-dirname enforces the dirname schema", () => {
+  const options = { schema: "dirname", minDepth: 2 };
+  const unrelatedReports = lintFilename("/repo/src/components/foo/useAuth.ts", options);
+  const qualifierReports = lintFilename("/repo/src/components/foo/foo.effect.ts", options);
+
+  assert.equal(unrelatedReports[0].messageId, "mismatch");
+  assert.equal(qualifierReports[0].messageId, "mismatch");
+});
+
+test("require-filename-matches-dirname accepts dirname schema patterns", () => {
+  const options = { schema: "dirname", minDepth: 2 };
+  const filenames = ["foo.ts", "foo.utils.tsx", "index.ts"];
+  const reportCounts = filenames.map((name) =>
+    lintFilename(`/repo/src/components/foo/${name}`, options).length,
+  );
+
+  assert.deepEqual(reportCounts, [0, 0, 0]);
+});
+
+test("require-filename-matches-dirname accepts dirname schema overrides", () => {
+  const options = {
+    schema: "dirname",
+    minDepth: 2,
+    allowedQualifiers: ["effect"],
+    allowedFilenames: ["schema"],
+  };
+  const effectReports = lintFilename("/repo/src/components/foo/foo.effect.ts", options);
+  const schemaReports = lintFilename("/repo/src/components/foo/schema.ts", options);
+
+  assert.equal(effectReports.length, 0);
+  assert.equal(schemaReports.length, 0);
+});
+
+test("require-filename-matches-dirname accepts the index schema", () => {
+  const options = { schema: "index", minDepth: 2 };
+  const filenames = [
+    "constants.ts",
+    "index.tsx",
+    "index.test.ts",
+    "types.ts",
+    "utils.tsx",
+    "utils.test.tsx",
+  ];
+  const reportCounts = filenames.map((name) =>
+    lintFilename(`/repo/src/components/foo/${name}`, options).length,
+  );
+
+  assert.deepEqual(reportCounts, [0, 0, 0, 0, 0, 0]);
+});
+
+test("require-filename-matches-dirname rejects dirname patterns under the index schema", () => {
+  const options = { schema: "index", minDepth: 2 };
+  const reports = lintFilename("/repo/src/components/button/button.test.ts", options);
+
   assert.equal(reports.length, 1);
   assert.equal(reports[0].messageId, "mismatch");
 });
 
-test("require-filename-matches-dirname reports unknown qualifier", () => {
-  const { visitor, reports } = createRule("require-filename-matches-dirname", [{ minDepth: 2 }], {
-    filename: "/repo/src/components/foo/foo.effect.ts",
-    cwd: "/repo",
-  });
-  visitor.Program({ type: "Program" });
-  assert.equal(reports.length, 1);
-  assert.equal(reports[0].messageId, "unknownQualifier");
-});
+test("require-filename-matches-dirname supports custom schemas", () => {
+  const patterns = ["{dirname}.effect", "schema", "schema.test"];
+  const options = { schema: "custom", minDepth: 2, patterns };
+  const effectReports = lintFilename("/repo/src/components/foo/foo.effect.ts", options);
+  const schemaReports = lintFilename("/repo/src/components/foo/schema.test.tsx", options);
+  const indexReports = lintFilename("/repo/src/components/foo/index.ts", options);
 
-test("require-filename-matches-dirname allows filename matching dir", () => {
-  const { visitor, reports } = createRule("require-filename-matches-dirname", [{ minDepth: 2 }], {
-    filename: "/repo/src/components/foo/foo.ts",
-    cwd: "/repo",
-  });
-  visitor.Program({ type: "Program" });
-  assert.equal(reports.length, 0);
-});
-
-test("require-filename-matches-dirname allows approved qualifier", () => {
-  const { visitor, reports } = createRule("require-filename-matches-dirname", [{ minDepth: 2 }], {
-    filename: "/repo/src/components/foo/foo.utils.ts",
-    cwd: "/repo",
-  });
-  visitor.Program({ type: "Program" });
-  assert.equal(reports.length, 0);
-});
-
-test("require-filename-matches-dirname allows standalone allowlist filenames", () => {
-  const { visitor, reports } = createRule("require-filename-matches-dirname", [{ minDepth: 2 }], {
-    filename: "/repo/src/components/foo/index.ts",
-    cwd: "/repo",
-  });
-  visitor.Program({ type: "Program" });
-  assert.equal(reports.length, 0);
+  assert.equal(effectReports.length, 0);
+  assert.equal(schemaReports.length, 0);
+  assert.equal(indexReports.length, 1);
 });
 
 test("require-filename-matches-dirname exempts files below minDepth", () => {
-  const { visitor, reports } = createRule("require-filename-matches-dirname", [{ minDepth: 3 }], {
-    filename: "/repo/src/hooks/useAuth.ts",
-    cwd: "/repo",
-  });
-  visitor.Program({ type: "Program" });
+  const options = { schema: "index", minDepth: 3 };
+  const reports = lintFilename("/repo/src/hooks/useAuth.ts", options);
+
   assert.equal(reports.length, 0);
 });
 
-test("require-filename-matches-dirname allows custom qualifier via config", () => {
-  const { visitor, reports } = createRule(
-    "require-filename-matches-dirname",
-    [{ minDepth: 2, allowedQualifiers: ["utils", "types", "effect"] }],
-    { filename: "/repo/src/components/foo/foo.effect.ts", cwd: "/repo" },
-  );
-  visitor.Program({ type: "Program" });
-  assert.equal(reports.length, 0);
+test("require-filename-matches-dirname validates the required schema option", async () => {
+  const { Linter } = await import("eslint");
+  const linter = new Linter({ configType: "flat" });
+  const ruleConfig: ["error", Record<string, never>] = ["error", {}];
+  const rules = { "legibility/require-filename-matches-dirname": ruleConfig };
+  const config = [{ plugins: { legibility: plugin }, rules }];
+  const verify = () => linter.verify("const value = true;", config);
+
+  assert.throws(verify, /required property 'schema'/);
 });
 
 test("no-mixed-filename-casing reports hyphen mixed with uppercase", () => {
@@ -1586,33 +1706,247 @@ test("comment rules work through ESLint Linter when ESLint is installed", async 
   );
 });
 
-test("oxlint can load the package as a JS plugin when oxlint is installed", (t) => {
+interface LintDiagnostic {
+  code: string;
+  severity: string;
+}
+
+interface LintFixtureCase {
+  directory: string;
+  expected: LintDiagnostic[];
+  invalidFiles: string[];
+  invalidStatus: number;
+  validFiles: string[];
+}
+
+const defaultFixtureRuleNames = [
+  "max-function-parameters",
+  "no-complex-ternaries",
+  "prefer-early-return",
+  "prefer-flat-map",
+  "prefer-object-lookup",
+];
+const recommendedFixtureRuleNames = RECOMMENDED_RULE_NAMES.concat(COMMENT_RULE_NAMES);
+const strictFixtureRuleNames = recommendedFixtureRuleNames.concat(STRICT_ONLY_RULE_NAMES);
+const optInFixtureRuleNames = strictFixtureRuleNames.concat(Array.from(OPT_IN_RULE_NAMES));
+
+function createFixtureDiagnostics(
+  engine: "eslint" | "oxlint",
+  ruleNames: readonly string[],
+  severity: string,
+): LintDiagnostic[] {
+  return ruleNames
+    .map((ruleName) => {
+      const code = engine === "eslint" ? `legibility/${ruleName}` : `legibility(${ruleName})`;
+      return { code, severity };
+    })
+    .toSorted((left, right) => left.code.localeCompare(right.code));
+}
+
+function assertFixtureFilesCovered(engine: "eslint" | "oxlint", fixture: LintFixtureCase): void {
+  const fixtureRoot = join("tests", "fixtures", engine, fixture.directory);
+  const configName = `${engine}.config.ts`;
+  const sourceFiles = readdirSync(fixtureRoot)
+    .filter((file) => file.endsWith(".ts") && file !== configName)
+    .toSorted();
+  const coveredFiles = fixture.invalidFiles.concat(fixture.validFiles).toSorted();
+  assert.deepEqual(coveredFiles, sourceFiles);
+}
+
+interface OxlintFixtureResult {
+  diagnostics: LintDiagnostic[];
+  error: Error | undefined;
+  status: number | null;
+  stderr: string;
+}
+
+function runOxlintFixture(directory: string, filenames: readonly string[]): OxlintFixtureResult {
+  const oxlintName = process.platform === "win32" ? "oxlint.cmd" : "oxlint";
+  const oxlintPath = join(process.cwd(), "node_modules", ".bin", oxlintName);
+  const fixtureRoot = join("tests", "fixtures", "oxlint", directory);
+  const configPath = join(fixtureRoot, "oxlint.config.ts");
+  const sourcePaths = filenames.map((filename) => join(fixtureRoot, filename));
   const result = spawnSync(
-    process.platform === "win32" ? "nubx.cmd" : "nubx",
-    [
-      "oxlint",
-      "--config",
-      "tests/fixtures/oxlint/oxlint.fixture.json",
-      "tests/fixtures/oxlint/bad.ts",
-    ],
+    oxlintPath,
+    ["--config", configPath, "--format", "json"].concat(sourcePaths),
     { encoding: "utf8" },
   );
+  const output: { diagnostics: LintDiagnostic[] } = result.stdout
+    ? JSON.parse(result.stdout)
+    : { diagnostics: [] };
+  return {
+    diagnostics: output.diagnostics,
+    error: result.error,
+    status: result.status,
+    stderr: result.stderr,
+  };
+}
 
-  const spawnError = result.error as NodeJS.ErrnoException | undefined;
+function getOxlintDiagnostics(diagnostics: LintDiagnostic[]): LintDiagnostic[] {
+  const pluginDiagnostics = diagnostics
+    .filter((diagnostic) => diagnostic.code.startsWith("legibility("))
+    .map(({ code, severity }) => ({ code, severity }));
+  return uniqueDiagnostics(pluginDiagnostics);
+}
+
+function uniqueDiagnostics(diagnostics: LintDiagnostic[]): LintDiagnostic[] {
+  const entries = diagnostics.map((diagnostic) => [diagnostic.code, diagnostic] as const);
+  return Array.from(new Map(entries).values()).toSorted((left, right) =>
+    left.code.localeCompare(right.code),
+  );
+}
+
+const oxlintFixtureCases: LintFixtureCase[] = [
+  {
+    directory: "default",
+    expected: createFixtureDiagnostics("oxlint", defaultFixtureRuleNames, "error"),
+    invalidFiles: ["invalid.ts"],
+    invalidStatus: 1,
+    validFiles: ["valid.ts"],
+  },
+  {
+    directory: "recommended",
+    expected: createFixtureDiagnostics("oxlint", recommendedFixtureRuleNames, "warning"),
+    invalidFiles: ["features.ts", "invalid.ts", "mixed-File.ts"],
+    invalidStatus: 0,
+    validFiles: ["valid.ts"],
+  },
+  {
+    directory: "strict",
+    expected: createFixtureDiagnostics("oxlint", strictFixtureRuleNames, "error"),
+    invalidFiles: ["features.ts", "invalid.ts", "mixed-File.ts"],
+    invalidStatus: 1,
+    validFiles: ["valid.ts"],
+  },
+  {
+    directory: "opt-in",
+    expected: createFixtureDiagnostics("oxlint", optInFixtureRuleNames, "error"),
+    invalidFiles: ["button.ts", "features.ts", "mixed-File.ts"],
+    invalidStatus: 1,
+    validFiles: ["index.ts"],
+  },
+];
+
+oxlintFixtureCases.forEach((fixture) => {
+  test(`oxlint ${fixture.directory} fixture enforces its config`, (t) => {
+    assertFixtureFilesCovered("oxlint", fixture);
+    const invalidResult = runOxlintFixture(fixture.directory, fixture.invalidFiles);
+    const spawnError = invalidResult.error as NodeJS.ErrnoException | undefined;
+    if (spawnError?.code === "ENOENT") {
+      t.skip("Oxlint is not installed");
+      return;
+    }
+
+    assert.equal(invalidResult.stderr, "");
+    assert.equal(invalidResult.status, fixture.invalidStatus);
+    assert.deepEqual(getOxlintDiagnostics(invalidResult.diagnostics), fixture.expected);
+    const validResult = runOxlintFixture(fixture.directory, fixture.validFiles);
+    assert.equal(validResult.status, 0);
+    assert.deepEqual(getOxlintDiagnostics(validResult.diagnostics), []);
+  });
+});
+
+interface EslintMessage {
+  ruleId: string | null;
+  severity: number;
+}
+
+interface EslintFileResult {
+  messages: EslintMessage[];
+}
+
+interface EslintFixtureResult {
+  error: Error | undefined;
+  results: EslintFileResult[];
+  status: number | null;
+  stderr: string;
+}
+
+function createEslintArgs(fixtureRoot: string, filenames: readonly string[]): string[] {
+  const configPath = join(fixtureRoot, "eslint.config.ts");
+  const sourcePaths = filenames.map((filename) => join(fixtureRoot, filename));
+  return ["--config", configPath, "--format", "json"].concat(sourcePaths);
+}
+
+function runEslintFixture(directory: string, filenames: readonly string[]): EslintFixtureResult {
+  const eslintName = process.platform === "win32" ? "eslint.cmd" : "eslint";
+  const eslintPath = join(process.cwd(), "node_modules", ".bin", eslintName);
+  const fixtureRoot = join("tests", "fixtures", "eslint", directory);
+  const args = createEslintArgs(fixtureRoot, filenames);
+  const result = spawnSync(eslintPath, args, { encoding: "utf8" });
+  const results: EslintFileResult[] = result.stdout ? JSON.parse(result.stdout) : [];
+  return { error: result.error, results, status: result.status, stderr: result.stderr };
+}
+
+function getEslintSeverity(severity: number): string {
+  if (severity === 2) return "error";
+  return "warning";
+}
+
+function normalizeEslintMessage(message: EslintMessage): LintDiagnostic {
+  const code = message.ruleId ?? "";
+  const severity = getEslintSeverity(message.severity);
+  return { code, severity };
+}
+
+function getEslintDiagnostics(results: EslintFileResult[]): LintDiagnostic[] {
+  const pluginDiagnostics = results
+    .flatMap((result) => result.messages)
+    .filter((message) => message.ruleId?.startsWith("legibility/"))
+    .map(normalizeEslintMessage);
+  return uniqueDiagnostics(pluginDiagnostics);
+}
+
+const eslintFixtureCases: LintFixtureCase[] = [
+  {
+    directory: "default",
+    expected: createFixtureDiagnostics("eslint", defaultFixtureRuleNames, "error"),
+    invalidFiles: ["invalid.ts"],
+    invalidStatus: 1,
+    validFiles: ["valid.ts"],
+  },
+  {
+    directory: "recommended",
+    expected: createFixtureDiagnostics("eslint", recommendedFixtureRuleNames, "warning"),
+    invalidFiles: ["features.ts", "invalid.ts", "mixed-File.ts"],
+    invalidStatus: 0,
+    validFiles: ["valid.ts"],
+  },
+  {
+    directory: "strict",
+    expected: createFixtureDiagnostics("eslint", strictFixtureRuleNames, "error"),
+    invalidFiles: ["features.ts", "invalid.ts", "mixed-File.ts"],
+    invalidStatus: 1,
+    validFiles: ["valid.ts"],
+  },
+  {
+    directory: "opt-in",
+    expected: createFixtureDiagnostics("eslint", optInFixtureRuleNames, "error"),
+    invalidFiles: ["button.ts", "features.ts", "mixed-File.ts"],
+    invalidStatus: 1,
+    validFiles: ["index.ts"],
+  },
+];
+
+function verifyEslintFixture(fixture: LintFixtureCase, t: TestContext): void {
+  assertFixtureFilesCovered("eslint", fixture);
+  const invalidResult = runEslintFixture(fixture.directory, fixture.invalidFiles);
+  const spawnError = invalidResult.error as NodeJS.ErrnoException | undefined;
   if (spawnError?.code === "ENOENT") {
-    t.skip("Nub is not installed");
+    t.skip("ESLint is not installed");
     return;
   }
 
-  const output = `${result.stdout}\n${result.stderr}`;
-  if (output.includes('Command "oxlint" not found')) {
-    t.skip("Oxlint is not installed");
-    return;
-  }
+  assert.equal(invalidResult.stderr, "");
+  assert.equal(invalidResult.status, fixture.invalidStatus);
+  assert.deepEqual(getEslintDiagnostics(invalidResult.results), fixture.expected);
+  const validResult = runEslintFixture(fixture.directory, fixture.validFiles);
+  assert.equal(validResult.status, 0);
+  assert.deepEqual(getEslintDiagnostics(validResult.results), []);
+}
 
-  assert.notEqual(result.status, 0);
-  assert.match(output, /legibility(?:\/|\()prefer-early-return/);
-  assert.match(output, /legibility(?:\/|\()no-unmatched-comments/);
-  assert.match(output, /complexity/);
-  assert.match(output, /max-lines-per-function/);
+eslintFixtureCases.forEach((fixture) => {
+  test(`eslint ${fixture.directory} fixture enforces its config`, (t) => {
+    verifyEslintFixture(fixture, t);
+  });
 });

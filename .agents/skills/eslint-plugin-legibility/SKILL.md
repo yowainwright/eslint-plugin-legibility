@@ -14,12 +14,15 @@ Use this as the shared workflow for Codex, Claude, and generic agent skill roots
 
 ## Comments
 
-Use `legibility/no-unmatched-comments` without options to reject comments by default.
+Both presets enforce the same comment-quality rules. Use the session flag to reject comments added while an agent works.
 
 - Agents do not add source comments by default.
+- Run `npx lint-changed --comments=forbid` during agent sessions.
+- `legibility/no-stacked-comments` rejects adjacent comments.
+- The session flag enables `legibility/no-unmatched-comments` as an error for new files and added lines.
+- ESLint disable directives cannot suppress the session policy.
 - A configured `prefixIdentifiers` or `suffixIdentifiers` value lets ESLint allow a matching comment.
-- Use `matchers` and the other comment rules for additional repository-specific controls.
-- `legibility/no-stacked-comments` means an adjacent comment should be updated or removed instead of adding another.
+- An adjacent comment should be updated or removed instead of stacking another comment.
 
 ## Package Install
 
@@ -39,9 +42,9 @@ npx eslint-plugin-legibility-install-skill --target claude
 ## Developer Cleanup Loop
 
 1. Inspect the changed JavaScript and TypeScript files before editing.
-2. Run changed-file linting:
+2. Run changed-file linting with the agent comment policy:
    ```sh
-   npx lint-changed
+   npx lint-changed --comments=forbid
    ```
 3. Pass a base ref when the branch does not target `origin/main`:
    ```sh
@@ -58,7 +61,7 @@ npx eslint-plugin-legibility-install-skill --target claude
    - Keep functions at 40 nonblank, non-comment lines or fewer.
    - Keep JSX and object literals free of hidden complex logic.
 
-5. Re-run `npx lint-changed` until the touched files are clean or only documented unrelated failures remain.
+5. Re-run `npx lint-changed --comments=forbid` until the touched files are clean or only documented unrelated failures remain.
 
 Do not run `eslint .`, `nub run lint`, or `oxlint .` for the cleanup loop unless the user asks for full-repo validation.
 

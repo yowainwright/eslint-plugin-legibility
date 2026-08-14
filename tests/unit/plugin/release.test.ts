@@ -74,12 +74,24 @@ test("publish workflow uses npm trusted publishing", () => {
   assert.doesNotMatch(publishWorkflow, /secrets\.(NODE_AUTH_TOKEN|NPM_TOKEN)/);
 });
 
-test("ci workflow runs Bun and Deno compatibility suites", () => {
+test("ci workflow covers supported runtimes and linter hosts", () => {
+  assert.match(ciWorkflow, /node: \[22, 24, 26\]/);
+  assert.match(ciWorkflow, /eslint: "8\.57\.1"/);
+  assert.match(ciWorkflow, /eslint: "10\.8\.1"/);
+  assert.match(ciWorkflow, /oxlint: "1\.55\.0"/);
   assert.match(ciWorkflow, /name: bun/);
   assert.match(ciWorkflow, /nub run test:bun/);
   assert.match(ciWorkflow, /name: deno/);
   assert.match(ciWorkflow, /denoland\/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed/);
   assert.match(ciWorkflow, /nub run test:deno/);
+});
+
+test("package metadata declares supported runtimes and optional linter hosts", () => {
+  assert.equal(manifest.engines.node, ">=22.12 <27");
+  assert.equal(manifest.peerDependencies.eslint, "^8.57.0 || ^9.0.0 || ^10.0.0");
+  assert.equal(manifest.peerDependencies.oxlint, ">=1.55.0 <2");
+  assert.equal(manifest.peerDependenciesMeta.eslint.optional, true);
+  assert.equal(manifest.peerDependenciesMeta.oxlint.optional, true);
 });
 
 test("update workflow maintains dependencies and override metadata", () => {

@@ -7,7 +7,6 @@ import { pathToFileURL } from "node:url";
 
 import {
   buildTestRunPlan,
-  getTestFileExtension,
   isDirectRun,
   isTestRunMode,
   listTestFiles,
@@ -24,7 +23,6 @@ function createTempDirectory(): string {
 
 test("parses known test run modes", () => {
   assert.equal(isTestRunMode("node-ts"), true);
-  assert.equal(isTestRunMode("node-js"), true);
   assert.equal(isTestRunMode("coverage"), true);
   assert.equal(isTestRunMode("bun-ts"), true);
   assert.equal(isTestRunMode("deno-ts"), true);
@@ -35,7 +33,6 @@ test("parses known test run modes", () => {
 
 test("builds test run plans for each runtime", () => {
   const nodeTsPlan = buildTestRunPlan("node-ts");
-  const nodeJsPlan = buildTestRunPlan("node-js");
   const bunPlan = buildTestRunPlan("bun-ts");
   const denoPlan = buildTestRunPlan("deno-ts");
   const coveragePlan = buildTestRunPlan("coverage");
@@ -43,22 +40,13 @@ test("builds test run plans for each runtime", () => {
   assert.equal(nodeTsPlan.command, process.execPath);
   assert.deepEqual(nodeTsPlan.args, ["--test"]);
   assert.deepEqual(nodeTsPlan.testDirectories, ["tests/unit", "tests/scripts"]);
-  assert.deepEqual(nodeJsPlan.testDirectories, [".build/tests/unit", ".build/tests/scripts"]);
   assert.equal(bunPlan.command, "bun");
   assert.deepEqual(bunPlan.args, ["test"]);
   assert.equal(denoPlan.command, "deno");
   assert.deepEqual(denoPlan.args, ["test", "--no-config", "--no-check", "--no-remote"]);
   assert.deepEqual(denoPlan.testDirectories, ["tests/compat"]);
-  assert.deepEqual(coveragePlan.testDirectories, [".build/tests/unit", ".build/tests/scripts"]);
+  assert.deepEqual(coveragePlan.testDirectories, ["tests/unit", "tests/scripts"]);
   assert.equal(coveragePlan.coverageFile, "coverage/lcov.info");
-});
-
-test("selects extensions for source and compiled tests", () => {
-  assert.equal(getTestFileExtension("node-ts"), ".test.ts");
-  assert.equal(getTestFileExtension("bun-ts"), ".test.ts");
-  assert.equal(getTestFileExtension("deno-ts"), ".test.ts");
-  assert.equal(getTestFileExtension("node-js"), ".test.js");
-  assert.equal(getTestFileExtension("coverage"), ".test.js");
 });
 
 test("detects direct script execution with resolved file URLs", () => {
@@ -81,13 +69,13 @@ test("lists matching test files recursively in sorted order", () => {
 
   try {
     mkdirSync(nestedDirectory);
-    writeFileSync(join(directory, "z.test.js"), "");
-    writeFileSync(join(directory, "a.test.ts"), "");
-    writeFileSync(join(nestedDirectory, "b.test.js"), "");
+    writeFileSync(join(directory, "z.test.ts"), "");
+    writeFileSync(join(directory, "a.ts"), "");
+    writeFileSync(join(nestedDirectory, "b.test.ts"), "");
 
-    assert.deepEqual(listTestFiles(directory, ".test.js"), [
-      join(directory, "nested", "b.test.js"),
-      join(directory, "z.test.js"),
+    assert.deepEqual(listTestFiles(directory, ".test.ts"), [
+      join(directory, "nested", "b.test.ts"),
+      join(directory, "z.test.ts"),
     ]);
   } finally {
     rmSync(directory, { force: true, recursive: true });
@@ -129,15 +117,15 @@ test("runs a test plan with sorted files and remaps passing coverage", () => {
 
   try {
     mkdirSync(testDirectory, { recursive: true });
-    writeFileSync(join(testDirectory, "b.test.js"), "");
-    writeFileSync(join(testDirectory, "a.test.js"), "");
+    writeFileSync(join(testDirectory, "b.test.ts"), "");
+    writeFileSync(join(testDirectory, "a.test.ts"), "");
 
-    assert.equal(runTestPlan(plan, ".test.js", commandRunner), 0);
+    assert.equal(runTestPlan(plan, commandRunner), 0);
     assert.equal(recordedCommand, "node");
     assert.deepEqual(recordedArgs, [
       "--test",
-      join(testDirectory, "a.test.js"),
-      join(testDirectory, "b.test.js"),
+      join(testDirectory, "a.test.ts"),
+      join(testDirectory, "b.test.ts"),
     ]);
     assert.equal(readFileSync(coveragePath, "utf8"), "SF:src/constants.ts\n");
   } finally {
@@ -154,7 +142,7 @@ test("fails when a test plan has no matching files", () => {
   };
 
   try {
-    assert.throws(() => runTestPlan(plan, ".test.js"), /No \.test\.js files found/);
+    assert.throws(() => runTestPlan(plan), /No \.test\.ts files found/);
     assert.equal(existsSync(join(directory, "coverage")), false);
   } finally {
     rmSync(directory, { force: true, recursive: true });

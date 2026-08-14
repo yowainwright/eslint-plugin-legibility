@@ -47,12 +47,15 @@ const compatibilityBody =
 
 const commentPolicyHeading = "## Comments";
 const commentPolicyIntro =
-  "Use `legibility/no-unmatched-comments` without options to reject comments by default.";
+  "Both presets enforce the same comment-quality rules. Use the session flag to reject comments added while an agent works.";
 const commentPolicyRules = [
   "- Agents do not add source comments by default.",
+  "- Run `npx lint-changed --comments=forbid` during agent sessions.",
+  "- `legibility/no-stacked-comments` rejects adjacent comments.",
+  "- The session flag enables `legibility/no-unmatched-comments` as an error for new files and added lines.",
+  "- ESLint disable directives cannot suppress the session policy.",
   "- A configured `prefixIdentifiers` or `suffixIdentifiers` value lets ESLint allow a matching comment.",
-  "- Use `matchers` and the other comment rules for additional repository-specific controls.",
-  "- `legibility/no-stacked-comments` means an adjacent comment should be updated or removed instead of adding another.",
+  "- An adjacent comment should be updated or removed instead of stacking another comment.",
 ].join("\n");
 const commentPolicyBody = [commentPolicyIntro, commentPolicyRules].join("\n\n");
 
@@ -67,8 +70,8 @@ const installBody = [
 const cleanupHeading = "## Developer Cleanup Loop";
 const cleanupIntro = [
   "1. Inspect the changed JavaScript and TypeScript files before editing.",
-  "2. Run changed-file linting:",
-  "   ```sh\n   npx lint-changed\n   ```",
+  "2. Run changed-file linting with the agent comment policy:",
+  "   ```sh\n   npx lint-changed --comments=forbid\n   ```",
   "3. Pass a base ref when the branch does not target `origin/main`:",
   "   ```sh\n   npx lint-changed origin/develop\n   ```",
   "4. Fix actionable diagnostics with behavior-preserving edits:",
@@ -86,7 +89,7 @@ const cleanupEdits = [
 ].join("\n");
 
 const cleanupClose = [
-  "5. Re-run `npx lint-changed` until the touched files are clean or only documented unrelated failures remain.",
+  "5. Re-run `npx lint-changed --comments=forbid` until the touched files are clean or only documented unrelated failures remain.",
   "Do not run `eslint .`, `nub run lint`, or `oxlint .` for the cleanup loop unless the user asks for full-repo validation.",
 ].join("\n\n");
 

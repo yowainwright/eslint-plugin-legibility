@@ -9,15 +9,15 @@ Never run `eslint .`, `nub run lint`, or `oxlint .` — these lint the entire co
 Always run:
 
 ```sh
-npx lint-changed
+npx lint-changed --comments=forbid
 ```
 
 This only lints files changed vs `origin/main`. New files are checked at error level; modified files at warn level.
 
-Agents do not add source comments by default. `legibility/no-unmatched-comments` allows a comment when it matches a configured prefix, suffix, or other matcher. `legibility/no-stacked-comments` means an adjacent comment should be updated or removed instead of stacking another one.
+Agents do not add source comments by default. The session flag enables `legibility/no-unmatched-comments` as an error without changing the project config. Configure a prefix, suffix, or matcher in the project config when comments must be allowed.
 
 To override the base branch:
 
 ```sh
-npx lint-changed origin/develop
+npx lint-changed origin/develop --comments=forbid
 ```

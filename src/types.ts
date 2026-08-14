@@ -4,6 +4,14 @@ export type OperatorComplexity = Record<string, number>;
 
 export type StringSet = ReadonlySet<string>;
 
+export type FilenameSchema = "custom" | "dirname" | "index";
+
+export interface FilenameDetails {
+  parentDepth: number;
+  parentDirName: string;
+  stem: string;
+}
+
 export type RuleLevel = "warn" | "error";
 
 export type PrimitiveOptionValue = string | number | boolean | null;
@@ -23,6 +31,8 @@ export type RuleConfig = Severity | readonly [Severity, ...RuleOptions];
 
 export type RuleCreate = (context: RuleContext) => RuleListener;
 
+export type RuleCreateOnce = RuleCreate;
+
 export type RuleVisitor = (node: AstNode) => void;
 
 export type RuleListener = Record<string, RuleVisitor>;
@@ -37,9 +47,21 @@ export interface RuleReport {
   node: AstNode;
   messageId: string;
   data?: RuleReportData;
+  fix?: RuleFixCallback;
 }
 
 export type RuleReportData = Record<string, string | number | boolean | null | undefined>;
+
+export interface RuleFix {
+  range: readonly [number, number];
+  text: string;
+}
+
+export interface RuleFixer {
+  replaceText(node: AstNode, text: string): RuleFix;
+}
+
+export type RuleFixCallback = (fixer: RuleFixer) => RuleFix | readonly RuleFix[] | null;
 
 export interface RuleContext {
   cwd?: string;
@@ -111,6 +133,7 @@ export interface LookupPart {
 
 export interface RuleMeta {
   type: "problem" | "suggestion" | "layout";
+  fixable?: "code" | "whitespace";
   docs?: {
     description?: string;
     recommended?: boolean;
@@ -125,6 +148,7 @@ export type RuleSchema = RuleOptionValue | readonly RuleOptionValue[];
 export interface RuleModule {
   meta: RuleMeta;
   create: RuleCreate;
+  createOnce?: RuleCreateOnce;
 }
 
 export interface AliasCandidate {
@@ -174,26 +198,46 @@ export interface ControlFlowState {
 
 export type ScopeCallback = () => void;
 
-export interface LegacyConfig {
-  plugins: string[];
-  rules: Record<string, RuleConfig>;
-}
-
 export interface FlatConfig {
   plugins: Record<string, LegibilityPlugin>;
   rules: Record<string, RuleConfig>;
 }
 
+export interface OxlintJsPlugin {
+  name: string;
+  specifier: string;
+}
+
+export interface OxlintMaxLinesOptions extends RuleOptionRecord {
+  IIFEs: boolean;
+  max: number;
+  skipBlankLines: boolean;
+  skipComments: boolean;
+}
+
+export type OxlintRuleConfig = Severity | [Severity, ...RuleOptionValue[]];
+
+export interface OxlintRules extends Record<string, OxlintRuleConfig> {
+  complexity: [RuleLevel, number];
+  ["max-lines-per-function"]: [RuleLevel, OxlintMaxLinesOptions];
+}
+
+export interface OxlintConfig {
+  jsPlugins: Array<string | OxlintJsPlugin>;
+  rules: OxlintRules;
+}
+
 export interface LegibilityPlugin {
   meta: {
-    name: "legibility";
+    name: string;
+    namespace: string;
     version: string;
   };
   rules: Record<string, RuleModule>;
   configs: {
-    recommended: LegacyConfig;
-    strict: LegacyConfig;
     "flat/recommended": FlatConfig;
     "flat/strict": FlatConfig;
+    "oxlint/recommended": OxlintConfig;
+    "oxlint/strict": OxlintConfig;
   };
 }

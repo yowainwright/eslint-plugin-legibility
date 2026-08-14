@@ -4,8 +4,9 @@ import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { TestCommandRunner, TestRunMode, TestRunPlan } from "./types.ts";
 
-const testModes = new Set<TestRunMode>(["bun-ts", "coverage", "deno-ts", "node-js", "node-ts"]);
+const testModes = new Set<TestRunMode>(["bun-ts", "coverage", "deno-ts", "node-ts"]);
 const coverageFile = "coverage/lcov.info";
+const testFileExtension = ".test.ts";
 const runTestCommand: TestCommandRunner = (command, args) =>
   spawnSync(command, Array.from(args), { stdio: "inherit" });
 
@@ -51,14 +52,6 @@ export function buildTestRunPlan(mode: TestRunMode): TestRunPlan {
     };
   }
 
-  if (mode === "node-js") {
-    return {
-      command: process.execPath,
-      args: ["--test"],
-      testDirectories: [".build/tests/unit", ".build/tests/scripts"],
-    };
-  }
-
   if (mode === "coverage") {
     return {
       command: process.execPath,
@@ -69,7 +62,7 @@ export function buildTestRunPlan(mode: TestRunMode): TestRunPlan {
         `--test-reporter-destination=${coverageFile}`,
       ],
       coverageFile,
-      testDirectories: [".build/tests/unit", ".build/tests/scripts"],
+      testDirectories: ["tests/unit", "tests/scripts"],
     };
   }
 
@@ -88,20 +81,15 @@ export function remapCoverageSources(path: string): void {
   writeFileSync(path, remappedCoverage);
 }
 
-export function getTestFileExtension(mode: TestRunMode): ".test.js" | ".test.ts" {
-  const usesCompiledTests = mode === "coverage" || mode === "node-js";
-  const extension = usesCompiledTests ? ".test.js" : ".test.ts";
-  return extension;
-}
-
 export function runTestPlan(
   plan: TestRunPlan,
-  extension: ".test.js" | ".test.ts",
   commandRunner: TestCommandRunner = runTestCommand,
 ): number {
-  const testFiles = plan.testDirectories.flatMap((directory) => listTestFiles(directory, extension));
+  const testFiles = plan.testDirectories.flatMap((directory) =>
+    listTestFiles(directory, testFileExtension),
+  );
   if (testFiles.length === 0) {
-    throw new Error(`No ${extension} files found in ${plan.testDirectories.join(", ")}`);
+    throw new Error(`No ${testFileExtension} files found in ${plan.testDirectories.join(", ")}`);
   }
 
   const coveragePath = plan.coverageFile;
@@ -122,8 +110,7 @@ export function runTestPlan(
 
 export function runTests(mode: TestRunMode): number {
   const plan = buildTestRunPlan(mode);
-  const extension = getTestFileExtension(mode);
-  const status = runTestPlan(plan, extension);
+  const status = runTestPlan(plan);
   return status;
 }
 

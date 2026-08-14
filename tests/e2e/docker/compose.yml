@@ -1,0 +1,31 @@
+name: eslint-plugin-legibility-e2e
+
+x-runner: &runner
+  build:
+    context: ../../..
+    dockerfile: tests/e2e/docker/Dockerfile
+    args:
+      ESLINT_VERSION: "${E2E_ESLINT_VERSION:-9.39.5}"
+      NODE_VERSION: "${E2E_NODE_VERSION:-26}"
+      OXLINT_VERSION: "${E2E_OXLINT_VERSION:-1.78.0}"
+  image: eslint-plugin-legibility-e2e:local
+  init: true
+  environment:
+    ESLINT_USE_FLAT_CONFIG: "true"
+  network_mode: none
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+
+services:
+  test:
+    <<: *runner
+    command: ["tests/e2e/correctness.ts"]
+
+  benchmark:
+    <<: *runner
+    command: ["tests/e2e/benchmark.ts"]
+    environment:
+      BENCHMARK_ITERATIONS: "${BENCHMARK_ITERATIONS:-5}"
+      BENCHMARK_WARMUPS: "${BENCHMARK_WARMUPS:-1}"
+      ESLINT_USE_FLAT_CONFIG: "true"

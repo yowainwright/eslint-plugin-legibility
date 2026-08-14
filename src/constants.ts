@@ -1,9 +1,10 @@
 import packageManifest from "../package.json" with { type: "json" };
 import type { RuleMeta } from "./types.js";
 
+const PACKAGE_NAME = packageManifest.name;
 const PACKAGE_VERSION = packageManifest.version;
 
-export { PACKAGE_VERSION };
+export { PACKAGE_NAME, PACKAGE_VERSION };
 
 export const PLUGIN_NAME = "legibility";
 
@@ -25,6 +26,14 @@ export const DEFAULT_ALLOWED_STANDALONE_FILENAMES = new Set([
   "index",
   "types",
   "utils",
+]);
+export const DEFAULT_INDEX_FILENAME_SCHEMA = new Set([
+  "index",
+  "utils",
+  "constants",
+  "types",
+  "index.test",
+  "utils.test",
 ]);
 export const DEFAULT_MAX_IF_OPERATORS = 0;
 export const DEFAULT_MAX_TERNARY_OPERATORS = 2;
@@ -173,7 +182,7 @@ export const SEARCH_METHODS = new Set(["filter", "find", "includes", "indexOf", 
 
 export const EQUALITY_OPERATORS = new Set(["==", "===", "!=", "!=="]);
 
-export const OBJECT_LOOKUP_OPERATORS = new Set(["==", "==="]);
+export const DEFAULT_OBJECT_LOOKUP_OPERATORS = new Set(["==", "==="]);
 
 export const ITERATION_METHODS = new Set([
   "every",
@@ -294,35 +303,76 @@ export const RECOMMENDED_RULE_NAMES = [
   "max-function-parameters",
   "no-complex-ternaries",
   "no-computed-values",
-  "no-direct-node-bin-smoke",
   "no-hidden-side-effects",
   "no-identity-array-callback",
   "no-mixed-filename-casing",
-  "no-quadratic-patterns",
   "no-redundant-boolean-logic",
   "no-redundant-nullish-fallback",
-  "no-small-collection-conversion",
-  "no-standalone-array-mutations",
   "no-trivial-wrapper-functions",
   "no-unnecessary-block-callback",
-  "no-unnecessary-async",
-  "prefer-concat-object-assign",
   "prefer-early-return",
   "prefer-flat-map",
   "prefer-guard-clauses",
   "prefer-object-lookup",
-  "require-executable-shebang",
-  "require-filename-matches-dirname",
+  "prefer-positive-condition-names",
 ];
 
-export const COMMENT_RULE_NAMES = new Set([
+export const COMMENT_RULE_NAMES = [
   "no-automated-comment-attribution",
   "no-stacked-comments",
-  "no-unmatched-comments",
   "require-jsdoc-multiline-comments",
+];
+
+export const STRICT_ONLY_RULE_NAMES = [
+  "no-direct-node-bin-smoke",
+  "no-quadratic-patterns",
+  "no-repeated-collection-search",
+  "no-single-use-renaming-alias",
+  "no-small-collection-conversion",
+  "no-standalone-array-mutations",
+  "no-unnecessary-async",
+];
+
+export const OPT_IN_RULE_NAMES = new Set([
+  "no-unmatched-comments",
+  "prefer-concat-object-assign",
+  "require-executable-shebang",
+  "require-filename-matches-dirname",
 ]);
 
 const STRING_ARRAY_SCHEMA = { type: "array", items: { type: "string" } };
+
+const FILENAME_MIN_DEPTH_SCHEMA = { type: "integer", minimum: 1 };
+const DIRNAME_FILENAME_SCHEMA = {
+  type: "object",
+  required: ["schema"],
+  properties: {
+    schema: { enum: ["dirname"] },
+    minDepth: FILENAME_MIN_DEPTH_SCHEMA,
+    allowedQualifiers: STRING_ARRAY_SCHEMA,
+    allowedFilenames: STRING_ARRAY_SCHEMA,
+  },
+  additionalProperties: false,
+};
+const INDEX_FILENAME_SCHEMA = {
+  type: "object",
+  required: ["schema"],
+  properties: {
+    schema: { enum: ["index"] },
+    minDepth: FILENAME_MIN_DEPTH_SCHEMA,
+  },
+  additionalProperties: false,
+};
+const CUSTOM_FILENAME_SCHEMA = {
+  type: "object",
+  required: ["schema", "patterns"],
+  properties: {
+    schema: { enum: ["custom"] },
+    minDepth: FILENAME_MIN_DEPTH_SCHEMA,
+    patterns: { type: "array", items: { type: "string" }, minItems: 1, uniqueItems: true },
+  },
+  additionalProperties: false,
+};
 
 const OPERATOR_COMPLEXITY_SCHEMA = {
   type: "object",
@@ -394,7 +444,7 @@ export const NO_QUADRATIC_PATTERNS_META = defineMeta("no-quadratic-patterns", {
   type: "suggestion",
   docs: {
     description: "Flag nested loops, search-in-loop, and nested array iteration patterns.",
-    recommended: true,
+    recommended: false,
   },
   schema: [
     {
@@ -434,7 +484,7 @@ export const NO_AUTOMATED_COMMENT_ATTRIBUTION_META = defineMeta(
     type: "problem",
     docs: {
       description: "Flag comments that contain prohibited authorship signatures.",
-      recommended: false,
+      recommended: true,
     },
     schema: [
       {
@@ -453,7 +503,7 @@ export const NO_AUTOMATED_COMMENT_ATTRIBUTION_META = defineMeta(
 
 const noStackedCommentsDocs = {
   description: "Avoid comments stacked directly above other comments.",
-  recommended: false,
+  recommended: true,
 };
 const noStackedCommentsMessages = {
   stackedComment: "Update or remove the adjacent comment instead of stacking another comment.",
@@ -498,7 +548,7 @@ export const NO_STANDALONE_ARRAY_MUTATIONS_META = defineMeta("no-standalone-arra
   type: "suggestion",
   docs: {
     description: "Avoid standalone array mutations when a composable expression is clearer.",
-    recommended: true,
+    recommended: false,
   },
   schema: [
     {
@@ -537,7 +587,7 @@ export const PREFER_CONCAT_OBJECT_ASSIGN_META = defineMeta("prefer-concat-object
   docs: {
     description:
       "Prefer explicit concat/Object.assign composition over array or object literal spread.",
-    recommended: true,
+    recommended: false,
   },
   schema: [],
   messages: {
@@ -565,7 +615,7 @@ export const REQUIRE_EXECUTABLE_SHEBANG_META = defineMeta("require-executable-sh
   type: "problem",
   docs: {
     description: "Require configured executable entry source files to start with a shebang.",
-    recommended: true,
+    recommended: false,
   },
   schema: [
     {
@@ -589,8 +639,9 @@ export const REQUIRE_JSDOC_MULTILINE_COMMENTS_META = defineMeta(
     type: "layout",
     docs: {
       description: "Require multiline block comments to use JSDoc syntax.",
-      recommended: false,
+      recommended: true,
     },
+    fixable: "code",
     schema: [],
     messages: {
       useJsdoc: "Multiline block comments must use JSDoc syntax (`/** ... */`).",
@@ -603,7 +654,7 @@ export const NO_DIRECT_NODE_BIN_SMOKE_META = defineMeta("no-direct-node-bin-smok
   docs: {
     description:
       "Prefer smoke-testing installed package binaries instead of direct node entrypoint execution.",
-    recommended: true,
+    recommended: false,
   },
   schema: [
     {
@@ -736,7 +787,7 @@ export const PREFER_POSITIVE_CONDITION_NAMES_META = defineMeta("prefer-positive-
   type: "suggestion",
   docs: {
     description: "Prefer positive boolean names instead of double-negative condition names.",
-    recommended: false,
+    recommended: true,
   },
   schema: [
     {
@@ -796,7 +847,7 @@ export const NO_UNNECESSARY_ASYNC_META = defineMeta("no-unnecessary-async", {
   type: "suggestion",
   docs: {
     description: "Avoid async functions when their work can remain synchronous.",
-    recommended: true,
+    recommended: false,
   },
   schema: [],
   messages: {
@@ -815,7 +866,7 @@ export const NO_SMALL_COLLECTION_CONVERSION_META = defineMeta(
     type: "suggestion",
     docs: {
       description: "Avoid small literal Map or Set conversions used for one lookup.",
-      recommended: true,
+      recommended: false,
     },
     schema: [
       {
@@ -918,25 +969,17 @@ export const PREFER_OBJECT_LOOKUP_META = defineMeta("prefer-object-lookup", {
 export const REQUIRE_FILENAME_MATCHES_DIRNAME_META = defineMeta("require-filename-matches-dirname", {
   type: "suggestion",
   docs: {
-    description: "Require files in named subdirectories to match the directory name.",
-    recommended: true,
+    description: "Require filenames to match an explicitly selected schema.",
+    recommended: false,
   },
   schema: [
     {
-      type: "object",
-      properties: {
-        minDepth: { type: "integer", minimum: 1 },
-        allowedQualifiers: STRING_ARRAY_SCHEMA,
-        allowedFilenames: STRING_ARRAY_SCHEMA,
-      },
-      additionalProperties: false,
+      oneOf: [DIRNAME_FILENAME_SCHEMA, INDEX_FILENAME_SCHEMA, CUSTOM_FILENAME_SCHEMA],
     },
   ],
   messages: {
-    mismatch:
-      "Filename \"{{name}}\" does not match parent directory \"{{dir}}\". Use {{dir}}.ts, {{dir}}.{qualifier}.ts, or a known filename (index, types, constants, utils).",
-    unknownQualifier:
-      "Qualifier \"{{qualifier}}\" in \"{{name}}\" is not in the allowed list: {{allowed}}.",
+    missingSchema: "Choose a filename schema: dirname, index, or custom.",
+    mismatch: "Filename \"{{name}}\" does not match the {{schema}} schema. Allowed basenames: {{allowed}}.",
   },
 });
 

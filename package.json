@@ -48,7 +48,7 @@
   ],
   "sideEffects": false,
   "engines": {
-    "node": "^26.0.0"
+    "node": ">=22.12 <27"
   },
   "devEngines": {
     "runtime": {
@@ -64,6 +64,7 @@
   },
   "packageManager": "pnpm@11.21.0",
   "scripts": {
+    "benchmark:e2e": "nub --node scripts/e2e.ts benchmark",
     "build": "nub run build:agent && nub run build:plugin && nub run build:bin",
     "build:agent": "nub --node scripts/agent/build.ts",
     "build:bin": "nub run build:runtime && nub --node scripts/build.ts",
@@ -73,7 +74,7 @@
     "codependence:update": "codependence --update",
     "typecheck": "nub run build:plugin && tsc -p tsconfig.json",
     "lint": "nub run build:plugin && eslint .",
-    "lint:oxlint": "oxlint .",
+    "lint:oxlint": "oxlint --disable-nested-config .",
     "pastoralist": "pastoralist",
     "pack:check": "nub --node scripts/repoManager.ts pack",
     "prepare": "sh scripts/prepare.sh",
@@ -96,10 +97,9 @@
     "test": "nub run build && nub --node scripts/test.ts node-ts",
     "test:bun": "nub run build && nub --node scripts/test.ts bun-ts",
     "test:deno": "nub run build && nub --node scripts/test.ts deno-ts",
+    "test:e2e": "nub --node scripts/e2e.ts test",
     "test:coverage": "nub run build && nub --node scripts/test.ts coverage",
-    "test:compat": "nub run build && nub --node scripts/test.ts node-js",
     "validate": "nub --node scripts/repoManager.ts validate",
-    "validate:compat": "nub --node scripts/repoManager.ts validate:compat",
     "typecheck:strict": "nub --node scripts/build.ts strict",
     "type-coverage": "type-coverage --strict --at-least 99.5 -- src/index.ts src/constants.ts src/types.ts"
   },
@@ -148,7 +148,18 @@
     }
   },
   "dependencies": {},
-  "peerDependencies": {},
+  "peerDependencies": {
+    "eslint": "^8.57.0 || ^9.0.0 || ^10.0.0",
+    "oxlint": ">=1.55.0 <2"
+  },
+  "peerDependenciesMeta": {
+    "eslint": {
+      "optional": true
+    },
+    "oxlint": {
+      "optional": true
+    }
+  },
   "optionalDependencies": {},
   "pastoralist": {
     "depPaths": [
