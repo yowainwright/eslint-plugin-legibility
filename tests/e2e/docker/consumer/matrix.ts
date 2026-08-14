@@ -1,8 +1,14 @@
 import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { join } from "node:path";
 
 export type Engine = "eslint" | "oxlint";
-export type Preset = "default" | "opt-in" | "recommended" | "strict";
+export type Profile = "default" | "opt-in" | "recommended" | "strict";
+
+interface PluginShape {
+  configs: Record<"flat/recommended" | "flat/strict", { rules: Record<string, unknown> }>;
+  rules: Record<string, unknown>;
+}
 
 export interface Diagnostic {
   code: string;
@@ -12,10 +18,10 @@ export interface Diagnostic {
 export interface MatrixCase {
   engine: Engine;
   expected: Diagnostic[];
-  invalidFile: string;
+  invalidFiles: string[];
   invalidStatus: number;
-  preset: Preset;
-  validFile: string;
+  profile: Profile;
+  validFiles: string[];
 }
 
 export interface LintCommandResult {
@@ -24,6 +30,9 @@ export interface LintCommandResult {
   stdout: string;
 }
 
+const require = createRequire(import.meta.url);
+const legibility = require("eslint-plugin-legibility") as PluginShape;
+
 const defaultFeatureRules = [
   "max-function-parameters",
   "no-complex-ternaries",
@@ -31,26 +40,19 @@ const defaultFeatureRules = [
   "prefer-flat-map",
   "prefer-object-lookup",
 ];
-const presetFeatureRules = [
-  "max-expression-operators",
-  "max-function-parameters",
-  "no-complex-ternaries",
-  "no-computed-values",
-  "no-computed-values",
-  "no-identity-array-callback",
-  "no-unnecessary-async",
-  "prefer-early-return",
-  "prefer-flat-map",
-  "prefer-object-lookup",
-];
-const optInFeatureRules = presetFeatureRules.concat(
-  "no-unmatched-comments",
-  "require-filename-matches-dirname",
-);
+const recommendedFeatureRules = getPresetRuleNames("flat/recommended");
+const strictFeatureRules = getPresetRuleNames("flat/strict");
+const optInFeatureRules = Object.keys(legibility.rules);
+
+function getPresetRuleNames(preset: "flat/recommended" | "flat/strict"): string[] {
+  return Object.keys(legibility.configs[preset].rules)
+    .filter((ruleName) => ruleName.startsWith("legibility/"))
+    .map((ruleName) => ruleName.replace("legibility/", ""));
+}
 
 function createDiagnostics(
   engine: Engine,
-  ruleNames: string[],
+  ruleNames: readonly string[],
   severity: Diagnostic["severity"],
 ): Diagnostic[] {
   return ruleNames
@@ -65,66 +67,66 @@ export const matrixCases: readonly MatrixCase[] = [
   {
     engine: "eslint",
     expected: createDiagnostics("eslint", defaultFeatureRules, "error"),
-    invalidFile: "invalid.ts",
+    invalidFiles: ["invalid.ts"],
     invalidStatus: 1,
-    preset: "default",
-    validFile: "valid.ts",
+    profile: "default",
+    validFiles: ["valid.ts"],
   },
   {
     engine: "eslint",
     expected: createDiagnostics("eslint", optInFeatureRules, "error"),
-    invalidFile: "button.ts",
+    invalidFiles: ["button.ts", "features.ts", "mixed-File.ts"],
     invalidStatus: 1,
-    preset: "opt-in",
-    validFile: "index.ts",
+    profile: "opt-in",
+    validFiles: ["index.ts"],
   },
   {
     engine: "eslint",
-    expected: createDiagnostics("eslint", presetFeatureRules, "warning"),
-    invalidFile: "invalid.ts",
+    expected: createDiagnostics("eslint", recommendedFeatureRules, "warning"),
+    invalidFiles: ["features.ts", "invalid.ts", "mixed-File.ts"],
     invalidStatus: 0,
-    preset: "recommended",
-    validFile: "valid.ts",
+    profile: "recommended",
+    validFiles: ["valid.ts"],
   },
   {
     engine: "eslint",
-    expected: createDiagnostics("eslint", presetFeatureRules, "error"),
-    invalidFile: "invalid.ts",
+    expected: createDiagnostics("eslint", strictFeatureRules, "error"),
+    invalidFiles: ["features.ts", "invalid.ts", "mixed-File.ts"],
     invalidStatus: 1,
-    preset: "strict",
-    validFile: "valid.ts",
+    profile: "strict",
+    validFiles: ["valid.ts"],
   },
   {
     engine: "oxlint",
     expected: createDiagnostics("oxlint", defaultFeatureRules, "error"),
-    invalidFile: "invalid.ts",
+    invalidFiles: ["invalid.ts"],
     invalidStatus: 1,
-    preset: "default",
-    validFile: "valid.ts",
+    profile: "default",
+    validFiles: ["valid.ts"],
   },
   {
     engine: "oxlint",
     expected: createDiagnostics("oxlint", optInFeatureRules, "error"),
-    invalidFile: "button.ts",
+    invalidFiles: ["button.ts", "features.ts", "mixed-File.ts"],
     invalidStatus: 1,
-    preset: "opt-in",
-    validFile: "index.ts",
+    profile: "opt-in",
+    validFiles: ["index.ts"],
   },
   {
     engine: "oxlint",
-    expected: createDiagnostics("oxlint", presetFeatureRules, "warning"),
-    invalidFile: "invalid.ts",
+    expected: createDiagnostics("oxlint", recommendedFeatureRules, "warning"),
+    invalidFiles: ["features.ts", "invalid.ts", "mixed-File.ts"],
     invalidStatus: 0,
-    preset: "recommended",
-    validFile: "valid.ts",
+    profile: "recommended",
+    validFiles: ["valid.ts"],
   },
   {
     engine: "oxlint",
-    expected: createDiagnostics("oxlint", presetFeatureRules, "error"),
-    invalidFile: "invalid.ts",
+    expected: createDiagnostics("oxlint", strictFeatureRules, "error"),
+    invalidFiles: ["features.ts", "invalid.ts", "mixed-File.ts"],
     invalidStatus: 1,
-    preset: "strict",
-    validFile: "valid.ts",
+    profile: "strict",
+    validFiles: ["valid.ts"],
   },
 ];
 
@@ -133,7 +135,7 @@ export function getBinary(engine: Engine): string {
 }
 
 export function getFixtureRoot(matrixCase: MatrixCase): string {
-  return join(process.cwd(), "tests", "fixtures", matrixCase.engine, matrixCase.preset);
+  return join(process.cwd(), "tests", "fixtures", matrixCase.engine, matrixCase.profile);
 }
 
 export function getConfigPath(matrixCase: MatrixCase): string {
@@ -145,10 +147,10 @@ export function getFixtureSource(matrixCase: MatrixCase, filename: string): stri
   return join(getFixtureRoot(matrixCase), filename);
 }
 
-export function runLint(matrixCase: MatrixCase, source: string): LintCommandResult {
+export function runLint(matrixCase: MatrixCase, sources: readonly string[]): LintCommandResult {
   const binary = getBinary(matrixCase.engine);
   const config = getConfigPath(matrixCase);
-  const args = ["--config", config, "--format", "json", source];
+  const args = ["--config", config, "--format", "json"].concat(sources);
   const result = spawnSync(binary, args, { encoding: "utf8" });
   if (result.error) throw result.error;
 

@@ -4,6 +4,9 @@ ARG NODE_VERSION=26.7.0
 
 FROM node:${NODE_VERSION}-bookworm-slim AS toolchain
 ARG NUB_VERSION=0.7.4
+RUN apt-get update && \
+  apt-get install --no-install-recommends --yes libatomic1 && \
+  rm -rf /var/lib/apt/lists/*
 RUN npm install --global "@nubjs/nub@${NUB_VERSION}" && npm cache clean --force
 ENV CI=true
 

@@ -11,6 +11,12 @@ interface SearchRequest {
   sort: string;
 }
 
+export function compose(items: string[], nextItem: string, defaults: object, overrides: object) {
+  const nextItems = [...items, nextItem];
+  const options = { ...defaults, ...overrides };
+  return { nextItems, options };
+}
+
 export function buildSearchRequest(
   query: string,
   page: number,

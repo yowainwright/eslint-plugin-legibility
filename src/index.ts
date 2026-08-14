@@ -69,7 +69,6 @@ import {
   NO_UNMATCHED_COMMENTS_META,
   NO_UNNECESSARY_ASYNC_META,
   NO_UNNECESSARY_BLOCK_CALLBACK_META,
-  OPT_IN_RULE_NAMES,
   PACKAGE_NAME,
   PACKAGE_VERSION,
   PLUGIN_NAME,
@@ -86,6 +85,7 @@ import {
   SIDE_EFFECT_FREE_ITERATION_METHODS,
   SHELL_COMMAND_FUNCTIONS,
   SKIP_KEYS,
+  STRICT_ONLY_RULE_NAMES,
   TERMINAL_STATEMENT_TYPES,
 } from "./constants.js";
 import type {
@@ -3550,11 +3550,7 @@ function buildRuleConfig(
 }
 
 function buildCoreRuleConfig(level: RuleLevel): Record<string, RuleConfig> {
-  const complexityOptions = {
-    max: DEFAULT_MAX_CYCLOMATIC_COMPLEXITY,
-    variant: "classic",
-  };
-  const complexity: RuleConfig = [level, complexityOptions];
+  const complexity: RuleConfig = [level, DEFAULT_MAX_CYCLOMATIC_COMPLEXITY];
   const maxLineOptions = {
     max: DEFAULT_MAX_FUNCTION_LINES,
     skipBlankLines: true,
@@ -3575,7 +3571,7 @@ const recommendedRuleNames = RECOMMENDED_RULE_NAMES.concat(COMMENT_RULE_NAMES);
 const recommendedPluginRules = buildRuleConfig(recommendedRuleNames, "warn");
 const recommendedCoreRules = buildCoreRuleConfig("warn");
 const recommendedRules = Object.assign({}, recommendedPluginRules, recommendedCoreRules);
-const strictRuleNames = Object.keys(rules).filter((ruleName) => !OPT_IN_RULE_NAMES.has(ruleName));
+const strictRuleNames = recommendedRuleNames.concat(STRICT_ONLY_RULE_NAMES);
 const strictPluginRules = buildRuleConfig(strictRuleNames, "error");
 const strictCoreRules = buildCoreRuleConfig("error");
 const strictRules = Object.assign({}, strictPluginRules, strictCoreRules);
@@ -3584,7 +3580,8 @@ const oxlintStrictConfig = buildOxlintConfig(strictRules);
 
 const plugin: LegibilityPlugin = {
   meta: {
-    name: PLUGIN_NAME,
+    name: PACKAGE_NAME,
+    namespace: PLUGIN_NAME,
     version: PACKAGE_VERSION,
   },
   rules,

@@ -7,6 +7,12 @@ import test, { type TestContext } from "node:test";
 import { pathToFileURL } from "node:url";
 
 import manifest from "../../../package.json" with { type: "json" };
+import {
+  COMMENT_RULE_NAMES,
+  OPT_IN_RULE_NAMES,
+  RECOMMENDED_RULE_NAMES,
+  STRICT_ONLY_RULE_NAMES,
+} from "../../../dist/constants.js";
 import type { RuleModule } from "../../../src/types.ts";
 
 const require = createRequire(import.meta.url);
@@ -234,7 +240,8 @@ function arrow(params: any[], body: any): any {
 }
 
 test("exports an ESLint and Oxlint compatible plugin shape", () => {
-  assert.equal(plugin.meta.name, "legibility");
+  assert.equal(plugin.meta.name, "eslint-plugin-legibility");
+  assert.equal(plugin.meta.namespace, "legibility");
   assert.equal(plugin.meta.version, manifest.version);
   assert.ok(plugin.rules["max-expression-operators"]);
   assert.ok(plugin.rules["max-function-parameters"]);
@@ -256,11 +263,11 @@ test("exports an ESLint and Oxlint compatible plugin shape", () => {
   );
   assert.deepEqual(plugin.configs["flat/recommended"].rules.complexity, [
     "warn",
-    { max: 20, variant: "classic" },
+    20,
   ]);
   assert.deepEqual(plugin.configs["flat/strict"].rules.complexity, [
     "error",
-    { max: 20, variant: "classic" },
+    20,
   ]);
   const maxLinesOptions = {
     max: 40,
@@ -276,31 +283,36 @@ test("exports an ESLint and Oxlint compatible plugin shape", () => {
     "error",
     maxLinesOptions,
   ]);
-  const commentRuleNames = [
-    "no-automated-comment-attribution",
-    "no-stacked-comments",
-    "require-jsdoc-multiline-comments",
-  ];
-  commentRuleNames.forEach((ruleName) => {
+  COMMENT_RULE_NAMES.forEach((ruleName) => {
     const ruleId = `legibility/${ruleName}`;
     assert.equal(plugin.rules[ruleName].meta.docs.recommended, true);
     assert.equal(plugin.configs["flat/recommended"].rules[ruleId], "warn");
     assert.equal(plugin.configs["flat/strict"].rules[ruleId], "error");
   });
-  const optInRuleNames = ["no-unmatched-comments", "require-filename-matches-dirname"];
-  optInRuleNames.forEach((ruleName) => {
+  OPT_IN_RULE_NAMES.forEach((ruleName) => {
     const ruleId = `legibility/${ruleName}`;
     assert.equal(plugin.rules[ruleName].meta.docs.recommended, false);
     assert.equal(plugin.configs["flat/recommended"].rules[ruleId], undefined);
     assert.equal(plugin.configs["flat/strict"].rules[ruleId], undefined);
   });
-  Object.keys(plugin.rules)
-    .filter((ruleName) => !optInRuleNames.includes(ruleName))
-    .forEach((ruleName) => {
-      const ruleId = `legibility/${ruleName}`;
-      assert.equal(plugin.configs["flat/recommended"].rules[ruleId], "warn");
-      assert.equal(plugin.configs["flat/strict"].rules[ruleId], "error");
-    });
+  RECOMMENDED_RULE_NAMES.forEach((ruleName) => {
+    const ruleId = `legibility/${ruleName}`;
+    assert.equal(plugin.rules[ruleName].meta.docs.recommended, true);
+    assert.equal(plugin.configs["flat/recommended"].rules[ruleId], "warn");
+    assert.equal(plugin.configs["flat/strict"].rules[ruleId], "error");
+  });
+  STRICT_ONLY_RULE_NAMES.forEach((ruleName) => {
+    const ruleId = `legibility/${ruleName}`;
+    assert.equal(plugin.rules[ruleName].meta.docs.recommended, false);
+    assert.equal(plugin.configs["flat/recommended"].rules[ruleId], undefined);
+    assert.equal(plugin.configs["flat/strict"].rules[ruleId], "error");
+  });
+  const categorizedRules = RECOMMENDED_RULE_NAMES.concat(
+    COMMENT_RULE_NAMES,
+    STRICT_ONLY_RULE_NAMES,
+    Array.from(OPT_IN_RULE_NAMES),
+  ).toSorted();
+  assert.deepEqual(categorizedRules, Object.keys(plugin.rules).toSorted());
   assert.deepEqual(Object.keys(plugin.configs).sort(), [
     "flat/recommended",
     "flat/strict",
@@ -308,7 +320,8 @@ test("exports an ESLint and Oxlint compatible plugin shape", () => {
     "oxlint/strict",
   ]);
   assert.equal(requiredPlugin, plugin);
-  assert.equal(requiredPlugin.meta.name, "legibility");
+  assert.equal(requiredPlugin.meta.name, "eslint-plugin-legibility");
+  assert.equal(requiredPlugin.meta.namespace, "legibility");
 });
 
 test("Oxlint presets mirror the ESLint rules and register the plugin", () => {
@@ -1701,9 +1714,9 @@ interface LintDiagnostic {
 interface LintFixtureCase {
   directory: string;
   expected: LintDiagnostic[];
-  invalidFile: string;
+  invalidFiles: string[];
   invalidStatus: number;
-  validFile: string;
+  validFiles: string[];
 }
 
 const defaultFixtureRuleNames = [
@@ -1713,26 +1726,13 @@ const defaultFixtureRuleNames = [
   "prefer-flat-map",
   "prefer-object-lookup",
 ];
-const presetFixtureRuleNames = [
-  "max-expression-operators",
-  "max-function-parameters",
-  "no-complex-ternaries",
-  "no-computed-values",
-  "no-computed-values",
-  "no-identity-array-callback",
-  "no-unnecessary-async",
-  "prefer-early-return",
-  "prefer-flat-map",
-  "prefer-object-lookup",
-];
-const optInFixtureRuleNames = presetFixtureRuleNames.concat(
-  "no-unmatched-comments",
-  "require-filename-matches-dirname",
-);
+const recommendedFixtureRuleNames = RECOMMENDED_RULE_NAMES.concat(COMMENT_RULE_NAMES);
+const strictFixtureRuleNames = recommendedFixtureRuleNames.concat(STRICT_ONLY_RULE_NAMES);
+const optInFixtureRuleNames = strictFixtureRuleNames.concat(Array.from(OPT_IN_RULE_NAMES));
 
 function createFixtureDiagnostics(
   engine: "eslint" | "oxlint",
-  ruleNames: string[],
+  ruleNames: readonly string[],
   severity: string,
 ): LintDiagnostic[] {
   return ruleNames
@@ -1749,7 +1749,7 @@ function assertFixtureFilesCovered(engine: "eslint" | "oxlint", fixture: LintFix
   const sourceFiles = readdirSync(fixtureRoot)
     .filter((file) => file.endsWith(".ts") && file !== configName)
     .toSorted();
-  const coveredFiles = [fixture.invalidFile, fixture.validFile].toSorted();
+  const coveredFiles = fixture.invalidFiles.concat(fixture.validFiles).toSorted();
   assert.deepEqual(coveredFiles, sourceFiles);
 }
 
@@ -1760,15 +1760,15 @@ interface OxlintFixtureResult {
   stderr: string;
 }
 
-function runOxlintFixture(directory: string, filename: string): OxlintFixtureResult {
+function runOxlintFixture(directory: string, filenames: readonly string[]): OxlintFixtureResult {
   const oxlintName = process.platform === "win32" ? "oxlint.cmd" : "oxlint";
   const oxlintPath = join(process.cwd(), "node_modules", ".bin", oxlintName);
   const fixtureRoot = join("tests", "fixtures", "oxlint", directory);
   const configPath = join(fixtureRoot, "oxlint.config.ts");
-  const sourcePath = join(fixtureRoot, filename);
+  const sourcePaths = filenames.map((filename) => join(fixtureRoot, filename));
   const result = spawnSync(
     oxlintPath,
-    ["--config", configPath, "--format", "json", sourcePath],
+    ["--config", configPath, "--format", "json"].concat(sourcePaths),
     { encoding: "utf8" },
   );
   const output: { diagnostics: LintDiagnostic[] } = result.stdout
@@ -1783,47 +1783,54 @@ function runOxlintFixture(directory: string, filename: string): OxlintFixtureRes
 }
 
 function getOxlintDiagnostics(diagnostics: LintDiagnostic[]): LintDiagnostic[] {
-  return diagnostics
+  const pluginDiagnostics = diagnostics
     .filter((diagnostic) => diagnostic.code.startsWith("legibility("))
-    .map(({ code, severity }) => ({ code, severity }))
-    .toSorted((left, right) => left.code.localeCompare(right.code));
+    .map(({ code, severity }) => ({ code, severity }));
+  return uniqueDiagnostics(pluginDiagnostics);
+}
+
+function uniqueDiagnostics(diagnostics: LintDiagnostic[]): LintDiagnostic[] {
+  const entries = diagnostics.map((diagnostic) => [diagnostic.code, diagnostic] as const);
+  return Array.from(new Map(entries).values()).toSorted((left, right) =>
+    left.code.localeCompare(right.code),
+  );
 }
 
 const oxlintFixtureCases: LintFixtureCase[] = [
   {
     directory: "default",
     expected: createFixtureDiagnostics("oxlint", defaultFixtureRuleNames, "error"),
-    invalidFile: "invalid.ts",
+    invalidFiles: ["invalid.ts"],
     invalidStatus: 1,
-    validFile: "valid.ts",
+    validFiles: ["valid.ts"],
   },
   {
     directory: "recommended",
-    expected: createFixtureDiagnostics("oxlint", presetFixtureRuleNames, "warning"),
-    invalidFile: "invalid.ts",
+    expected: createFixtureDiagnostics("oxlint", recommendedFixtureRuleNames, "warning"),
+    invalidFiles: ["features.ts", "invalid.ts", "mixed-File.ts"],
     invalidStatus: 0,
-    validFile: "valid.ts",
+    validFiles: ["valid.ts"],
   },
   {
     directory: "strict",
-    expected: createFixtureDiagnostics("oxlint", presetFixtureRuleNames, "error"),
-    invalidFile: "invalid.ts",
+    expected: createFixtureDiagnostics("oxlint", strictFixtureRuleNames, "error"),
+    invalidFiles: ["features.ts", "invalid.ts", "mixed-File.ts"],
     invalidStatus: 1,
-    validFile: "valid.ts",
+    validFiles: ["valid.ts"],
   },
   {
     directory: "opt-in",
     expected: createFixtureDiagnostics("oxlint", optInFixtureRuleNames, "error"),
-    invalidFile: "button.ts",
+    invalidFiles: ["button.ts", "features.ts", "mixed-File.ts"],
     invalidStatus: 1,
-    validFile: "index.ts",
+    validFiles: ["index.ts"],
   },
 ];
 
 oxlintFixtureCases.forEach((fixture) => {
   test(`oxlint ${fixture.directory} fixture enforces its config`, (t) => {
     assertFixtureFilesCovered("oxlint", fixture);
-    const invalidResult = runOxlintFixture(fixture.directory, fixture.invalidFile);
+    const invalidResult = runOxlintFixture(fixture.directory, fixture.invalidFiles);
     const spawnError = invalidResult.error as NodeJS.ErrnoException | undefined;
     if (spawnError?.code === "ENOENT") {
       t.skip("Oxlint is not installed");
@@ -1833,7 +1840,7 @@ oxlintFixtureCases.forEach((fixture) => {
     assert.equal(invalidResult.stderr, "");
     assert.equal(invalidResult.status, fixture.invalidStatus);
     assert.deepEqual(getOxlintDiagnostics(invalidResult.diagnostics), fixture.expected);
-    const validResult = runOxlintFixture(fixture.directory, fixture.validFile);
+    const validResult = runOxlintFixture(fixture.directory, fixture.validFiles);
     assert.equal(validResult.status, 0);
     assert.deepEqual(getOxlintDiagnostics(validResult.diagnostics), []);
   });
@@ -1855,17 +1862,17 @@ interface EslintFixtureResult {
   stderr: string;
 }
 
-function createEslintArgs(fixtureRoot: string, filename: string): string[] {
+function createEslintArgs(fixtureRoot: string, filenames: readonly string[]): string[] {
   const configPath = join(fixtureRoot, "eslint.config.ts");
-  const sourcePath = join(fixtureRoot, filename);
-  return ["--config", configPath, "--format", "json", sourcePath];
+  const sourcePaths = filenames.map((filename) => join(fixtureRoot, filename));
+  return ["--config", configPath, "--format", "json"].concat(sourcePaths);
 }
 
-function runEslintFixture(directory: string, filename: string): EslintFixtureResult {
+function runEslintFixture(directory: string, filenames: readonly string[]): EslintFixtureResult {
   const eslintName = process.platform === "win32" ? "eslint.cmd" : "eslint";
   const eslintPath = join(process.cwd(), "node_modules", ".bin", eslintName);
   const fixtureRoot = join("tests", "fixtures", "eslint", directory);
-  const args = createEslintArgs(fixtureRoot, filename);
+  const args = createEslintArgs(fixtureRoot, filenames);
   const result = spawnSync(eslintPath, args, { encoding: "utf8" });
   const results: EslintFileResult[] = result.stdout ? JSON.parse(result.stdout) : [];
   return { error: result.error, results, status: result.status, stderr: result.stderr };
@@ -1883,47 +1890,47 @@ function normalizeEslintMessage(message: EslintMessage): LintDiagnostic {
 }
 
 function getEslintDiagnostics(results: EslintFileResult[]): LintDiagnostic[] {
-  return results
+  const pluginDiagnostics = results
     .flatMap((result) => result.messages)
     .filter((message) => message.ruleId?.startsWith("legibility/"))
-    .map(normalizeEslintMessage)
-    .toSorted((left, right) => left.code.localeCompare(right.code));
+    .map(normalizeEslintMessage);
+  return uniqueDiagnostics(pluginDiagnostics);
 }
 
 const eslintFixtureCases: LintFixtureCase[] = [
   {
     directory: "default",
     expected: createFixtureDiagnostics("eslint", defaultFixtureRuleNames, "error"),
-    invalidFile: "invalid.ts",
+    invalidFiles: ["invalid.ts"],
     invalidStatus: 1,
-    validFile: "valid.ts",
+    validFiles: ["valid.ts"],
   },
   {
     directory: "recommended",
-    expected: createFixtureDiagnostics("eslint", presetFixtureRuleNames, "warning"),
-    invalidFile: "invalid.ts",
+    expected: createFixtureDiagnostics("eslint", recommendedFixtureRuleNames, "warning"),
+    invalidFiles: ["features.ts", "invalid.ts", "mixed-File.ts"],
     invalidStatus: 0,
-    validFile: "valid.ts",
+    validFiles: ["valid.ts"],
   },
   {
     directory: "strict",
-    expected: createFixtureDiagnostics("eslint", presetFixtureRuleNames, "error"),
-    invalidFile: "invalid.ts",
+    expected: createFixtureDiagnostics("eslint", strictFixtureRuleNames, "error"),
+    invalidFiles: ["features.ts", "invalid.ts", "mixed-File.ts"],
     invalidStatus: 1,
-    validFile: "valid.ts",
+    validFiles: ["valid.ts"],
   },
   {
     directory: "opt-in",
     expected: createFixtureDiagnostics("eslint", optInFixtureRuleNames, "error"),
-    invalidFile: "button.ts",
+    invalidFiles: ["button.ts", "features.ts", "mixed-File.ts"],
     invalidStatus: 1,
-    validFile: "index.ts",
+    validFiles: ["index.ts"],
   },
 ];
 
 function verifyEslintFixture(fixture: LintFixtureCase, t: TestContext): void {
   assertFixtureFilesCovered("eslint", fixture);
-  const invalidResult = runEslintFixture(fixture.directory, fixture.invalidFile);
+  const invalidResult = runEslintFixture(fixture.directory, fixture.invalidFiles);
   const spawnError = invalidResult.error as NodeJS.ErrnoException | undefined;
   if (spawnError?.code === "ENOENT") {
     t.skip("ESLint is not installed");
@@ -1933,7 +1940,7 @@ function verifyEslintFixture(fixture: LintFixtureCase, t: TestContext): void {
   assert.equal(invalidResult.stderr, "");
   assert.equal(invalidResult.status, fixture.invalidStatus);
   assert.deepEqual(getEslintDiagnostics(invalidResult.results), fixture.expected);
-  const validResult = runEslintFixture(fixture.directory, fixture.validFile);
+  const validResult = runEslintFixture(fixture.directory, fixture.validFiles);
   assert.equal(validResult.status, 0);
   assert.deepEqual(getEslintDiagnostics(validResult.results), []);
 }

@@ -30,19 +30,26 @@ function normalizeEslintMessage(message: EslintMessage): Diagnostic {
 
 function getEslintDiagnostics(stdout: string): Diagnostic[] {
   const results = JSON.parse(stdout) as EslintResult[];
-  return results
+  const diagnostics = results
     .flatMap((result) => result.messages)
     .filter((message) => message.ruleId?.startsWith("legibility/"))
-    .map(normalizeEslintMessage)
-    .toSorted((left, right) => left.code.localeCompare(right.code));
+    .map(normalizeEslintMessage);
+  return uniqueDiagnostics(diagnostics);
 }
 
 function getOxlintDiagnostics(stdout: string): Diagnostic[] {
   const output = JSON.parse(stdout) as OxlintOutput;
-  return output.diagnostics
+  const diagnostics = output.diagnostics
     .filter((diagnostic) => diagnostic.code.startsWith("legibility("))
-    .map(({ code, severity }) => ({ code, severity }))
-    .toSorted((left, right) => left.code.localeCompare(right.code));
+    .map(({ code, severity }) => ({ code, severity }));
+  return uniqueDiagnostics(diagnostics);
+}
+
+function uniqueDiagnostics(diagnostics: Diagnostic[]): Diagnostic[] {
+  const entries = diagnostics.map((diagnostic) => [diagnostic.code, diagnostic] as const);
+  return Array.from(new Map(entries).values()).toSorted((left, right) =>
+    left.code.localeCompare(right.code),
+  );
 }
 
 function getDiagnostics(matrixCase: MatrixCase, stdout: string): Diagnostic[] {
@@ -55,24 +62,28 @@ function verifyFixtureCoverage(matrixCase: MatrixCase): void {
   const sourceFiles = readdirSync(getFixtureRoot(matrixCase))
     .filter((file) => file.endsWith(".ts") && file !== configName)
     .toSorted();
-  const coveredFiles = [matrixCase.invalidFile, matrixCase.validFile].toSorted();
+  const coveredFiles = matrixCase.invalidFiles.concat(matrixCase.validFiles).toSorted();
   assert.deepEqual(coveredFiles, sourceFiles);
+}
+
+function getFixtureSources(matrixCase: MatrixCase, files: readonly string[]): string[] {
+  return files.map((filename) => getFixtureSource(matrixCase, filename));
 }
 
 function verifyCase(matrixCase: MatrixCase): void {
   verifyFixtureCoverage(matrixCase);
-  const invalidSource = getFixtureSource(matrixCase, matrixCase.invalidFile);
-  const invalidResult = runLint(matrixCase, invalidSource);
+  const invalidSources = getFixtureSources(matrixCase, matrixCase.invalidFiles);
+  const invalidResult = runLint(matrixCase, invalidSources);
   assert.equal(invalidResult.stderr, "");
   assert.equal(invalidResult.status, matrixCase.invalidStatus);
   assert.deepEqual(getDiagnostics(matrixCase, invalidResult.stdout), matrixCase.expected);
 
-  const validSource = getFixtureSource(matrixCase, matrixCase.validFile);
-  const validResult = runLint(matrixCase, validSource);
+  const validSources = getFixtureSources(matrixCase, matrixCase.validFiles);
+  const validResult = runLint(matrixCase, validSources);
   assert.equal(validResult.stderr, "");
   assert.equal(validResult.status, 0);
   assert.deepEqual(getDiagnostics(matrixCase, validResult.stdout), []);
-  process.stdout.write(`PASS ${matrixCase.engine}/${matrixCase.preset}\n`);
+  process.stdout.write(`PASS ${matrixCase.engine}/${matrixCase.profile}\n`);
 }
 
 matrixCases.forEach(verifyCase);

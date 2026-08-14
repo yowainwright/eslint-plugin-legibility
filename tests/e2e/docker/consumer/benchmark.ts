@@ -29,9 +29,12 @@ function readCount(name: string, fallback: number, minimum: number): number {
   throw new Error(`${name} must be an integer of at least ${minimum}`);
 }
 
-function getSource(matrixCase: MatrixCase, workload: Workload): string {
-  if (workload === "single") return getFixtureSource(matrixCase, matrixCase.validFile);
-  return join(process.cwd(), "workload");
+function getSources(matrixCase: MatrixCase, workload: Workload): string[] {
+  if (workload === "single") {
+    const validFile = matrixCase.validFiles[0] ?? "valid.ts";
+    return [getFixtureSource(matrixCase, validFile)];
+  }
+  return [join(process.cwd(), "workload")];
 }
 
 function getFileCount(workload: Workload): number {
@@ -39,17 +42,17 @@ function getFileCount(workload: Workload): number {
   return 100;
 }
 
-function runOnce(matrixCase: MatrixCase, source: string): number {
+function runOnce(matrixCase: MatrixCase, sources: readonly string[]): number {
   const start = performance.now();
-  const result = runLint(matrixCase, source);
+  const result = runLint(matrixCase, sources);
   const elapsed = performance.now() - start;
   assert.equal(result.status, 0, result.stderr || result.stdout);
   return elapsed;
 }
 
-function measure(matrixCase: MatrixCase, source: string): number[] {
-  Array.from({ length: warmups }).forEach(() => runOnce(matrixCase, source));
-  return Array.from({ length: iterations }, () => runOnce(matrixCase, source));
+function measure(matrixCase: MatrixCase, sources: readonly string[]): number[] {
+  Array.from({ length: warmups }).forEach(() => runOnce(matrixCase, sources));
+  return Array.from({ length: iterations }, () => runOnce(matrixCase, sources));
 }
 
 function round(value: number): number {
@@ -74,12 +77,12 @@ function summarize(samples: number[]): BenchmarkStats {
 }
 
 function benchmarkCase(matrixCase: MatrixCase, workload: Workload) {
-  const source = getSource(matrixCase, workload);
+  const sources = getSources(matrixCase, workload);
   const files = getFileCount(workload);
-  const samples = measure(matrixCase, source);
+  const samples = measure(matrixCase, sources);
   const stats = summarize(samples);
   const meanPerFileMs = round(stats.meanMs / files);
-  return { engine: matrixCase.engine, files, meanPerFileMs, preset: matrixCase.preset, stats, workload };
+  return { engine: matrixCase.engine, files, meanPerFileMs, profile: matrixCase.profile, stats, workload };
 }
 
 function benchmarkMatrixCase(matrixCase: MatrixCase) {

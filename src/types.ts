@@ -208,11 +208,6 @@ export interface OxlintJsPlugin {
   specifier: string;
 }
 
-export interface OxlintComplexityOptions extends RuleOptionRecord {
-  max: number;
-  variant: "classic" | "modified";
-}
-
 export interface OxlintMaxLinesOptions extends RuleOptionRecord {
   IIFEs: boolean;
   max: number;
@@ -223,7 +218,7 @@ export interface OxlintMaxLinesOptions extends RuleOptionRecord {
 export type OxlintRuleConfig = Severity | [Severity, ...RuleOptionValue[]];
 
 export interface OxlintRules extends Record<string, OxlintRuleConfig> {
-  complexity: [RuleLevel, OxlintComplexityOptions];
+  complexity: [RuleLevel, number];
   ["max-lines-per-function"]: [RuleLevel, OxlintMaxLinesOptions];
 }
 
@@ -234,7 +229,8 @@ export interface OxlintConfig {
 
 export interface LegibilityPlugin {
   meta: {
-    name: "legibility";
+    name: string;
+    namespace: string;
     version: string;
   };
   rules: Record<string, RuleModule>;

@@ -303,27 +303,18 @@ export const RECOMMENDED_RULE_NAMES = [
   "max-function-parameters",
   "no-complex-ternaries",
   "no-computed-values",
-  "no-direct-node-bin-smoke",
   "no-hidden-side-effects",
   "no-identity-array-callback",
   "no-mixed-filename-casing",
-  "no-quadratic-patterns",
-  "no-repeated-collection-search",
   "no-redundant-boolean-logic",
   "no-redundant-nullish-fallback",
-  "no-small-collection-conversion",
-  "no-single-use-renaming-alias",
-  "no-standalone-array-mutations",
   "no-trivial-wrapper-functions",
   "no-unnecessary-block-callback",
-  "no-unnecessary-async",
-  "prefer-concat-object-assign",
   "prefer-early-return",
   "prefer-flat-map",
   "prefer-guard-clauses",
   "prefer-object-lookup",
   "prefer-positive-condition-names",
-  "require-executable-shebang",
 ];
 
 export const COMMENT_RULE_NAMES = [
@@ -332,8 +323,20 @@ export const COMMENT_RULE_NAMES = [
   "require-jsdoc-multiline-comments",
 ];
 
+export const STRICT_ONLY_RULE_NAMES = [
+  "no-direct-node-bin-smoke",
+  "no-quadratic-patterns",
+  "no-repeated-collection-search",
+  "no-single-use-renaming-alias",
+  "no-small-collection-conversion",
+  "no-standalone-array-mutations",
+  "no-unnecessary-async",
+];
+
 export const OPT_IN_RULE_NAMES = new Set([
   "no-unmatched-comments",
+  "prefer-concat-object-assign",
+  "require-executable-shebang",
   "require-filename-matches-dirname",
 ]);
 
@@ -441,7 +444,7 @@ export const NO_QUADRATIC_PATTERNS_META = defineMeta("no-quadratic-patterns", {
   type: "suggestion",
   docs: {
     description: "Flag nested loops, search-in-loop, and nested array iteration patterns.",
-    recommended: true,
+    recommended: false,
   },
   schema: [
     {
@@ -545,7 +548,7 @@ export const NO_STANDALONE_ARRAY_MUTATIONS_META = defineMeta("no-standalone-arra
   type: "suggestion",
   docs: {
     description: "Avoid standalone array mutations when a composable expression is clearer.",
-    recommended: true,
+    recommended: false,
   },
   schema: [
     {
@@ -584,7 +587,7 @@ export const PREFER_CONCAT_OBJECT_ASSIGN_META = defineMeta("prefer-concat-object
   docs: {
     description:
       "Prefer explicit concat/Object.assign composition over array or object literal spread.",
-    recommended: true,
+    recommended: false,
   },
   schema: [],
   messages: {
@@ -612,7 +615,7 @@ export const REQUIRE_EXECUTABLE_SHEBANG_META = defineMeta("require-executable-sh
   type: "problem",
   docs: {
     description: "Require configured executable entry source files to start with a shebang.",
-    recommended: true,
+    recommended: false,
   },
   schema: [
     {
@@ -651,7 +654,7 @@ export const NO_DIRECT_NODE_BIN_SMOKE_META = defineMeta("no-direct-node-bin-smok
   docs: {
     description:
       "Prefer smoke-testing installed package binaries instead of direct node entrypoint execution.",
-    recommended: true,
+    recommended: false,
   },
   schema: [
     {
@@ -727,7 +730,7 @@ export const NO_REPEATED_COLLECTION_SEARCH_META = defineMeta("no-repeated-collec
   docs: {
     description:
       "Flag repeated searches over the same collection in one scope; prefer a named lookup Map or Set.",
-    recommended: true,
+    recommended: false,
   },
   schema: [
     {
@@ -805,7 +808,7 @@ export const NO_SINGLE_USE_RENAMING_ALIAS_META = defineMeta("no-single-use-renam
   type: "suggestion",
   docs: {
     description: "Avoid aliases that only rename another identifier or member once.",
-    recommended: true,
+    recommended: false,
   },
   schema: [],
   messages: {
@@ -844,7 +847,7 @@ export const NO_UNNECESSARY_ASYNC_META = defineMeta("no-unnecessary-async", {
   type: "suggestion",
   docs: {
     description: "Avoid async functions when their work can remain synchronous.",
-    recommended: true,
+    recommended: false,
   },
   schema: [],
   messages: {
@@ -863,7 +866,7 @@ export const NO_SMALL_COLLECTION_CONVERSION_META = defineMeta(
     type: "suggestion",
     docs: {
       description: "Avoid small literal Map or Set conversions used for one lookup.",
-      recommended: true,
+      recommended: false,
     },
     schema: [
       {

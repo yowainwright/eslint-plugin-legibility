@@ -24,6 +24,8 @@ This project provides ESLint and Oxlint-compatible rules for readable, explicit,
 
 The package exports an ESLint-compatible plugin object. ESLint can load it as a normal plugin, and Oxlint can load the same package through JavaScript plugin support. 
 
+Runtime support is Node 22 through 26, Bun, and Deno. The supported hosts are ESLint 8.57 through 10 and Oxlint 1.55 through current. Both are optional peers, so consumers only install the linter they use. Oxlint's JavaScript plugin API is currently marked alpha by [Oxlint](https://oxc.rs/docs/guide/usage/linter/js-plugins).
+
 ```sh
 # npm, pnpm, bun
 npm add -D eslint-plugin-legibility
@@ -37,7 +39,7 @@ Choose the preset for your linter and severity.
 
 ### `flat/recommended`
 
-Enables the bundled rules and core complexity limits as warnings.
+Enables the broadly applicable legibility rules and core complexity limits as warnings.
 
 ```ts
 import legibility from "eslint-plugin-legibility";
@@ -47,7 +49,7 @@ export default [legibility.configs["flat/recommended"]];
 
 ### `flat/strict`
 
-Enables the same rules and core complexity limits as errors.
+Enables every recommended rule plus the more opinionated analysis rules as errors.
 
 ```ts
 import legibility from "eslint-plugin-legibility";
@@ -57,7 +59,7 @@ export default [legibility.configs["flat/strict"]];
 
 ### `oxlint/recommended`
 
-Enables the same rules as warnings in `oxlint.config.ts`.
+Mirrors `flat/recommended` in `oxlint.config.ts`.
 
 ```ts
 import { defineConfig } from "oxlint";
@@ -68,7 +70,7 @@ export default defineConfig(legibility.configs["oxlint/recommended"]);
 
 ### `oxlint/strict`
 
-Enables the same rules as errors in `oxlint.config.ts`.
+Mirrors `flat/strict` in `oxlint.config.ts`.
 
 ```ts
 import { defineConfig } from "oxlint";
@@ -79,7 +81,7 @@ export default defineConfig(legibility.configs["oxlint/strict"]);
 
 All presets explicitly configure these core rules because ESLint's recommended config does not enable them:
 
-- `complexity`: `max: 20`, using the `classic` variant.
+- `complexity`: maximum cyclomatic complexity of `20`.
 - `max-lines-per-function`: `max: 40`, excluding blank lines and comments and including IIFEs.
 
 ---
@@ -97,7 +99,7 @@ nub run validate
 
 <!-- Docker end-to-end commands and matrix from package.json and tests/e2e/docker/compose.yml -->
 
-Build the package tarball, install it in an isolated Node 26 consumer, and test ESLint and Oxlint with the `default`, `opt-in`, `recommended`, and `strict` fixtures:
+Build the package tarball, install it in an isolated consumer, and test ESLint and Oxlint with the `default`, `opt-in`, `recommended`, and `strict` fixture profiles:
 
 ```sh
 nub run test:e2e
@@ -109,13 +111,15 @@ Benchmark every engine and fixture setup against one file and a generated 100-fi
 nub run benchmark:e2e
 ```
 
+The local image defaults to Node 26, ESLint 9, and Oxlint 1.78. Set `E2E_NODE_VERSION`, `E2E_ESLINT_VERSION`, and `E2E_OXLINT_VERSION` to test another supported combination. CI covers the oldest supported ESLint and Oxlint releases and the current major releases across Node 22, 24, and 26.
+
 The benchmark reports JSON with mean, median, p95, minimum, maximum, and mean-per-file duration. Adjust its sample counts with `BENCHMARK_WARMUPS` and `BENCHMARK_ITERATIONS`. Benchmarks report measurements without enforcing timing thresholds. Both commands remove their Compose containers, networks, volumes, and local e2e image after success or failure.
 
 ---
 
 ## Rules
 
-Both presets enable the same rules. `flat/recommended` uses warnings; `flat/strict` uses errors. Filename schemas and `no-unmatched-comments` are opt-in because they require a project policy.
+`recommended` contains broadly applicable legibility checks. `strict` includes every recommended rule plus more opinionated performance and code-shape analysis. Composition style, executable-entry checks, filename schemas, and blanket comment policies remain opt-in because they require a project decision.
 
 <!-- rule section links grouped by preset membership from src/constants.ts -->
 <details>
@@ -130,38 +134,38 @@ Both presets enable the same rules. `flat/recommended` uses warnings; `flat/stri
 - [`legibility/max-function-parameters`](#max-function-parameters)
 - [`legibility/no-complex-ternaries`](#no-complex-ternaries)
 - [`legibility/no-computed-values`](#no-computed-values)
-- [`legibility/no-direct-node-bin-smoke`](#no-direct-node-bin-smoke)
 - [`legibility/no-hidden-side-effects`](#no-hidden-side-effects)
 - [`legibility/no-identity-array-callback`](#no-identity-array-callback)
 - [`legibility/no-mixed-filename-casing`](#no-mixed-filename-casing)
 - [`legibility/no-automated-comment-attribution`](#no-automated-comment-attribution)
-- [`legibility/no-quadratic-patterns`](#no-quadratic-patterns)
 - [`legibility/no-redundant-boolean-logic`](#no-redundant-boolean-logic)
 - [`legibility/no-redundant-nullish-fallback`](#no-redundant-nullish-fallback)
-- [`legibility/no-repeated-collection-search`](#no-repeated-collection-search)
-- [`legibility/no-small-collection-conversion`](#no-small-collection-conversion)
-- [`legibility/no-single-use-renaming-alias`](#no-single-use-renaming-alias)
-- [`legibility/no-standalone-array-mutations`](#no-standalone-array-mutations)
 - [`legibility/no-stacked-comments`](#no-stacked-comments)
 - [`legibility/no-trivial-wrapper-functions`](#no-trivial-wrapper-functions)
-- [`legibility/no-unnecessary-async`](#no-unnecessary-async)
 - [`legibility/no-unnecessary-block-callback`](#no-unnecessary-block-callback)
-- [`legibility/prefer-concat-object-assign`](#prefer-concat-object-assign)
 - [`legibility/prefer-early-return`](#prefer-early-return)
 - [`legibility/prefer-flat-map`](#prefer-flat-map)
 - [`legibility/prefer-guard-clauses`](#prefer-guard-clauses)
 - [`legibility/prefer-object-lookup`](#prefer-object-lookup)
 - [`legibility/prefer-positive-condition-names`](#prefer-positive-condition-names)
-- [`legibility/require-executable-shebang`](#require-executable-shebang)
 - [`legibility/require-jsdoc-multiline-comments`](#require-jsdoc-multiline-comments)
 
-**Opt-in filename policy**
+**Strict only**
 
-- [`legibility/require-filename-matches-dirname`](#require-filename-matches-dirname)
+- [`legibility/no-direct-node-bin-smoke`](#no-direct-node-bin-smoke)
+- [`legibility/no-quadratic-patterns`](#no-quadratic-patterns)
+- [`legibility/no-repeated-collection-search`](#no-repeated-collection-search)
+- [`legibility/no-single-use-renaming-alias`](#no-single-use-renaming-alias)
+- [`legibility/no-small-collection-conversion`](#no-small-collection-conversion)
+- [`legibility/no-standalone-array-mutations`](#no-standalone-array-mutations)
+- [`legibility/no-unnecessary-async`](#no-unnecessary-async)
 
-**Opt-in comment policy**
+**Opt-in project policies**
 
 - [`legibility/no-unmatched-comments`](#no-unmatched-comments)
+- [`legibility/prefer-concat-object-assign`](#prefer-concat-object-assign)
+- [`legibility/require-executable-shebang`](#require-executable-shebang)
+- [`legibility/require-filename-matches-dirname`](#require-filename-matches-dirname)
 
 </details>
 
@@ -719,7 +723,15 @@ Prefer expression-bodied arrow callbacks when the callback block only returns.
 
 ### `legibility/prefer-concat-object-assign()`
 
-Prefer `concat` and `Object.assign` over spread composition.
+Opt-in opinion: prefer explicit method-based composition when that is the project style.
+
+The reason is consistency and searchability. It is not a universal speed claim.
+
+ESLint's opposing [prefer-object-spread][eslint-prefer-object-spread] rule only says spread may perform better.
+
+[V8's spread documentation][v8-spread] shows that fast paths depend on position and data shape. Engine, collection size, and object shape can change the result.
+
+The forms are not semantically identical. Object assignment can invoke setters, while object spread creates data properties. Concat uses concat-spreadability, while array spread uses iteration.
 
 #### do / don't
 
@@ -849,6 +861,8 @@ Prefer positive boolean names over names like `isNotReady`.
 
 <!-- require-executable-shebang runtime defaults from src/constants.ts -->
 Require configured CLI entry source files to include a Node, Bun, or Deno shebang.
+
+This rule is opt-in because a common source index is not necessarily executable. Enable it only for actual command entry paths.
 
 #### options
 
@@ -1116,7 +1130,7 @@ Use an `oxlint/*` preset above with `oxlint.config.ts`. For `.oxlintrc.json`, re
     "legibility/max-array-chain-depth": ["warn", { "max": 2 }],
     "legibility/max-expression-operators": ["warn", { "max": 4 }],
     "legibility/no-quadratic-patterns": "warn",
-    "complexity": ["warn", { "max": 20, "variant": "classic" }],
+    "complexity": ["warn", 20],
     "max-lines-per-function": [
       "warn",
       {
@@ -1170,6 +1184,13 @@ Rules are configured through ESLint or Oxlint `rules`.
 - Releases are tag-triggered and publish GitHub release assets.
 - npm publishing uses GitHub Actions trusted publishing with provenance.
 <!-- runtime compatibility coverage from .github/workflows/ci.yml -->
-- CI runs validation on Node 26, Docker package-consumer end-to-end tests, and compatibility suites on Bun and Deno.
+- CI runs tests on Node 22, 24, and 26; Docker package-consumer tests cover supported ESLint and Oxlint ranges; compatibility suites run on Bun and Deno.
 - Codependence maintains pnpm dependencies, GitHub Actions, and Docker image pins.
 - Pastoralist audits CVE overrides in `pnpm-workspace.yaml` and records their metadata in `package.json`.
+
+## License
+
+[MIT](./LICENSE)
+
+[eslint-prefer-object-spread]: https://eslint.org/docs/latest/rules/prefer-object-spread
+[v8-spread]: https://v8.dev/blog/spread-elements
