@@ -40,6 +40,7 @@ interface CommentDiagnostic {
 interface EslintMessage {
   column: number;
   endLine?: number;
+  fatal?: boolean;
   line: number;
   message: string;
   ruleId: string | null;
@@ -55,6 +56,7 @@ interface OxlintDiagnostic {
   filename: string;
   labels: Array<{ span: OxlintSpan }>;
   message: string;
+  severity: string;
 }
 
 interface OxlintResult {
@@ -66,6 +68,19 @@ interface OxlintSpan {
   length: number;
   line: number;
   offset: number;
+}
+
+interface ParsedCommentPolicy {
+  diagnostics: CommentDiagnostic[];
+  hasFatalError: boolean;
+}
+
+interface CommentPolicyEvaluation {
+  changedLines: ReadonlyMap<string, Set<number>>;
+  newFiles: ReadonlySet<string>;
+  policy: ParsedCommentPolicy;
+  status: number | null;
+  stderr: string;
 }
 
 function parseLintChangedArgs(args: readonly string[]): LintChangedOptions {
@@ -136,12 +151,11 @@ function addHunkLines(addedLines: Map<string, Set<number>>, file: string, line: 
   const hasHunk = file.length > 0 && hunkLines.length > 0;
   if (!hasHunk) return;
 
-  const nextFileLines = new Set(addedLines.get(file));
+  const fileLines = new Set(addedLines.get(file));
   const mergedLines = hunkLines.reduce((lines, lineNumber) => {
-    const nextLines = new Set(lines);
-    nextLines.add(lineNumber);
-    return nextLines;
-  }, nextFileLines);
+    lines.add(lineNumber);
+    return lines;
+  }, fileLines);
   addedLines.set(file, mergedLines);
 }
 
@@ -160,11 +174,15 @@ function changedLineNumbers(base: string, files: string[]): Map<string, Set<numb
   if (files.length === 0) return new Map();
 
   const mergeBase = resolveMergeBase(base);
-  const args = ['diff', '--unified=0', '--no-color', mergeBase, '--'].concat(files);
+  const args = ['diff', '--find-renames', '--unified=0', '--no-color', mergeBase, '--'];
   const result = spawnSync('git', args, { encoding: 'utf8' });
   const failed = result.error || result.status !== 0;
   if (failed) return null;
-  return parseAddedLines(result.stdout || '');
+
+  const changedLines = parseAddedLines(result.stdout || '');
+  const requestedFiles = new Set(files.map(normalizeSeparators));
+  const selectedLines = Array.from(changedLines).filter(([file]) => requestedFiles.has(file));
+  return new Map(selectedLines);
 }
 
 function runLinter(bin: string, args: string[]): number {
@@ -181,9 +199,13 @@ function getCommentRuleArgs(bin: string, forbidComments: boolean): string[] {
 }
 
 function getCommentPolicyArgs(bin: string, files: string[]): string[] {
+  const isOxlint = bin.endsWith('/oxlint') || bin === 'oxlint';
+  const policyArgs = isOxlint
+    ? ['--no-ignore']
+    : ['--no-ignore', '--no-inline-config', '--exit-on-fatal-error'];
   const formatArgs = ['--format', 'json'];
   const commentRuleArgs = getCommentRuleArgs(bin, true);
-  return formatArgs.concat(commentRuleArgs, files);
+  return policyArgs.concat(formatArgs, commentRuleArgs, files);
 }
 
 function normalizeSeparators(file: string): string {
@@ -217,12 +239,15 @@ function parseEslintResult(result: EslintResult): CommentDiagnostic[] {
   });
 }
 
-function parseEslintDiagnostics(output: string): CommentDiagnostic[] {
+function parseEslintPolicy(output: string): ParsedCommentPolicy {
   const results = JSON.parse(output) as EslintResult[];
-  return results.reduce<CommentDiagnostic[]>((diagnostics, result) => {
+  const diagnostics = results.reduce<CommentDiagnostic[]>((current, result) => {
     const fileDiagnostics = parseEslintResult(result);
-    return diagnostics.concat(fileDiagnostics);
+    return current.concat(fileDiagnostics);
   }, []);
+  const messages = results.flatMap((result) => result.messages);
+  const hasFatalError = messages.some((message) => message.fatal);
+  return { diagnostics, hasFatalError };
 }
 
 function getSpanEndLine(source: Buffer, span: OxlintSpan): number {
@@ -254,18 +279,25 @@ function toOxlintDiagnostic(diagnostic: OxlintDiagnostic): CommentDiagnostic[] {
   return [commentDiagnostic];
 }
 
-function parseOxlintDiagnostics(output: string): CommentDiagnostic[] {
+function parseOxlintPolicy(output: string): ParsedCommentPolicy {
   const result = JSON.parse(output) as OxlintResult;
-  const diagnostics = result.diagnostics.filter(
+  const commentDiagnostics = result.diagnostics.filter(
     (diagnostic) => diagnostic.code === 'legibility(no-unmatched-comments)',
   );
-  return diagnostics.flatMap(toOxlintDiagnostic);
+  const diagnostics = commentDiagnostics.flatMap(toOxlintDiagnostic);
+  const hasFatalError = result.diagnostics.some((diagnostic) => {
+    const isCommentDiagnostic = diagnostic.code === 'legibility(no-unmatched-comments)';
+    const isError = diagnostic.severity === 'error';
+    const isFatalError = isError && !isCommentDiagnostic;
+    return isFatalError;
+  });
+  return { diagnostics, hasFatalError };
 }
 
-function parseCommentDiagnostics(bin: string, output: string): CommentDiagnostic[] {
+function parseCommentPolicy(bin: string, output: string): ParsedCommentPolicy {
   const isOxlint = bin.endsWith('/oxlint') || bin === 'oxlint';
-  if (isOxlint) return parseOxlintDiagnostics(output);
-  return parseEslintDiagnostics(output);
+  if (isOxlint) return parseOxlintPolicy(output);
+  return parseEslintPolicy(output);
 }
 
 function intersectsAddedLine(diagnostic: CommentDiagnostic, addedLines: Set<number>): boolean {
@@ -300,6 +332,21 @@ function selectCommentViolations(
   );
 }
 
+function evaluateCommentPolicy(input: CommentPolicyEvaluation): number {
+  const { changedLines, newFiles, policy, status, stderr } = input;
+  const hasUnexpectedStatus = status === null || status > 1;
+  const hasPolicyFailure = policy.hasFatalError || hasUnexpectedStatus;
+  if (hasPolicyFailure) {
+    process.stderr.write(stderr || 'lint-changed: comment policy failed\n');
+    return 1;
+  }
+
+  const violations = selectCommentViolations(policy.diagnostics, newFiles, changedLines);
+  violations.forEach(printCommentDiagnostic);
+  const hasViolations = violations.length > 0;
+  return Number(hasViolations);
+}
+
 function runCommentPolicy(
   bin: string,
   files: string[],
@@ -311,11 +358,15 @@ function runCommentPolicy(
   if (result.error) return 1;
 
   try {
-    const diagnostics = parseCommentDiagnostics(bin, result.stdout || '');
-    const violations = selectCommentViolations(diagnostics, newFiles, changedLines);
-    violations.forEach(printCommentDiagnostic);
-    const hasViolations = violations.length > 0;
-    return hasViolations ? 1 : 0;
+    const policy = parseCommentPolicy(bin, result.stdout || '');
+    const evaluation = {
+      changedLines,
+      newFiles,
+      policy,
+      status: result.status,
+      stderr: result.stderr || '',
+    };
+    return evaluateCommentPolicy(evaluation);
   } catch {
     process.stderr.write(result.stderr || 'lint-changed: comment policy failed\n');
     return 1;
@@ -352,11 +403,12 @@ function runNewFileLinters(linters: string[], files: string[]): number {
   return codes.some((code) => code !== 0) ? 1 : 0;
 }
 
-function runModifiedFileLinters(linters: string[], files: string[]): void {
-  if (files.length === 0) return;
+function runModifiedFileLinters(linters: string[], files: string[]): number {
+  if (files.length === 0) return 0;
 
   process.stdout.write(`~ ${files.length} modified file(s) — warn\n`);
-  linters.forEach((bin) => runLinter(bin, files));
+  const codes = linters.map((bin) => runLinter(bin, files));
+  return codes.some((code) => code !== 0) ? 1 : 0;
 }
 
 function runSessionPolicy(input: SessionPolicyInput): number {
@@ -405,12 +457,12 @@ if (isMain) {
   }
 
   const newFileExitCode = runNewFileLinters(linters, newFiles);
-  runModifiedFileLinters(linters, modifiedFiles);
+  const modifiedFileExitCode = runModifiedFileLinters(linters, modifiedFiles);
   const sessionPolicyInput = {
     comments: options,
     files: { modified: modifiedFiles, new: newFiles },
     linters: { eslint, oxlint },
   };
   const policyExitCode = runSessionPolicy(sessionPolicyInput);
-  process.exit(Math.max(newFileExitCode, policyExitCode));
+  process.exit(Math.max(newFileExitCode, modifiedFileExitCode, policyExitCode));
 }

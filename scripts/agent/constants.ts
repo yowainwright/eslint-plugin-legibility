@@ -53,6 +53,7 @@ const commentPolicyRules = [
   "- Run `npx lint-changed --comments=forbid` during agent sessions.",
   "- `legibility/no-stacked-comments` rejects adjacent comments.",
   "- The session flag enables `legibility/no-unmatched-comments` as an error for new files and added lines.",
+  "- ESLint disable directives cannot suppress the session policy.",
   "- A configured `prefixIdentifiers` or `suffixIdentifiers` value lets ESLint allow a matching comment.",
   "- An adjacent comment should be updated or removed instead of stacking another comment.",
 ].join("\n");

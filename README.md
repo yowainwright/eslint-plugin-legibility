@@ -24,7 +24,7 @@ This project provides ESLint and Oxlint-compatible rules for readable, explicit,
 
 The package exports an ESLint-compatible plugin object. ESLint can load it as a normal plugin, and Oxlint can load the same package through JavaScript plugin support. 
 
-Runtime support is Node 22 through 26, Bun, and Deno. The supported hosts are ESLint 8.57 through 10 and Oxlint 1.55 through current. Both are optional peers, so consumers only install the linter they use. Oxlint's JavaScript plugin API is currently marked alpha by [Oxlint](https://oxc.rs/docs/guide/usage/linter/js-plugins).
+Runtime support is Node 22.12 through 26, Bun, and Deno. Node 22.12 is the minimum because it added [CommonJS interoperability for synchronous ESM loading][node-require-esm]. The supported hosts are ESLint 8.57 through 10 and Oxlint 1.55 through current. Both are optional peers, so consumers only install the linter they use. Oxlint's JavaScript plugin API is currently marked alpha by [Oxlint](https://oxc.rs/docs/guide/usage/linter/js-plugins).
 
 ```sh
 # npm, pnpm, bun
@@ -1017,6 +1017,8 @@ npx lint-changed --comments=forbid
 
 The flag enables `legibility/no-unmatched-comments` as an error for that invocation. It does not change the project config. Every comment in a new file fails. In modified files, only comments that intersect added lines fail, so existing comments outside the session diff remain untouched.
 
+ESLint disable directives cannot suppress the session policy. Parse or configuration failures fail the command, and a pure file rename does not turn existing comments into additions.
+
 Pass the base branch before or after the flag:
 
 ```sh
@@ -1193,4 +1195,5 @@ Rules are configured through ESLint or Oxlint `rules`.
 [MIT](./LICENSE)
 
 [eslint-prefer-object-spread]: https://eslint.org/docs/latest/rules/prefer-object-spread
+[node-require-esm]: https://nodejs.org/dist/latest/docs/api/modules.html
 [v8-spread]: https://v8.dev/blog/spread-elements

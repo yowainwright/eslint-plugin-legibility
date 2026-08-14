@@ -26,6 +26,7 @@ const gitEnvironmentVariables = [
 gitEnvironmentVariables.forEach((variable) => delete process.env[variable]);
 const {
   changedFiles,
+  changedLineNumbers,
   getCommentPolicyArgs,
   getSpanEndLine,
   isDirectRun,
@@ -48,7 +49,7 @@ function runGit(repository: string, args: string[]): void {
 }
 
 function createCleanRepository(): string {
-  const fixtureRoot = join(process.cwd(), '.build', 'test-fixtures');
+  const fixtureRoot = join(process.cwd(), 'tests', '.test-fixtures');
   mkdirSync(fixtureRoot, { recursive: true });
   const repository = mkdtempSync(join(fixtureRoot, 'lint-changed-'));
   runGit(repository, ['init', '--quiet']);
@@ -86,6 +87,9 @@ test('parseLintChangedArgs supports the forbid-comments session policy', () => {
 test('getCommentPolicyArgs enables no-unmatched-comments for ESLint and Oxlint', () => {
   const files = ['src/check.ts'];
   assert.deepEqual(getCommentPolicyArgs('./node_modules/.bin/eslint', files), [
+    '--no-ignore',
+    '--no-inline-config',
+    '--exit-on-fatal-error',
     '--format',
     'json',
     '--rule',
@@ -93,12 +97,27 @@ test('getCommentPolicyArgs enables no-unmatched-comments for ESLint and Oxlint',
     'src/check.ts',
   ]);
   assert.deepEqual(getCommentPolicyArgs('./node_modules/.bin/oxlint', files), [
+    '--no-ignore',
     '--format',
     'json',
     '--deny',
     'legibility/no-unmatched-comments',
     'src/check.ts',
   ]);
+});
+
+test('changedLineNumbers preserves pure rename detection', (context) => {
+  const repository = createCleanRepository();
+  context.after(() => rmSync(repository, { recursive: true }));
+  runGit(repository, ['mv', 'check.ts', 'renamed.ts']);
+
+  const cwd = process.cwd();
+  process.chdir(repository);
+  try {
+    assert.deepEqual(changedLineNumbers('HEAD', ['renamed.ts']), new Map());
+  } finally {
+    process.chdir(cwd);
+  }
 });
 
 test('parseAddedLines maps zero-context hunks to current line numbers', () => {
@@ -189,4 +208,65 @@ test('lint-changed reports no files in a clean checkout', (context) => {
   });
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /No changed JS\/TS files/);
+});
+
+test('lint-changed rejects inline directives during comment-forbidden sessions', (context) => {
+  const repository = createCleanRepository();
+  context.after(() => rmSync(repository, { recursive: true }));
+  const source = [
+    '/* eslint-disable legibility/no-unmatched-comments */',
+    'export const ready = true;',
+  ].join('\n');
+  writeFileSync(join(repository, 'check.ts'), `${source}\n`);
+
+  const result = spawnSync(process.execPath, [binPath, 'HEAD', '--comments=forbid'], {
+    cwd: repository,
+    encoding: 'utf8',
+    env: getFixtureEnvironment(),
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Comment does not match/);
+});
+
+test('lint-changed fails when comment-policy parsing aborts', (context) => {
+  const repository = createCleanRepository();
+  context.after(() => rmSync(repository, { recursive: true }));
+  writeFileSync(join(repository, 'check.ts'), 'export const ready = ;\n// hidden comment\n');
+
+  const result = spawnSync(process.execPath, [binPath, 'HEAD', '--comments=forbid'], {
+    cwd: repository,
+    encoding: 'utf8',
+    env: getFixtureEnvironment(),
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /comment policy failed/);
+});
+
+test('lint-changed preserves modified-file linter failures', (context) => {
+  const repository = createCleanRepository();
+  context.after(() => rmSync(repository, { recursive: true }));
+  writeFileSync(join(repository, 'check.ts'), 'export const ready = ;\n');
+
+  const result = spawnSync(process.execPath, [binPath, 'HEAD'], {
+    cwd: repository,
+    encoding: 'utf8',
+    env: getFixtureEnvironment(),
+  });
+  assert.equal(result.status, 1);
+});
+
+test('lint-changed permits existing comments in pure renames', (context) => {
+  const repository = createCleanRepository();
+  context.after(() => rmSync(repository, { recursive: true }));
+  writeFileSync(join(repository, 'check.ts'), '// existing context\nexport const ready = true;\n');
+  runGit(repository, ['add', 'check.ts']);
+  runGit(repository, ['commit', '--quiet', '--amend', '--no-edit']);
+  runGit(repository, ['mv', 'check.ts', 'renamed.ts']);
+
+  const result = spawnSync(process.execPath, [binPath, 'HEAD', '--comments=forbid'], {
+    cwd: repository,
+    encoding: 'utf8',
+    env: getFixtureEnvironment(),
+  });
+  assert.equal(result.status, 0, result.stderr);
 });
