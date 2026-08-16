@@ -568,8 +568,11 @@ function isUndefinedExpression(node: MaybeAstNode): boolean {
   const isVoidExpression = node.operator === "void";
   if (!isVoidExpression) return false;
 
-  const hasLiteralArgument = isRecord(node.argument) && node.argument.type === "Literal";
-  return hasLiteralArgument;
+  const argument = node.argument;
+  const hasLiteralArgument = isRecord(argument) && argument.type === "Literal";
+  const hasUndefinedArgument =
+    isRecord(argument) && argument.type === "Identifier" && argument.name === "undefined";
+  return hasLiteralArgument || hasUndefinedArgument;
 }
 
 function isLiteralLookupValue(node: MaybeAstNode): boolean {

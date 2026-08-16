@@ -1525,13 +1525,16 @@ test("no-identity-array-callback reports identity map and always-true filter", (
 test("no-redundant-nullish-fallback reports undefined fallbacks", () => {
   const { visitor, reports } = createRule("no-redundant-nullish-fallback");
   const voidZero = { type: "UnaryExpression", operator: "void", argument: literal(0) };
+  const voidUndefined = { type: "UnaryExpression", operator: "void", argument: id("undefined") };
 
   visitor.LogicalExpression(logical(id("value"), id("undefined"), "??"));
   visitor.LogicalExpression(logical(id("value"), voidZero, "??"));
+  visitor.LogicalExpression(logical(id("value"), voidUndefined, "??"));
 
-  assert.equal(reports.length, 2);
+  assert.equal(reports.length, 3);
   assert.equal(reports[0].messageId, "redundantUndefined");
   assert.equal(reports[1].messageId, "redundantUndefined");
+  assert.equal(reports[2].messageId, "redundantUndefined");
 });
 
 test("no-redundant-nullish-fallback allows effectful void fallbacks", () => {
