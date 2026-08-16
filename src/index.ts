@@ -95,6 +95,7 @@ import type {
   AsyncFsBindings,
   AsyncRuleFinding,
   AstNode,
+  AstPrimitive,
   AstValue,
   ControlFlowState,
   FilenameDetails,
@@ -123,6 +124,10 @@ import type {
   StringSet,
   TraversableEntry,
 } from "./types.js";
+
+type StaticEvaluation = { value: AstPrimitive };
+
+const STATIC_LOGICAL_OPERATORS = new Set(["&&", "??", "||"]);
 
 function defineRule(
   meta: RuleMeta,
@@ -555,57 +560,177 @@ function isBooleanLiteral(node: MaybeAstNode, value?: boolean): boolean {
   return isBooleanValue;
 }
 
-function isNonThrowingPrimitiveLiteral(node: MaybeAstNode): boolean {
-  const isLiteral = isRecord(node) && node.type === "Literal";
-  if (!isLiteral) return false;
+function isAstPrimitive(value: AstValue): value is AstPrimitive {
+  const isNullish = value === null || value === undefined;
+  if (isNullish) return true;
 
-  const isBigIntLiteral = typeof node.value === "bigint" || typeof node.bigint === "string";
-  if (isBigIntLiteral) return false;
-
-  const valueType = typeof node.value;
-  const isPrimitiveValue = node.value === null || ["boolean", "number", "string"].includes(valueType);
-  return isPrimitiveValue;
+  const valueType = typeof value;
+  return ["bigint", "boolean", "number", "string"].includes(valueType);
 }
 
-function hasNonThrowingStaticOperands(node: MaybeAstNode): boolean {
-  if (!isRecord(node)) return false;
+function evaluateStaticLiteral(node: AstNode): StaticEvaluation | undefined {
+  const bigintText = typeof node.bigint === "string" ? node.bigint : undefined;
+  if (bigintText !== undefined) {
+    try {
+      const value = BigInt(bigintText);
+      return { value };
+    } catch {
+      return undefined;
+    }
+  }
 
-  return isNonThrowingStaticExpression(node.left) && isNonThrowingStaticExpression(node.right);
+  const value = node.value;
+  if (!isAstPrimitive(value)) return undefined;
+
+  return { value };
 }
 
-function isNonThrowingStaticExpression(node: MaybeAstNode): boolean {
-  const isNode = isRecord(node);
-  if (!isNode) return false;
+function staticOperand(value: AstPrimitive): number {
+  return value as number;
+}
 
-  const isLiteral = node.type === "Literal";
-  if (isLiteral) return isNonThrowingPrimitiveLiteral(node);
+function evaluateStaticUnaryOperator(operator: string, argument: AstPrimitive): StaticEvaluation | undefined {
+  try {
+    const operand = staticOperand(argument);
+    let value: AstPrimitive;
+    switch (operator) {
+      case "!": value = !operand; break;
+      case "+": value = +operand; break;
+      case "-": value = -operand; break;
+      case "~": value = ~operand; break;
+      case "delete": value = true; break;
+      case "typeof": value = typeof operand; break;
+      case "void": value = undefined; break;
+      default: return undefined;
+    }
+    return { value };
+  } catch {
+    return undefined;
+  }
+}
 
-  const isUnaryExpression = node.type === "UnaryExpression";
-  if (isUnaryExpression) return isNonThrowingStaticExpression(node.argument);
+function evaluateStaticArithmetic(operator: string, left: AstPrimitive, right: AstPrimitive): StaticEvaluation | undefined {
+  try {
+    const leftOperand = staticOperand(left);
+    const rightOperand = staticOperand(right);
+    let value: AstPrimitive;
+    switch (operator) {
+      case "+": value = leftOperand + rightOperand; break;
+      case "-": value = leftOperand - rightOperand; break;
+      case "*": value = leftOperand * rightOperand; break;
+      case "/": value = leftOperand / rightOperand; break;
+      case "%": value = leftOperand % rightOperand; break;
+      case "**": value = leftOperand ** rightOperand; break;
+      default: return undefined;
+    }
+    return { value };
+  } catch {
+    return undefined;
+  }
+}
 
-  const isLogicalExpression = node.type === "LogicalExpression";
-  if (isLogicalExpression) return hasNonThrowingStaticOperands(node);
+function evaluateStaticBitwise(operator: string, left: AstPrimitive, right: AstPrimitive): StaticEvaluation | undefined {
+  try {
+    const leftOperand = staticOperand(left);
+    const rightOperand = staticOperand(right);
+    let value: AstPrimitive;
+    switch (operator) {
+      case "&": value = leftOperand & rightOperand; break;
+      case "|": value = leftOperand | rightOperand; break;
+      case "^": value = leftOperand ^ rightOperand; break;
+      case "<<": value = leftOperand << rightOperand; break;
+      case ">>": value = leftOperand >> rightOperand; break;
+      case ">>>": value = leftOperand >>> rightOperand; break;
+      default: return undefined;
+    }
+    return { value };
+  } catch {
+    return undefined;
+  }
+}
 
-  const isBinaryExpression = node.type === "BinaryExpression";
-  if (!isBinaryExpression) return false;
+function evaluateStaticComparison(
+  operator: string,
+  left: AstPrimitive,
+  right: AstPrimitive,
+): StaticEvaluation | undefined {
+  let value: boolean;
+  switch (operator) {
+    case "==": value = left == right; break;
+    case "!=": value = left != right; break;
+    case "===": value = left === right; break;
+    case "!==": value = left !== right; break;
+    case "<": value = staticOperand(left) < staticOperand(right); break;
+    case "<=": value = staticOperand(left) <= staticOperand(right); break;
+    case ">": value = staticOperand(left) > staticOperand(right); break;
+    case ">=": value = staticOperand(left) >= staticOperand(right); break;
+    default: return undefined;
+  }
+  return { value };
+}
 
-  const canThrowForPrimitiveOperands = node.operator === "in" || node.operator === "instanceof";
-  if (canThrowForPrimitiveOperands) return false;
+function evaluateStaticBinaryExpression(node: AstNode): StaticEvaluation | undefined {
+  const left = evaluateStaticExpression(node.left);
+  if (!left) return undefined;
 
-  return hasNonThrowingStaticOperands(node);
+  const right = evaluateStaticExpression(node.right);
+  if (!right) return undefined;
+
+  const operator = typeof node.operator === "string" ? node.operator : "";
+  const arithmetic = evaluateStaticArithmetic(operator, left.value, right.value);
+  if (arithmetic) return arithmetic;
+
+  const bitwise = evaluateStaticBitwise(operator, left.value, right.value);
+  if (bitwise) return bitwise;
+
+  return evaluateStaticComparison(operator, left.value, right.value);
+}
+
+function evaluateStaticLogicalExpression(node: AstNode): StaticEvaluation | undefined {
+  const left = evaluateStaticExpression(node.left);
+  if (!left) return undefined;
+
+  const operator = node.operator;
+  const shortCircuitsAnd = operator === "&&" && !left.value;
+  if (shortCircuitsAnd) return left;
+
+  const shortCircuitsOr = operator === "||" && !!left.value;
+  if (shortCircuitsOr) return left;
+
+  const isNullish = left.value === null || left.value === undefined;
+  const shortCircuitsNullish = operator === "??" && !isNullish;
+  if (shortCircuitsNullish) return left;
+
+  const evaluatesRight = typeof operator === "string" && STATIC_LOGICAL_OPERATORS.has(operator);
+  if (!evaluatesRight) return undefined;
+
+  return evaluateStaticExpression(node.right);
+}
+
+function evaluateStaticExpression(node: MaybeAstNode): StaticEvaluation | undefined {
+  if (!isRecord(node)) return undefined;
+
+  if (node.type === "Literal") return evaluateStaticLiteral(node);
+  if (node.type === "BinaryExpression") return evaluateStaticBinaryExpression(node);
+  if (node.type === "LogicalExpression") return evaluateStaticLogicalExpression(node);
+  if (node.type !== "UnaryExpression") return undefined;
+
+  const argument = evaluateStaticExpression(node.argument);
+  if (!argument) return undefined;
+
+  const operator = typeof node.operator === "string" ? node.operator : "";
+  return evaluateStaticUnaryOperator(operator, argument.value);
 }
 
 function isSideEffectFreeExpression(node: MaybeAstNode): boolean {
-  const isNode = isRecord(node);
-  if (!isNode) return false;
-
-  const isLiteral = node.type === "Literal";
+  const isLiteral = isRecord(node) && node.type === "Literal";
   if (isLiteral) return true;
 
-  const isUndefinedIdentifier = node.type === "Identifier" && node.name === "undefined";
+  const isUndefinedIdentifier =
+    isRecord(node) && node.type === "Identifier" && node.name === "undefined";
   if (isUndefinedIdentifier) return true;
 
-  return isNonThrowingStaticExpression(node);
+  return evaluateStaticExpression(node) !== undefined;
 }
 
 function isUndefinedExpression(node: MaybeAstNode): boolean {

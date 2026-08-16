@@ -151,6 +151,15 @@ function literal(value: any): any {
   };
 }
 
+function bigintLiteral(value: bigint): any {
+  return {
+    type: "Literal",
+    value,
+    bigint: String(value),
+    __text: `${value}n`,
+  };
+}
+
 function arrayExpression(elements: any[]): any {
   const node: any = { type: "ArrayExpression", elements };
   elements.forEach((element) => {
@@ -223,6 +232,12 @@ function logical(left: any, right: any, operator = "&&"): any {
   };
   left.parent = node;
   right.parent = node;
+  return node;
+}
+
+function unary(operator: string, argument: any): any {
+  const node: any = { type: "UnaryExpression", operator, argument };
+  argument.parent = node;
   return node;
 }
 
@@ -1524,35 +1539,70 @@ test("no-identity-array-callback reports identity map and always-true filter", (
 
 test("no-redundant-nullish-fallback reports undefined fallbacks", () => {
   const { visitor, reports } = createRule("no-redundant-nullish-fallback");
-  const voidZero = { type: "UnaryExpression", operator: "void", argument: literal(0) };
-  const voidUndefined = { type: "UnaryExpression", operator: "void", argument: id("undefined") };
-  const voidBinary = {
-    type: "UnaryExpression",
-    operator: "void",
-    argument: binary(literal(1), "+", literal(2)),
-  };
+  const voidZero = unary("void", literal(0));
+  const voidUndefined = unary("void", id("undefined"));
+  const voidBinary = unary("void", binary(literal(1), "+", literal(2)));
+  const voidBigIntBinary = unary("void", binary(bigintLiteral(1n), "+", bigintLiteral(2n)));
+  const voidRegex = unary("void", literal(/value/));
 
   visitor.LogicalExpression(logical(id("value"), id("undefined"), "??"));
   visitor.LogicalExpression(logical(id("value"), voidZero, "??"));
   visitor.LogicalExpression(logical(id("value"), voidUndefined, "??"));
   visitor.LogicalExpression(logical(id("value"), voidBinary, "??"));
+  visitor.LogicalExpression(logical(id("value"), voidBigIntBinary, "??"));
+  visitor.LogicalExpression(logical(id("value"), voidRegex, "??"));
 
-  assert.equal(reports.length, 4);
-  assert.equal(reports[0].messageId, "redundantUndefined");
-  assert.equal(reports[1].messageId, "redundantUndefined");
-  assert.equal(reports[2].messageId, "redundantUndefined");
-  assert.equal(reports[3].messageId, "redundantUndefined");
+  assert.equal(reports.length, 6);
+  reports.forEach((report) => assert.equal(report.messageId, "redundantUndefined"));
+});
+
+test("no-redundant-nullish-fallback evaluates static operators", () => {
+  const { visitor, reports } = createRule("no-redundant-nullish-fallback");
+  const arithmeticOperators = ["+", "-", "*", "/", "%", "**"];
+  const bitwiseOperators = ["&", "|", "^", "<<", ">>", ">>>"];
+  const comparisonOperators = ["==", "!=", "===", "!==", "<", "<=", ">", ">="];
+  const binaryOperators = arithmeticOperators.concat(bitwiseOperators, comparisonOperators);
+  const binaryArguments = binaryOperators.map((operator) => binary(literal(4), operator, literal(2)));
+  const bigintOperators = ["+", "-", "*", "/", "%", "**", "&", "|", "^", "<<", ">>"];
+  const bigintArguments = bigintOperators.map((operator) =>
+    binary(bigintLiteral(4n), operator, bigintLiteral(2n)),
+  );
+  const numberUnaryArguments = ["!", "+", "-", "~", "delete", "typeof", "void"].map(
+    (operator) => unary(operator, literal(1)),
+  );
+  const bigintUnaryArguments = [unary("-", bigintLiteral(1n)), unary("~", bigintLiteral(1n))];
+  const unaryArguments = numberUnaryArguments.concat(bigintUnaryArguments);
+  const mixedBigIntArguments = [
+    binary(bigintLiteral(1n), "+", literal(" item")),
+    binary(bigintLiteral(1n), "<", literal(2)),
+  ];
+  const logicalArguments = [
+    logical(literal(true), literal(1), "&&"),
+    logical(literal(false), literal(1), "||"),
+    logical(literal(null), literal(1), "??"),
+    logical(literal(false), binary(bigintLiteral(1n), "+", literal(1)), "&&"),
+    logical(literal(true), binary(bigintLiteral(1n), "+", literal(1)), "||"),
+    logical(literal(1), binary(bigintLiteral(1n), "+", literal(1)), "??"),
+  ];
+  const staticArguments = binaryArguments.concat(
+    bigintArguments,
+    unaryArguments,
+    mixedBigIntArguments,
+    logicalArguments,
+  );
+
+  staticArguments.forEach((argument) => {
+    visitor.LogicalExpression(logical(id("value"), unary("void", argument), "??"));
+  });
+
+  assert.equal(reports.length, staticArguments.length);
 });
 
 test("no-redundant-nullish-fallback allows effectful void fallbacks", () => {
   const { visitor, reports } = createRule("no-redundant-nullish-fallback");
   const logMissCall = call(id("logMiss"));
-  const effectfulVoid = { type: "UnaryExpression", operator: "void", argument: logMissCall };
-  const effectfulBinaryVoid = {
-    type: "UnaryExpression",
-    operator: "void",
-    argument: binary(logMissCall, "+", literal(1)),
-  };
+  const effectfulVoid = unary("void", logMissCall);
+  const effectfulBinaryVoid = unary("void", binary(logMissCall, "+", literal(1)));
 
   visitor.LogicalExpression(logical(id("value"), effectfulVoid, "??"));
   visitor.LogicalExpression(logical(id("value"), effectfulBinaryVoid, "??"));
@@ -1562,16 +1612,43 @@ test("no-redundant-nullish-fallback allows effectful void fallbacks", () => {
 
 test("no-redundant-nullish-fallback allows throwing void fallbacks", () => {
   const { visitor, reports } = createRule("no-redundant-nullish-fallback");
-  const bigIntLiteral = { type: "Literal", value: 1n, bigint: "1", __text: "1n" };
-  const mixedBigInt = binary(bigIntLiteral, "+", literal(1));
-  const invalidIn = binary(literal(1), "in", literal(2));
-  const mixedBigIntVoid = { type: "UnaryExpression", operator: "void", argument: mixedBigInt };
-  const invalidInVoid = { type: "UnaryExpression", operator: "void", argument: invalidIn };
+  const throwingArguments = [
+    binary(bigintLiteral(1n), "+", literal(1)),
+    binary(bigintLiteral(1n), "/", bigintLiteral(0n)),
+    binary(bigintLiteral(1n), "**", unary("-", bigintLiteral(1n))),
+    binary(bigintLiteral(1n), ">>>", bigintLiteral(1n)),
+    binary(literal(1), "in", literal(2)),
+    unary("+", bigintLiteral(1n)),
+    logical(literal(true), binary(bigintLiteral(1n), "+", literal(1)), "&&"),
+  ];
 
-  visitor.LogicalExpression(logical(id("value"), mixedBigIntVoid, "??"));
-  visitor.LogicalExpression(logical(id("value"), invalidInVoid, "??"));
+  throwingArguments.forEach((argument) => {
+    visitor.LogicalExpression(logical(id("value"), unary("void", argument), "??"));
+  });
 
   assert.equal(reports.length, 0);
+});
+
+test("no-redundant-nullish-fallback evaluates BigInt through ESLint", async () => {
+  const { Linter } = await import("eslint");
+  const linter = new Linter({ configType: "flat" });
+  const source = [
+    "input ?? void (1n + 2n);",
+    "input ?? void (1n + 1);",
+    "input ?? void (1n / 0n);",
+    "input ?? void (1n ** -1n);",
+  ].join("\n");
+  const messages = linter.verify(source, [
+    {
+      plugins: { legibility: plugin },
+      languageOptions: { ecmaVersion: 2022, sourceType: "script" },
+      rules: { "legibility/no-redundant-nullish-fallback": "error" },
+    },
+  ]);
+
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].line, 1);
+  assert.equal(messages[0].messageId, "redundantUndefined");
 });
 
 test("prefer-object-lookup reports long equality OR chains", () => {
