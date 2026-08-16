@@ -565,8 +565,11 @@ function isUndefinedExpression(node: MaybeAstNode): boolean {
   const isUnaryExpression = node.type === "UnaryExpression";
   if (!isUnaryExpression) return false;
 
-  const isVoidExpression = node.operator === "void" && isRecord(node.argument);
-  return isVoidExpression;
+  const isVoidExpression = node.operator === "void";
+  if (!isVoidExpression) return false;
+
+  const hasLiteralArgument = isRecord(node.argument) && node.argument.type === "Literal";
+  return hasLiteralArgument;
 }
 
 function isLiteralLookupValue(node: MaybeAstNode): boolean {
@@ -1827,25 +1830,27 @@ function createNoComputedValues(context: RuleContext): RuleListener {
   };
 }
 
-function reportSpreadElements(
+function reportSpreadLiteral(
   context: RuleContext,
+  node: AstNode,
   nodes: readonly MaybeAstNode[],
   messageId: string,
 ): void {
-  nodes
-    .filter((node): node is AstNode => isRecord(node) && node.type === "SpreadElement")
-    .forEach((node) => {
-      context.report({ node, messageId });
-    });
+  const hasSpreadElement = nodes.some(
+    (candidate) => isRecord(candidate) && candidate.type === "SpreadElement",
+  );
+  if (!hasSpreadElement) return;
+
+  context.report({ node, messageId });
 }
 
 function createPreferConcatObjectAssign(context: RuleContext): RuleListener {
   return {
     ArrayExpression(node) {
-      reportSpreadElements(context, node.elements ?? [], "arraySpread");
+      reportSpreadLiteral(context, node, node.elements ?? [], "arraySpread");
     },
     ObjectExpression(node) {
-      reportSpreadElements(context, node.properties ?? [], "objectSpread");
+      reportSpreadLiteral(context, node, node.properties ?? [], "objectSpread");
     },
   };
 }
@@ -1949,9 +1954,6 @@ function checkNestedIteration(
   const body = getCallbackBody(node);
   const hasCallbackBody = Boolean(body);
   if (!hasCallbackBody) return false;
-
-  const containsIteration = containsCallTo(body, iterationMethods);
-  if (!containsIteration) return false;
 
   const innerMatch = Array.from(iterationMethods).find((method) =>
     containsCallTo(body, new Set([method])),

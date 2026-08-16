@@ -887,6 +887,18 @@ test("no-quadratic-patterns ignores one-time search calls in loop headers", () =
   assert.equal(reports.length, 0);
 });
 
+test("no-quadratic-patterns reports nested iteration", () => {
+  const { visitor, reports } = createRule("no-quadratic-patterns");
+  const innerIteration = methodCall(id("children"), "map", [arrow([id("child")], id("child"))]);
+  const outerIteration = methodCall(id("items"), "map", [arrow([id("item")], innerIteration)]);
+
+  visitor.CallExpression(outerIteration);
+
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].messageId, "nestedIteration");
+  assert.deepEqual(reports[0].data, { outer: "map", inner: "map" });
+});
+
 test("require-executable-shebang reports configured executable sources without shebangs", () => {
   const { visitor, reports } = createRule("require-executable-shebang");
 
@@ -1122,21 +1134,32 @@ test("no-standalone-array-mutations allows custom mutating methods", () => {
   assert.equal(reports[0].messageId, "standaloneArrayMutation");
 });
 
-test("prefer-concat-object-assign reports array and object spreads", () => {
+test("prefer-concat-object-assign reports each spread literal once", () => {
   const { visitor, reports } = createRule("prefer-concat-object-assign");
+  const spreadElements = [{ type: "SpreadElement" }, { type: "SpreadElement" }];
+  const spreadProperties = [{ type: "SpreadElement" }, { type: "SpreadElement" }];
+  const arrayExpression = { type: "ArrayExpression", elements: spreadElements };
+  const objectExpression = { type: "ObjectExpression", properties: spreadProperties };
 
-  visitor.ArrayExpression({
-    type: "ArrayExpression",
-    elements: [{ type: "SpreadElement" }],
-  });
-  visitor.ObjectExpression({
-    type: "ObjectExpression",
-    properties: [{ type: "SpreadElement" }],
-  });
+  visitor.ArrayExpression(arrayExpression);
+  visitor.ObjectExpression(objectExpression);
 
   assert.equal(reports.length, 2);
   assert.equal(reports[0].messageId, "arraySpread");
+  assert.equal(reports[0].node, arrayExpression);
   assert.equal(reports[1].messageId, "objectSpread");
+  assert.equal(reports[1].node, objectExpression);
+});
+
+test("prefer-concat-object-assign allows literals without spread", () => {
+  const { visitor, reports } = createRule("prefer-concat-object-assign");
+  const elements = [{ type: "Literal", value: "item" }];
+  const properties = [{ type: "Property" }];
+
+  visitor.ArrayExpression({ type: "ArrayExpression", elements });
+  visitor.ObjectExpression({ type: "ObjectExpression", properties });
+
+  assert.equal(reports.length, 0);
 });
 
 test("prefer-early-return reports else branches after an exiting consequent", () => {
@@ -1501,11 +1524,24 @@ test("no-identity-array-callback reports identity map and always-true filter", (
 
 test("no-redundant-nullish-fallback reports undefined fallbacks", () => {
   const { visitor, reports } = createRule("no-redundant-nullish-fallback");
+  const voidZero = { type: "UnaryExpression", operator: "void", argument: literal(0) };
 
   visitor.LogicalExpression(logical(id("value"), id("undefined"), "??"));
+  visitor.LogicalExpression(logical(id("value"), voidZero, "??"));
 
-  assert.equal(reports.length, 1);
+  assert.equal(reports.length, 2);
   assert.equal(reports[0].messageId, "redundantUndefined");
+  assert.equal(reports[1].messageId, "redundantUndefined");
+});
+
+test("no-redundant-nullish-fallback allows effectful void fallbacks", () => {
+  const { visitor, reports } = createRule("no-redundant-nullish-fallback");
+  const logMissCall = call(id("logMiss"));
+  const effectfulVoid = { type: "UnaryExpression", operator: "void", argument: logMissCall };
+
+  visitor.LogicalExpression(logical(id("value"), effectfulVoid, "??"));
+
+  assert.equal(reports.length, 0);
 });
 
 test("prefer-object-lookup reports long equality OR chains", () => {
