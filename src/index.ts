@@ -555,6 +555,46 @@ function isBooleanLiteral(node: MaybeAstNode, value?: boolean): boolean {
   return isBooleanValue;
 }
 
+function isNonThrowingPrimitiveLiteral(node: MaybeAstNode): boolean {
+  const isLiteral = isRecord(node) && node.type === "Literal";
+  if (!isLiteral) return false;
+
+  const isBigIntLiteral = typeof node.value === "bigint" || typeof node.bigint === "string";
+  if (isBigIntLiteral) return false;
+
+  const valueType = typeof node.value;
+  const isPrimitiveValue = node.value === null || ["boolean", "number", "string"].includes(valueType);
+  return isPrimitiveValue;
+}
+
+function hasNonThrowingStaticOperands(node: MaybeAstNode): boolean {
+  if (!isRecord(node)) return false;
+
+  return isNonThrowingStaticExpression(node.left) && isNonThrowingStaticExpression(node.right);
+}
+
+function isNonThrowingStaticExpression(node: MaybeAstNode): boolean {
+  const isNode = isRecord(node);
+  if (!isNode) return false;
+
+  const isLiteral = node.type === "Literal";
+  if (isLiteral) return isNonThrowingPrimitiveLiteral(node);
+
+  const isUnaryExpression = node.type === "UnaryExpression";
+  if (isUnaryExpression) return isNonThrowingStaticExpression(node.argument);
+
+  const isLogicalExpression = node.type === "LogicalExpression";
+  if (isLogicalExpression) return hasNonThrowingStaticOperands(node);
+
+  const isBinaryExpression = node.type === "BinaryExpression";
+  if (!isBinaryExpression) return false;
+
+  const canThrowForPrimitiveOperands = node.operator === "in" || node.operator === "instanceof";
+  if (canThrowForPrimitiveOperands) return false;
+
+  return hasNonThrowingStaticOperands(node);
+}
+
 function isSideEffectFreeExpression(node: MaybeAstNode): boolean {
   const isNode = isRecord(node);
   if (!isNode) return false;
@@ -565,14 +605,7 @@ function isSideEffectFreeExpression(node: MaybeAstNode): boolean {
   const isUndefinedIdentifier = node.type === "Identifier" && node.name === "undefined";
   if (isUndefinedIdentifier) return true;
 
-  const isUnaryExpression = node.type === "UnaryExpression";
-  if (isUnaryExpression) return isSideEffectFreeExpression(node.argument);
-
-  const isTwoOperandExpression =
-    node.type === "BinaryExpression" || node.type === "LogicalExpression";
-  if (!isTwoOperandExpression) return false;
-
-  return isSideEffectFreeExpression(node.left) && isSideEffectFreeExpression(node.right);
+  return isNonThrowingStaticExpression(node);
 }
 
 function isUndefinedExpression(node: MaybeAstNode): boolean {

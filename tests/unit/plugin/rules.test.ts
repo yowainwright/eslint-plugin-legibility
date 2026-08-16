@@ -1560,6 +1560,20 @@ test("no-redundant-nullish-fallback allows effectful void fallbacks", () => {
   assert.equal(reports.length, 0);
 });
 
+test("no-redundant-nullish-fallback allows throwing void fallbacks", () => {
+  const { visitor, reports } = createRule("no-redundant-nullish-fallback");
+  const bigIntLiteral = { type: "Literal", value: 1n, bigint: "1", __text: "1n" };
+  const mixedBigInt = binary(bigIntLiteral, "+", literal(1));
+  const invalidIn = binary(literal(1), "in", literal(2));
+  const mixedBigIntVoid = { type: "UnaryExpression", operator: "void", argument: mixedBigInt };
+  const invalidInVoid = { type: "UnaryExpression", operator: "void", argument: invalidIn };
+
+  visitor.LogicalExpression(logical(id("value"), mixedBigIntVoid, "??"));
+  visitor.LogicalExpression(logical(id("value"), invalidInVoid, "??"));
+
+  assert.equal(reports.length, 0);
+});
+
 test("prefer-object-lookup reports long equality OR chains", () => {
   const { visitor, reports } = createRule("prefer-object-lookup");
   const first = binary(id("type"), "===", literal("a"));
