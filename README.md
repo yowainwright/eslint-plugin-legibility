@@ -10,7 +10,7 @@
 
 ## Why was this written?
 
-> Working with LLM's for the majority of my work, I find the way that I code and read code has changed. This project contains rules I find useful for keeping Typescript and/or JavaScript more readable when written mainly by LLMs's. 
+> Working with LLMs for the majority of my work, I find the way that I code and read code has changed. This project contains rules I find useful for keeping TypeScript and/or JavaScript more readable when written mainly by LLMs.
 
 ## TLDR;
 
@@ -86,46 +86,13 @@ All presets explicitly configure these core rules because ESLint's recommended c
 
 ---
 
-## Development
-
-The repository uses Mise for Node 26 and Nub for pnpm 11. Nub keeps `pnpm-lock.yaml` as the package-manager source of truth.
-
-```sh
-nub install --frozen-lockfile
-nub run validate
-```
-
-### Docker end-to-end tests
-
-<!-- Docker end-to-end commands and matrix from package.json and tests/e2e/docker/compose.yml -->
-
-Build the package tarball, install it in an isolated consumer, and test ESLint and Oxlint with the `default`, `opt-in`, `recommended`, and `strict` fixture profiles:
-
-```sh
-nub run test:e2e
-```
-
-Benchmark every engine and fixture setup against one file and a generated 100-file project:
-
-```sh
-nub run benchmark:e2e
-```
-
-The local image defaults to Node 26, ESLint 9, and Oxlint 1.78. Set `E2E_NODE_VERSION`, `E2E_ESLINT_VERSION`, and `E2E_OXLINT_VERSION` to test another supported combination. CI covers the oldest supported ESLint and Oxlint releases and the current major releases across Node 22, 24, and 26.
-
-The benchmark reports JSON with mean, median, p95, minimum, maximum, and mean-per-file duration. Adjust its sample counts with `BENCHMARK_WARMUPS` and `BENCHMARK_ITERATIONS`. Benchmarks report measurements without enforcing timing thresholds. Both commands remove their Compose containers, networks, volumes, and local e2e image after success or failure.
-
----
-
 ## Rules
 
 `recommended` contains broadly applicable legibility checks. `strict` includes every recommended rule plus more opinionated performance and code-shape analysis. Composition style, executable-entry checks, filename schemas, and blanket comment policies remain opt-in because they require a project decision.
 
 <!-- rule section links grouped by preset membership from src/constants.ts -->
 <details>
-<summary>Rule table of contents</summary>
-
-**Recommended and strict**
+<summary>Recommended and strict rules</summary>
 
 - [`legibility/hoist-if-operators`](#hoist-if-operators)
 - [`legibility/max-array-chain-depth`](#max-array-chain-depth)
@@ -150,7 +117,10 @@ The benchmark reports JSON with mean, median, p95, minimum, maximum, and mean-pe
 - [`legibility/prefer-positive-condition-names`](#prefer-positive-condition-names)
 - [`legibility/require-jsdoc-multiline-comments`](#require-jsdoc-multiline-comments)
 
-**Strict only**
+</details>
+
+<details>
+<summary>Strict only rules</summary>
 
 - [`legibility/no-direct-node-bin-smoke`](#no-direct-node-bin-smoke)
 - [`legibility/no-quadratic-patterns`](#no-quadratic-patterns)
@@ -160,7 +130,10 @@ The benchmark reports JSON with mean, median, p95, minimum, maximum, and mean-pe
 - [`legibility/no-standalone-array-mutations`](#no-standalone-array-mutations)
 - [`legibility/no-unnecessary-async`](#no-unnecessary-async)
 
-**Opt-in project policies**
+</details>
+
+<details>
+<summary>Opt-in project policy rules</summary>
 
 - [`legibility/no-unmatched-comments`](#no-unmatched-comments)
 - [`legibility/prefer-concat-object-assign`](#prefer-concat-object-assign)
@@ -723,24 +696,52 @@ Prefer expression-bodied arrow callbacks when the callback block only returns.
 
 ### `legibility/prefer-concat-object-assign()`
 
-Opt-in opinion: prefer explicit method-based composition when that is the project style.
+Report array and object literals containing spread when a project prefers method-based composition:
 
-The reason is consistency and searchability. It is not a universal speed claim.
+- Array literal spread is reported in favor of `Array#concat`.
+- Object literal spread is reported in favor of `Object.assign` with a new target.
+- Function-call spread and rest syntax are unchanged.
 
-ESLint's opposing [prefer-object-spread][eslint-prefer-object-spread] rule only says spread may perform better.
+This rule has no options or autofix. Enable it explicitly:
 
-[V8's spread documentation][v8-spread] shows that fast paths depend on position and data shape. Engine, collection size, and object shape can change the result.
+```diff
+ import legibility from "eslint-plugin-legibility";
 
-The forms are not semantically identical. Object assignment can invoke setters, while object spread creates data properties. Concat uses concat-spreadability, while array spread uses iteration.
++const compositionRules = {
++  "legibility/prefer-concat-object-assign": "warn",
++};
++const compositionConfig = { rules: compositionRules };
++
+ export default [
+   legibility.configs["flat/recommended"],
++  compositionConfig,
+ ];
+```
+
+#### why it is opt-in
+
+This is a style opinion, not a universal performance rule. `concat` names the array composition operation. `Object.assign` names the object composition operation, makes the fresh target visible, and preserves source precedence in argument order.
+
+ESLint's opposing [prefer-object-spread][eslint-prefer-object-spread] rule says object spread may perform better. [V8's spread documentation][v8-spread] describes a fast path when spread begins an array literal, including `[...items, nextItem]`, but not when values precede it, as in `[firstItem, ...items]`. Engine, placement, collection size, and data shape can change the result, so neither form is always faster.
+
+The forms can also behave differently. `Object.assign` uses assignment semantics, while object spread creates data properties. `concat` observes concat-spreadability, while array spread uses iteration. The rule therefore reports the syntax but leaves the change to the developer.
 
 #### do / don't
 
+For ordinary dense arrays and plain objects where the behavior is equivalent:
+
 ```diff
-- const nextItems = [...items, nextItem];
-- const options = { ...defaults, ...overrides };
-+ const nextItems = items.concat(nextItem);
-+ const options = Object.assign({}, defaults, overrides);
+- const nextItems = [...items, ...moreItems];
+- const appendedItems = [...items, nextItem];
+- const prependedItems = [firstItem, ...items];
+- const options = { ...defaults, enabled: true };
++ const nextItems = items.concat(moreItems);
++ const appendedItems = items.concat([nextItem]);
++ const prependedItems = [firstItem].concat(items);
++ const options = Object.assign({}, defaults, { enabled: true });
 ```
+
+Wrapping `nextItem` in an array prevents `concat` from flattening it when the value is itself an array. The rule reports each containing literal once and does not autofix because custom iterators, concat-spreadability, sparse arrays, setters, and proxies can change behavior. Review each diagnostic for equivalent behavior.
 
 ---
 
@@ -1189,6 +1190,39 @@ Rules are configured through ESLint or Oxlint `rules`.
 - CI runs tests on Node 22, 24, and 26; Docker package-consumer tests cover supported ESLint and Oxlint ranges; compatibility suites run on Bun and Deno.
 - Codependence maintains pnpm dependencies, GitHub Actions, and Docker image pins.
 - Pastoralist audits CVE overrides in `pnpm-workspace.yaml` and records their metadata in `package.json`.
+
+---
+
+## Development
+
+The repository uses Mise for Node 26 and Nub for pnpm 11. Nub keeps `pnpm-lock.yaml` as the package-manager source of truth.
+
+```sh
+nub install --frozen-lockfile
+nub run validate
+```
+
+### Docker end-to-end tests
+
+<!-- Docker end-to-end commands and matrix from package.json and tests/e2e/docker/compose.yml -->
+
+Build the package tarball, install it in an isolated consumer, and test ESLint and Oxlint with the `default`, `opt-in`, `recommended`, and `strict` fixture profiles:
+
+```sh
+nub run test:e2e
+```
+
+Benchmark every engine and fixture setup against one file and a generated 100-file project:
+
+```sh
+nub run benchmark:e2e
+```
+
+The local image defaults to Node 26, ESLint 9, and Oxlint 1.78. Set `E2E_NODE_VERSION`, `E2E_ESLINT_VERSION`, and `E2E_OXLINT_VERSION` to test another supported combination. CI covers the oldest supported ESLint and Oxlint releases and the current major releases across Node 22, 24, and 26.
+
+The benchmark reports JSON with mean, median, p95, minimum, maximum, and mean-per-file duration. Adjust its sample counts with `BENCHMARK_WARMUPS` and `BENCHMARK_ITERATIONS`. Benchmarks report measurements without enforcing timing thresholds. Both commands remove their Compose containers, networks, volumes, and local e2e image after success or failure.
+
+---
 
 ## License
 

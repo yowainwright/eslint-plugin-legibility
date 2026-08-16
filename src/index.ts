@@ -95,6 +95,7 @@ import type {
   AsyncFsBindings,
   AsyncRuleFinding,
   AstNode,
+  AstPrimitive,
   AstValue,
   ControlFlowState,
   FilenameDetails,
@@ -123,6 +124,10 @@ import type {
   StringSet,
   TraversableEntry,
 } from "./types.js";
+
+type StaticEvaluation = { value: AstPrimitive };
+
+const STATIC_LOGICAL_OPERATORS = new Set(["&&", "??", "||"]);
 
 function defineRule(
   meta: RuleMeta,
@@ -555,6 +560,179 @@ function isBooleanLiteral(node: MaybeAstNode, value?: boolean): boolean {
   return isBooleanValue;
 }
 
+function isAstPrimitive(value: AstValue): value is AstPrimitive {
+  const isNullish = value === null || value === undefined;
+  if (isNullish) return true;
+
+  const valueType = typeof value;
+  return ["bigint", "boolean", "number", "string"].includes(valueType);
+}
+
+function evaluateStaticLiteral(node: AstNode): StaticEvaluation | undefined {
+  const bigintText = typeof node.bigint === "string" ? node.bigint : undefined;
+  if (bigintText !== undefined) {
+    try {
+      const value = BigInt(bigintText);
+      return { value };
+    } catch {
+      return undefined;
+    }
+  }
+
+  const value = node.value;
+  if (!isAstPrimitive(value)) return undefined;
+
+  return { value };
+}
+
+function staticOperand(value: AstPrimitive): number {
+  return value as number;
+}
+
+function evaluateStaticUnaryOperator(operator: string, argument: AstPrimitive): StaticEvaluation | undefined {
+  try {
+    const operand = staticOperand(argument);
+    let value: AstPrimitive;
+    switch (operator) {
+      case "!": value = !operand; break;
+      case "+": value = +operand; break;
+      case "-": value = -operand; break;
+      case "~": value = ~operand; break;
+      case "delete": value = true; break;
+      case "typeof": value = typeof operand; break;
+      case "void": value = undefined; break;
+      default: return undefined;
+    }
+    return { value };
+  } catch {
+    return undefined;
+  }
+}
+
+function evaluateStaticArithmetic(operator: string, left: AstPrimitive, right: AstPrimitive): StaticEvaluation | undefined {
+  try {
+    const leftOperand = staticOperand(left);
+    const rightOperand = staticOperand(right);
+    let value: AstPrimitive;
+    switch (operator) {
+      case "+": value = leftOperand + rightOperand; break;
+      case "-": value = leftOperand - rightOperand; break;
+      case "*": value = leftOperand * rightOperand; break;
+      case "/": value = leftOperand / rightOperand; break;
+      case "%": value = leftOperand % rightOperand; break;
+      case "**": value = leftOperand ** rightOperand; break;
+      default: return undefined;
+    }
+    return { value };
+  } catch {
+    return undefined;
+  }
+}
+
+function evaluateStaticBitwise(operator: string, left: AstPrimitive, right: AstPrimitive): StaticEvaluation | undefined {
+  try {
+    const leftOperand = staticOperand(left);
+    const rightOperand = staticOperand(right);
+    let value: AstPrimitive;
+    switch (operator) {
+      case "&": value = leftOperand & rightOperand; break;
+      case "|": value = leftOperand | rightOperand; break;
+      case "^": value = leftOperand ^ rightOperand; break;
+      case "<<": value = leftOperand << rightOperand; break;
+      case ">>": value = leftOperand >> rightOperand; break;
+      case ">>>": value = leftOperand >>> rightOperand; break;
+      default: return undefined;
+    }
+    return { value };
+  } catch {
+    return undefined;
+  }
+}
+
+function evaluateStaticComparison(
+  operator: string,
+  left: AstPrimitive,
+  right: AstPrimitive,
+): StaticEvaluation | undefined {
+  let value: boolean;
+  switch (operator) {
+    case "==": value = left == right; break;
+    case "!=": value = left != right; break;
+    case "===": value = left === right; break;
+    case "!==": value = left !== right; break;
+    case "<": value = staticOperand(left) < staticOperand(right); break;
+    case "<=": value = staticOperand(left) <= staticOperand(right); break;
+    case ">": value = staticOperand(left) > staticOperand(right); break;
+    case ">=": value = staticOperand(left) >= staticOperand(right); break;
+    default: return undefined;
+  }
+  return { value };
+}
+
+function evaluateStaticBinaryExpression(node: AstNode): StaticEvaluation | undefined {
+  const left = evaluateStaticExpression(node.left);
+  if (!left) return undefined;
+
+  const right = evaluateStaticExpression(node.right);
+  if (!right) return undefined;
+
+  const operator = typeof node.operator === "string" ? node.operator : "";
+  const arithmetic = evaluateStaticArithmetic(operator, left.value, right.value);
+  if (arithmetic) return arithmetic;
+
+  const bitwise = evaluateStaticBitwise(operator, left.value, right.value);
+  if (bitwise) return bitwise;
+
+  return evaluateStaticComparison(operator, left.value, right.value);
+}
+
+function evaluateStaticLogicalExpression(node: AstNode): StaticEvaluation | undefined {
+  const left = evaluateStaticExpression(node.left);
+  if (!left) return undefined;
+
+  const operator = node.operator;
+  const shortCircuitsAnd = operator === "&&" && !left.value;
+  if (shortCircuitsAnd) return left;
+
+  const shortCircuitsOr = operator === "||" && !!left.value;
+  if (shortCircuitsOr) return left;
+
+  const isNullish = left.value === null || left.value === undefined;
+  const shortCircuitsNullish = operator === "??" && !isNullish;
+  if (shortCircuitsNullish) return left;
+
+  const evaluatesRight = typeof operator === "string" && STATIC_LOGICAL_OPERATORS.has(operator);
+  if (!evaluatesRight) return undefined;
+
+  return evaluateStaticExpression(node.right);
+}
+
+function evaluateStaticExpression(node: MaybeAstNode): StaticEvaluation | undefined {
+  if (!isRecord(node)) return undefined;
+
+  if (node.type === "Literal") return evaluateStaticLiteral(node);
+  if (node.type === "BinaryExpression") return evaluateStaticBinaryExpression(node);
+  if (node.type === "LogicalExpression") return evaluateStaticLogicalExpression(node);
+  if (node.type !== "UnaryExpression") return undefined;
+
+  const argument = evaluateStaticExpression(node.argument);
+  if (!argument) return undefined;
+
+  const operator = typeof node.operator === "string" ? node.operator : "";
+  return evaluateStaticUnaryOperator(operator, argument.value);
+}
+
+function isSideEffectFreeExpression(node: MaybeAstNode): boolean {
+  const isLiteral = isRecord(node) && node.type === "Literal";
+  if (isLiteral) return true;
+
+  const isUndefinedIdentifier =
+    isRecord(node) && node.type === "Identifier" && node.name === "undefined";
+  if (isUndefinedIdentifier) return true;
+
+  return evaluateStaticExpression(node) !== undefined;
+}
+
 function isUndefinedExpression(node: MaybeAstNode): boolean {
   const isNode = isRecord(node);
   if (!isNode) return false;
@@ -562,11 +740,10 @@ function isUndefinedExpression(node: MaybeAstNode): boolean {
   const isUndefinedIdentifier = node.type === "Identifier" && node.name === "undefined";
   if (isUndefinedIdentifier) return true;
 
-  const isUnaryExpression = node.type === "UnaryExpression";
-  if (!isUnaryExpression) return false;
+  const isVoidExpression = node.type === "UnaryExpression" && node.operator === "void";
+  if (!isVoidExpression) return false;
 
-  const isVoidExpression = node.operator === "void" && isRecord(node.argument);
-  return isVoidExpression;
+  return isSideEffectFreeExpression(node.argument);
 }
 
 function isLiteralLookupValue(node: MaybeAstNode): boolean {
@@ -1827,25 +2004,27 @@ function createNoComputedValues(context: RuleContext): RuleListener {
   };
 }
 
-function reportSpreadElements(
+function reportSpreadLiteral(
   context: RuleContext,
+  node: AstNode,
   nodes: readonly MaybeAstNode[],
   messageId: string,
 ): void {
-  nodes
-    .filter((node): node is AstNode => isRecord(node) && node.type === "SpreadElement")
-    .forEach((node) => {
-      context.report({ node, messageId });
-    });
+  const hasSpreadElement = nodes.some(
+    (candidate) => isRecord(candidate) && candidate.type === "SpreadElement",
+  );
+  if (!hasSpreadElement) return;
+
+  context.report({ node, messageId });
 }
 
 function createPreferConcatObjectAssign(context: RuleContext): RuleListener {
   return {
     ArrayExpression(node) {
-      reportSpreadElements(context, node.elements ?? [], "arraySpread");
+      reportSpreadLiteral(context, node, node.elements ?? [], "arraySpread");
     },
     ObjectExpression(node) {
-      reportSpreadElements(context, node.properties ?? [], "objectSpread");
+      reportSpreadLiteral(context, node, node.properties ?? [], "objectSpread");
     },
   };
 }
@@ -1949,9 +2128,6 @@ function checkNestedIteration(
   const body = getCallbackBody(node);
   const hasCallbackBody = Boolean(body);
   if (!hasCallbackBody) return false;
-
-  const containsIteration = containsCallTo(body, iterationMethods);
-  if (!containsIteration) return false;
 
   const innerMatch = Array.from(iterationMethods).find((method) =>
     containsCallTo(body, new Set([method])),

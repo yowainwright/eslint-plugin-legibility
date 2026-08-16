@@ -582,6 +582,11 @@ export const NO_COMPUTED_VALUES_META = defineMeta("no-computed-values", {
   },
 });
 
+const ARRAY_COMPOSITION_MESSAGE =
+  "Array literal uses spread. Prefer Array#concat so array composition and ordering are explicit.";
+const OBJECT_COMPOSITION_MESSAGE =
+  "Object literal uses spread. Prefer Object.assign with an empty target so object composition and precedence are explicit.";
+
 export const PREFER_CONCAT_OBJECT_ASSIGN_META = defineMeta("prefer-concat-object-assign", {
   type: "suggestion",
   docs: {
@@ -591,9 +596,8 @@ export const PREFER_CONCAT_OBJECT_ASSIGN_META = defineMeta("prefer-concat-object
   },
   schema: [],
   messages: {
-    arraySpread: "Prefer Array#concat over array literal spread so array composition is explicit.",
-    objectSpread:
-      "Prefer Object.assign with an empty target over object literal spread so object composition is explicit.",
+    arraySpread: ARRAY_COMPOSITION_MESSAGE,
+    objectSpread: OBJECT_COMPOSITION_MESSAGE,
   },
 });
 
