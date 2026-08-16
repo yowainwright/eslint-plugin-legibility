@@ -555,6 +555,26 @@ function isBooleanLiteral(node: MaybeAstNode, value?: boolean): boolean {
   return isBooleanValue;
 }
 
+function isSideEffectFreeExpression(node: MaybeAstNode): boolean {
+  const isNode = isRecord(node);
+  if (!isNode) return false;
+
+  const isLiteral = node.type === "Literal";
+  if (isLiteral) return true;
+
+  const isUndefinedIdentifier = node.type === "Identifier" && node.name === "undefined";
+  if (isUndefinedIdentifier) return true;
+
+  const isUnaryExpression = node.type === "UnaryExpression";
+  if (isUnaryExpression) return isSideEffectFreeExpression(node.argument);
+
+  const isTwoOperandExpression =
+    node.type === "BinaryExpression" || node.type === "LogicalExpression";
+  if (!isTwoOperandExpression) return false;
+
+  return isSideEffectFreeExpression(node.left) && isSideEffectFreeExpression(node.right);
+}
+
 function isUndefinedExpression(node: MaybeAstNode): boolean {
   const isNode = isRecord(node);
   if (!isNode) return false;
@@ -562,17 +582,10 @@ function isUndefinedExpression(node: MaybeAstNode): boolean {
   const isUndefinedIdentifier = node.type === "Identifier" && node.name === "undefined";
   if (isUndefinedIdentifier) return true;
 
-  const isUnaryExpression = node.type === "UnaryExpression";
-  if (!isUnaryExpression) return false;
-
-  const isVoidExpression = node.operator === "void";
+  const isVoidExpression = node.type === "UnaryExpression" && node.operator === "void";
   if (!isVoidExpression) return false;
 
-  const argument = node.argument;
-  const hasLiteralArgument = isRecord(argument) && argument.type === "Literal";
-  const hasUndefinedArgument =
-    isRecord(argument) && argument.type === "Identifier" && argument.name === "undefined";
-  return hasLiteralArgument || hasUndefinedArgument;
+  return isSideEffectFreeExpression(node.argument);
 }
 
 function isLiteralLookupValue(node: MaybeAstNode): boolean {

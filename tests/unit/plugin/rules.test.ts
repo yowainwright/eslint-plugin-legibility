@@ -1526,23 +1526,36 @@ test("no-redundant-nullish-fallback reports undefined fallbacks", () => {
   const { visitor, reports } = createRule("no-redundant-nullish-fallback");
   const voidZero = { type: "UnaryExpression", operator: "void", argument: literal(0) };
   const voidUndefined = { type: "UnaryExpression", operator: "void", argument: id("undefined") };
+  const voidBinary = {
+    type: "UnaryExpression",
+    operator: "void",
+    argument: binary(literal(1), "+", literal(2)),
+  };
 
   visitor.LogicalExpression(logical(id("value"), id("undefined"), "??"));
   visitor.LogicalExpression(logical(id("value"), voidZero, "??"));
   visitor.LogicalExpression(logical(id("value"), voidUndefined, "??"));
+  visitor.LogicalExpression(logical(id("value"), voidBinary, "??"));
 
-  assert.equal(reports.length, 3);
+  assert.equal(reports.length, 4);
   assert.equal(reports[0].messageId, "redundantUndefined");
   assert.equal(reports[1].messageId, "redundantUndefined");
   assert.equal(reports[2].messageId, "redundantUndefined");
+  assert.equal(reports[3].messageId, "redundantUndefined");
 });
 
 test("no-redundant-nullish-fallback allows effectful void fallbacks", () => {
   const { visitor, reports } = createRule("no-redundant-nullish-fallback");
   const logMissCall = call(id("logMiss"));
   const effectfulVoid = { type: "UnaryExpression", operator: "void", argument: logMissCall };
+  const effectfulBinaryVoid = {
+    type: "UnaryExpression",
+    operator: "void",
+    argument: binary(logMissCall, "+", literal(1)),
+  };
 
   visitor.LogicalExpression(logical(id("value"), effectfulVoid, "??"));
+  visitor.LogicalExpression(logical(id("value"), effectfulBinaryVoid, "??"));
 
   assert.equal(reports.length, 0);
 });
