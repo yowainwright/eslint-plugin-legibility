@@ -451,6 +451,9 @@ Avoid boolean comparisons and boolean-only ternaries.
 
 Avoid `?? undefined` fallbacks.
 
+Static `void` operands are evaluated within a bounded BigInt budget. Expressions that could
+create unusually large BigInt values are ignored.
+
 #### do / don't
 
 ```diff
