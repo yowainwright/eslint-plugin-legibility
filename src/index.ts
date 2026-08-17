@@ -127,6 +127,8 @@ import type {
 
 type StaticEvaluation = { value: AstPrimitive };
 
+const MAX_STATIC_BIGINT_BITS = 4_096;
+const MAX_STATIC_BIGINT_BITS_VALUE = BigInt(MAX_STATIC_BIGINT_BITS);
 const STATIC_LOGICAL_OPERATORS = new Set(["&&", "??", "||"]);
 
 function defineRule(
@@ -568,12 +570,73 @@ function isAstPrimitive(value: AstValue): value is AstPrimitive {
   return ["bigint", "boolean", "number", "string"].includes(valueType);
 }
 
+function getBigIntBitLength(value: bigint): number {
+  const absoluteValue = value < 0n ? -value : value;
+  if (absoluteValue === 0n) return 0;
+  return absoluteValue.toString(2).length;
+}
+
+function createStaticEvaluation(value: AstPrimitive): StaticEvaluation | undefined {
+  const isBigInt = typeof value === "bigint";
+  if (!isBigInt) return { value };
+
+  const isWithinLimit = getBigIntBitLength(value) <= MAX_STATIC_BIGINT_BITS;
+  return isWithinLimit ? { value } : undefined;
+}
+
+function exceedsBigIntExponentLimit(
+  operator: string,
+  left: AstPrimitive,
+  right: AstPrimitive,
+): boolean {
+  const hasBigIntOperands = typeof left === "bigint" && typeof right === "bigint";
+  const hasBigIntExponent = operator === "**" && hasBigIntOperands;
+  if (!hasBigIntExponent) return false;
+  if (right < 0n) return false;
+
+  const absoluteBase = left < 0n ? -left : left;
+  if (absoluteBase <= 1n) return false;
+
+  const estimatedBits = BigInt(getBigIntBitLength(left)) * right;
+  return estimatedBits > MAX_STATIC_BIGINT_BITS_VALUE;
+}
+
+function exceedsBigIntShiftLimit(
+  operator: string,
+  left: AstPrimitive,
+  right: AstPrimitive,
+): boolean {
+  const hasBigIntOperands = typeof left === "bigint" && typeof right === "bigint";
+  const canGrow = hasBigIntOperands && left !== 0n;
+  if (!canGrow) return false;
+
+  const growsLeftShift = operator === "<<" && right > 0n;
+  const growsRightShift = operator === ">>" && right < 0n;
+  const growsBigInt = growsLeftShift || growsRightShift;
+  if (!growsBigInt) return false;
+
+  const shift = right < 0n ? -right : right;
+  const estimatedBits = BigInt(getBigIntBitLength(left)) + shift;
+  return estimatedBits > MAX_STATIC_BIGINT_BITS_VALUE;
+}
+
+function exceedsStaticBigIntLimit(
+  operator: string,
+  left: AstPrimitive,
+  right: AstPrimitive,
+): boolean {
+  const exceedsExponentLimit = exceedsBigIntExponentLimit(operator, left, right);
+  if (exceedsExponentLimit) return true;
+  return exceedsBigIntShiftLimit(operator, left, right);
+}
+
 function evaluateStaticLiteral(node: AstNode): StaticEvaluation | undefined {
   const bigintText = typeof node.bigint === "string" ? node.bigint : undefined;
   if (bigintText !== undefined) {
+    if (bigintText.length > MAX_STATIC_BIGINT_BITS) return undefined;
     try {
       const value = BigInt(bigintText);
-      return { value };
+      return createStaticEvaluation(value);
     } catch {
       return undefined;
     }
@@ -582,7 +645,7 @@ function evaluateStaticLiteral(node: AstNode): StaticEvaluation | undefined {
   const value = node.value;
   if (!isAstPrimitive(value)) return undefined;
 
-  return { value };
+  return createStaticEvaluation(value);
 }
 
 function staticOperand(value: AstPrimitive): number {
@@ -603,13 +666,16 @@ function evaluateStaticUnaryOperator(operator: string, argument: AstPrimitive): 
       case "void": value = undefined; break;
       default: return undefined;
     }
-    return { value };
+    return createStaticEvaluation(value);
   } catch {
     return undefined;
   }
 }
 
 function evaluateStaticArithmetic(operator: string, left: AstPrimitive, right: AstPrimitive): StaticEvaluation | undefined {
+  const exceedsBigIntLimit = exceedsStaticBigIntLimit(operator, left, right);
+  if (exceedsBigIntLimit) return undefined;
+
   try {
     const leftOperand = staticOperand(left);
     const rightOperand = staticOperand(right);
@@ -623,13 +689,16 @@ function evaluateStaticArithmetic(operator: string, left: AstPrimitive, right: A
       case "**": value = leftOperand ** rightOperand; break;
       default: return undefined;
     }
-    return { value };
+    return createStaticEvaluation(value);
   } catch {
     return undefined;
   }
 }
 
 function evaluateStaticBitwise(operator: string, left: AstPrimitive, right: AstPrimitive): StaticEvaluation | undefined {
+  const exceedsBigIntLimit = exceedsStaticBigIntLimit(operator, left, right);
+  if (exceedsBigIntLimit) return undefined;
+
   try {
     const leftOperand = staticOperand(left);
     const rightOperand = staticOperand(right);
@@ -643,7 +712,7 @@ function evaluateStaticBitwise(operator: string, left: AstPrimitive, right: AstP
       case ">>>": value = leftOperand >>> rightOperand; break;
       default: return undefined;
     }
-    return { value };
+    return createStaticEvaluation(value);
   } catch {
     return undefined;
   }

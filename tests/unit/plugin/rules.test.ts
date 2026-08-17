@@ -1629,6 +1629,22 @@ test("no-redundant-nullish-fallback allows throwing void fallbacks", () => {
   assert.equal(reports.length, 0);
 });
 
+test("no-redundant-nullish-fallback skips oversized BigInt evaluation", () => {
+  const { visitor, reports } = createRule("no-redundant-nullish-fallback");
+  const oversizedShift = bigintLiteral(1_000_000n);
+  const oversizedArguments = [
+    binary(bigintLiteral(2n), "**", bigintLiteral(1_000_000n)),
+    binary(bigintLiteral(1n), "<<", oversizedShift),
+    binary(bigintLiteral(1n), ">>", unary("-", bigintLiteral(1_000_000n))),
+  ];
+
+  oversizedArguments.forEach((argument) => {
+    visitor.LogicalExpression(logical(id("value"), unary("void", argument), "??"));
+  });
+
+  assert.equal(reports.length, 0);
+});
+
 test("no-redundant-nullish-fallback evaluates BigInt through ESLint", async () => {
   const { Linter } = await import("eslint");
   const linter = new Linter({ configType: "flat" });
