@@ -22,9 +22,7 @@ The goal of rules in this package are to make code readable for reviewing lots o
 
 This project provides ESLint and Oxlint-compatible rules for readable, explicit, performance-conscious JavaScript and TypeScript.
 
-The package exports an ESLint-compatible plugin object. ESLint loads normally  on version 8.57+. Oxlint can load its through JavaScript plugin support. Both are optional peer dependencies.
-
-Runtime supports node 22.18+, Bun, and Deno. Node 22.18+ is required for TypeScript Oxlint configs.
+The package exports an ESLint-compatible plugin object. ESLint loads it directly. Oxlint loads it through JavaScript plugin support. Both are optional peer dependencies.
 
 ```sh
 # npm, pnpm, bun
