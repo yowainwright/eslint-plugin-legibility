@@ -24,6 +24,13 @@ interface ReleaseItConfig {
   };
 }
 
+interface ManifestExports {
+  ".": {
+    import?: string;
+    require?: string;
+  };
+}
+
 const scripts = manifest.scripts as ManifestScripts;
 const releaseIt = manifest["release-it"] as ReleaseItConfig;
 const ciWorkflow = readFileSync(".github/workflows/ci.yml", "utf8");
@@ -92,6 +99,14 @@ test("package metadata declares supported runtimes and optional linter hosts", (
   assert.ok(manifest.peerDependencies.oxlint);
   assert.equal(manifest.peerDependenciesMeta.eslint.optional, true);
   assert.equal(manifest.peerDependenciesMeta.oxlint.optional, true);
+});
+
+test("package metadata publishes separate ESM and CommonJS entries", () => {
+  const packageExports = manifest.exports as ManifestExports;
+
+  assert.equal(manifest.main, "./dist/index.cjs");
+  assert.equal(packageExports["."].import, "./dist/index.js");
+  assert.equal(packageExports["."].require, "./dist/index.cjs");
 });
 
 test("update workflow maintains dependencies and override metadata", () => {

@@ -1,9 +1,6 @@
 import { basename, relative } from "node:path";
 import {
   ARRAY_MUTATING_METHODS,
-  ARG_COMMAND_FUNCTIONS,
-  ASYNC_FS_MODULE_SPECIFIERS,
-  ASYNC_FS_SYNC_METHODS,
   COMMENT_RULE_NAMES,
   COMPARISON_OPERATORS,
   CONTROL_FLOW_TYPES,
@@ -12,7 +9,6 @@ import {
   DEFAULT_COMMENT_PREFIX_IDENTIFIERS,
   DEFAULT_COMMENT_SUFFIX_IDENTIFIERS,
   DEFAULT_COMPUTED_VALUE_OPERATOR_COMPLEXITY,
-  DEFAULT_DIRECT_BIN_ENTRY_PATTERNS,
   DEFAULT_EXECUTABLE_ENTRY_PATTERNS,
   DEFAULT_EXECUTABLE_RUNTIMES,
   DEFAULT_INDEX_FILENAME_SCHEMA,
@@ -37,7 +33,6 @@ import {
   EQUALITY_OPERATORS,
   EXPRESSION_CONTAINER_NODE_TYPES,
   FLAT_METHODS,
-  FS_MODULE_SPECIFIERS,
   FUNCTION_NODE_TYPES,
   HOIST_IF_OPERATORS_META,
   ITERATION_METHODS,
@@ -52,7 +47,6 @@ import {
   NO_AUTOMATED_COMMENT_ATTRIBUTION_META,
   NO_COMPLEX_TERNARIES_META,
   NO_COMPUTED_VALUES_META,
-  NO_DIRECT_NODE_BIN_SMOKE_META,
   NO_HIDDEN_SIDE_EFFECTS_META,
   NO_IDENTITY_ARRAY_CALLBACK_META,
   NO_QUADRATIC_PATTERNS_META,
@@ -83,7 +77,6 @@ import {
   REQUIRE_JSDOC_MULTILINE_COMMENTS_META,
   SEARCH_METHODS,
   SIDE_EFFECT_FREE_ITERATION_METHODS,
-  SHELL_COMMAND_FUNCTIONS,
   SKIP_KEYS,
   STRICT_ONLY_RULE_NAMES,
   TERMINAL_STATEMENT_TYPES,
@@ -92,7 +85,6 @@ import type {
   AliasCandidate,
   AliasScope,
   AliasScopeStack,
-  AsyncFsBindings,
   AsyncRuleFinding,
   AstNode,
   AstPrimitive,
@@ -1512,167 +1504,6 @@ function checkExecutableShebang(
   });
 }
 
-function getTemplateQuasiValue(quasi: MaybeAstNode): string {
-  const isQuasiNode = isRecord(quasi);
-  if (!isQuasiNode) return "";
-
-  const value = quasi.value;
-  const hasValue = isRecord(value);
-  if (!hasValue) return "";
-
-  const cooked = value.cooked;
-  const hasCookedValue = typeof cooked === "string";
-  if (hasCookedValue) return cooked;
-
-  const raw = value.raw;
-  const hasRawValue = typeof raw === "string";
-  if (hasRawValue) return raw;
-
-  return "";
-}
-
-function getStringValue(node: MaybeAstNode): string | null {
-  const isNode = isRecord(node);
-  if (!isNode) return null;
-
-  const isLiteral = node.type === "Literal";
-  if (isLiteral) {
-    const literalValue = node.value;
-    const isStringLiteral = typeof literalValue === "string";
-    if (!isStringLiteral) return null;
-
-    return literalValue;
-  }
-
-  const isTemplateLiteral = node.type === "TemplateLiteral";
-  if (!isTemplateLiteral) return null;
-
-  const expressions = node.expressions ?? [];
-  const hasExpressions = Boolean(expressions.length);
-  if (hasExpressions) return null;
-
-  const quasis = node.quasis ?? [];
-  return quasis.map(getTemplateQuasiValue).join("");
-}
-
-function getCalleeName(node: MaybeAstNode): string | null {
-  const call = unwrapChainExpression(node);
-  const isCallNode = isRecord(call);
-  if (!isCallNode) return null;
-
-  const callee = unwrapChainExpression(call.callee);
-  const isCalleeNode = isRecord(callee);
-  if (!isCalleeNode) return null;
-
-  const isIdentifierCallee = callee.type === "Identifier";
-  if (isIdentifierCallee) return callee.name ?? null;
-
-  const isMemberCallee = callee.type === "MemberExpression";
-  if (!isMemberCallee) return null;
-
-  return getStaticPropertyName(callee);
-}
-
-function stripCommandQuotes(value: string): string {
-  return value.replace(/^["']|["']$/g, "");
-}
-
-function isNodeCommand(value: string): boolean {
-  const isBareNode = value === "node";
-  const isPathNode = value.endsWith("/node");
-  return isBareNode || isPathNode;
-}
-
-function isDirectBinEntry(value: string, patterns: readonly string[]): boolean {
-  const unquoted = normalizePath(stripCommandQuotes(value));
-  const withoutPrefix = unquoted.replace(/^\.\//, "");
-  return matchesAnyPathPattern(withoutPrefix, patterns);
-}
-
-function findDirectBinEntry(args: readonly string[], patterns: readonly string[]): string | null {
-  const unquotedArgs = args.map(stripCommandQuotes);
-  const directBinEntry = unquotedArgs.find((arg) => {
-    const isFlag = arg.startsWith("-");
-    if (isFlag) return false;
-
-    return isDirectBinEntry(arg, patterns);
-  });
-  return directBinEntry ?? null;
-}
-
-function getArrayStringValues(node: MaybeAstNode): string[] {
-  const isNode = isRecord(node);
-  if (!isNode) return [];
-
-  const isArrayExpression = node.type === "ArrayExpression";
-  if (!isArrayExpression) return [];
-
-  const elements = node.elements ?? [];
-  return elements.map(getStringValue).filter((value) => typeof value === "string");
-}
-
-function getDirectNodeEntryFromCommand(
-  command: string,
-  patterns: readonly string[],
-): string | null {
-  const parts = command.trim().split(/\s+/).map(stripCommandQuotes);
-  const commandName = parts[0] ?? "";
-  const usesNode = isNodeCommand(commandName);
-  if (!usesNode) return null;
-
-  return findDirectBinEntry(parts.slice(1), patterns) ?? null;
-}
-
-function getDirectNodeEntryFromCall(node: AstNode, patterns: readonly string[]): string | null {
-  const calleeName = getCalleeName(node);
-  const commandFunctionName = calleeName ?? "";
-  const args = node.arguments ?? [];
-  const firstArg = getStringValue(args[0]);
-  if (firstArg === null) return null;
-
-  const isShellCommandFunction = SHELL_COMMAND_FUNCTIONS.has(commandFunctionName);
-  if (isShellCommandFunction) {
-    return getDirectNodeEntryFromCommand(firstArg, patterns);
-  }
-
-  const isArgCommandFunction = ARG_COMMAND_FUNCTIONS.has(commandFunctionName);
-  if (!isArgCommandFunction) return null;
-
-  const usesNode = isNodeCommand(firstArg);
-  if (!usesNode) return null;
-
-  return findDirectBinEntry(getArrayStringValues(args[1]), patterns) ?? null;
-}
-
-function createNoDirectNodeBinSmoke(context: RuleContext): RuleListener {
-  const patterns = getConfiguredStringArray(
-    context,
-    "entryPatterns",
-    DEFAULT_DIRECT_BIN_ENTRY_PATTERNS,
-  );
-  return {
-    CallExpression(node) {
-      checkDirectNodeBinSmoke(context, node, patterns);
-    },
-  };
-}
-
-function checkDirectNodeBinSmoke(
-  context: RuleContext,
-  node: AstNode,
-  patterns: readonly string[],
-): void {
-  const entry = getDirectNodeEntryFromCall(node, patterns);
-  const hasDirectEntry = Boolean(entry);
-  if (!hasDirectEntry) return;
-
-  context.report({
-    node,
-    messageId: "directNodeBin",
-    data: { entry },
-  });
-}
-
 function createExpressionCheck(context: RuleContext): (expression: AstValue) => void {
   const max = getConfiguredMax(context, DEFAULT_MAX_EXPRESSION_OPERATORS);
   const complexity = getConfiguredOperatorComplexity(
@@ -3005,211 +2836,57 @@ function collectAwaitOperations(node: AstNode, root = node): AstNode[] {
   return operations.concat(childOperations);
 }
 
-function getImportName(node: AstValue): string | null {
-  const isIdentifier = isRecord(node) && node.type === "Identifier";
-  if (!isIdentifier) return null;
-  return node.name ?? null;
-}
+const ARTIFICIAL_PROMISE_METHODS = new Set(["reject", "resolve"]);
+const SYNCHRONOUS_AWAIT_TYPES = new Set([
+  "BinaryExpression",
+  "Literal",
+  "TemplateLiteral",
+  "UnaryExpression",
+]);
 
-function trackAsyncFsSpecifier(specifier: AstNode, bindings: AsyncFsBindings): void {
-  const localName = getImportName(specifier.local);
-  if (!localName) return;
-
-  const isNamedImport = specifier.type === "ImportSpecifier";
-  if (!isNamedImport) {
-    bindings.promises.add(localName);
-    return;
-  }
-
-  const importedName = getImportName(specifier.imported);
-  const syncMethod = importedName ? ASYNC_FS_SYNC_METHODS.get(importedName) : null;
-  if (syncMethod) bindings.methods.set(localName, syncMethod);
-}
-
-function trackFsSpecifier(specifier: AstNode, bindings: AsyncFsBindings): void {
-  const localName = getImportName(specifier.local);
-  if (!localName) return;
-
-  const importedName = getImportName(specifier.imported);
-  const isPromisesImport = specifier.type === "ImportSpecifier" && importedName === "promises";
-  if (isPromisesImport) {
-    bindings.promises.add(localName);
-    return;
-  }
-
-  bindings.fs.add(localName);
-}
-
-function trackAsyncFsImport(node: AstNode, bindings: AsyncFsBindings): void {
-  const specifiers = getNodeArray(node.specifiers);
-  specifiers.forEach((specifier) => trackAsyncFsSpecifier(specifier, bindings));
-}
-
-function trackNodeFsImport(node: AstNode, bindings: AsyncFsBindings): void {
-  const specifiers = getNodeArray(node.specifiers);
-  specifiers.forEach((specifier) => trackFsSpecifier(specifier, bindings));
-}
-
-function trackFsImport(node: AstNode, bindings: AsyncFsBindings): void {
-  const sourceNode = node.source;
-  const source = getStringValue(isRecord(sourceNode) ? sourceNode : null);
-  if (!source) return;
-
-  const isAsyncFsModule = ASYNC_FS_MODULE_SPECIFIERS.has(source);
-  if (isAsyncFsModule) {
-    trackAsyncFsImport(node, bindings);
-    return;
-  }
-
-  if (FS_MODULE_SPECIFIERS.has(source)) trackNodeFsImport(node, bindings);
-}
-
-function getMemberObjectName(member: AstNode): string | null {
-  const object = unwrapChainExpression(member.object);
-  return getImportName(object);
-}
-
-function getObjectPatternBindingNames(node: AstNode): string[] {
-  return getNodeArray(node.properties).flatMap((property) =>
-    getBindingValueNames(property.value ?? property.argument),
-  );
-}
-
-function getBindingValueNames(value: AstValue): string[] {
-  return isRecord(value) ? getBindingPatternNames(value) : [];
-}
-
-function getBindingPatternNames(node: MaybeAstNode): string[] {
-  if (!isRecord(node)) return [];
-  if (node.type === "Identifier") return node.name ? [node.name] : [];
-
-  const isWrapper = node.type === "AssignmentPattern" || node.type === "RestElement";
-  if (isWrapper) return getBindingPatternNames(node.left ?? node.argument);
-  if (node.type === "ArrayPattern") {
-    return getNodeArray(node.elements).flatMap(getBindingPatternNames);
-  }
-  if (node.type !== "ObjectPattern") return [];
-  return getObjectPatternBindingNames(node);
-}
-
-function getDeclarationBindingNames(node: AstNode): string[] {
-  if (node.type === "VariableDeclarator") return getBindingPatternNames(node.id);
-  if (node.type === "CatchClause") return getBindingValueNames(node.param);
-
-  const isNamedDeclaration =
-    node.type === "FunctionDeclaration" || node.type === "ClassDeclaration";
-  return isNamedDeclaration ? getBindingPatternNames(node.id) : [];
-}
-
-function collectChildLocalBindingNames(child: AstValue, root: AstNode): string[] {
-  if (Array.isArray(child)) {
-    return getNodeArray(child).flatMap((item) => collectLocalBindingNames(item, root));
-  }
-  return isRecord(child) ? collectLocalBindingNames(child, root) : [];
-}
-
-function collectLocalBindingNames(node: AstNode, root: AstNode): string[] {
-  const names = getDeclarationBindingNames(node);
-  if (isFunctionBoundary(node, root)) return names;
-
-  const childNames = getTraversableEntries(node).flatMap(([, child]) =>
-    collectChildLocalBindingNames(child, root),
-  );
-  return names.concat(childNames);
-}
-
-function getFunctionBindingNames(node: AstNode, body: AstNode): StringSet {
-  const ownName = getBindingPatternNames(node.id);
-  const parameterNames = getFunctionParams(node).flatMap(getBindingPatternNames);
-  const localNames = collectLocalBindingNames(body, body);
-  return new Set(ownName.concat(parameterNames, localNames));
-}
-
-function isTrackedBinding(name: string | null, tracked: StringSet, localNames: StringSet): boolean {
-  if (!name) return false;
-  const isTracked = tracked.has(name);
-  const isUnshadowed = !localNames.has(name);
-  return isTracked && isUnshadowed;
-}
-
-function getTrackedMethod(
-  name: string | null,
-  methods: ReadonlyMap<string, string>,
-  localNames: StringSet,
-): string | null {
-  if (!name) return null;
-  if (localNames.has(name)) return null;
-  return methods.get(name) ?? null;
-}
-
-function isFsPromisesMember(
-  member: MaybeAstNode,
-  bindings: AsyncFsBindings,
-  localNames: StringSet,
-): boolean {
-  const isMember = isRecord(member) && member.type === "MemberExpression";
-  if (!isMember) return false;
-
-  const isPromisesProperty = getStaticPropertyName(member) === "promises";
-  if (!isPromisesProperty) return false;
-
-  const fsName = getMemberObjectName(member);
-  return isTrackedBinding(fsName, bindings.fs, localNames);
-}
-
-function getAsyncFsMemberMethod(
-  callee: AstNode,
-  bindings: AsyncFsBindings,
-  localNames: StringSet,
-): string | null {
-  const method = getStaticPropertyName(callee);
-  const syncMethod = method ? ASYNC_FS_SYNC_METHODS.get(method) : null;
-  if (!syncMethod) return null;
-
-  const namespaceName = getMemberObjectName(callee);
-  const isPromiseNamespace = isTrackedBinding(namespaceName, bindings.promises, localNames);
-  const isFsPromisesNamespace = isFsPromisesMember(callee.object, bindings, localNames);
-  const usesPromiseNamespace = isPromiseNamespace || isFsPromisesNamespace;
-  if (!usesPromiseNamespace) return null;
-  return syncMethod;
-}
-
-function getAwaitedFsSyncMethod(
-  operation: AstNode,
-  bindings: AsyncFsBindings,
-  localNames: StringSet,
-): string | null {
+function getArtificialPromiseMethod(context: RuleContext, operation: AstNode): string | null {
   const call = unwrapChainExpression(operation.argument);
   const isCall = isRecord(call) && call.type === "CallExpression";
   if (!isCall) return null;
 
   const callee = unwrapChainExpression(call.callee);
-  const directName = getImportName(callee);
-  const directMethod = getTrackedMethod(directName, bindings.methods, localNames);
-  if (directMethod) return directMethod;
-
   const isMember = isRecord(callee) && callee.type === "MemberExpression";
-  return isMember ? getAsyncFsMemberMethod(callee, bindings, localNames) : null;
+  if (!isMember) return null;
+
+  const method = getStaticPropertyName(callee);
+  if (!method) return null;
+  const isArtificialMethod = ARTIFICIAL_PROMISE_METHODS.has(method);
+  if (!isArtificialMethod) return null;
+
+  const object = unwrapChainExpression(callee.object);
+  const isPromise = isRecord(object) && object.type === "Identifier" && object.name === "Promise";
+  if (!isPromise) return null;
+  return isGlobalReference(context, object) ? method : null;
 }
 
-function getSyncFsReplacements(
+function getSynchronousAwaitType(operation: AstNode): string | null {
+  if (operation.type !== "AwaitExpression") return null;
+  const argument = unwrapChainExpression(operation.argument);
+  if (!isRecord(argument)) return null;
+  const type = String(argument.type);
+  return SYNCHRONOUS_AWAIT_TYPES.has(type) ? type : null;
+}
+
+function getInvalidAwaitFinding(
+  context: RuleContext,
   operations: AstNode[],
-  bindings: AsyncFsBindings,
-  localNames: StringSet,
-): string[] | null {
-  const areAwaitExpressions = operations.every((node) => node.type === "AwaitExpression");
-  if (!areAwaitExpressions) return null;
+  name: string,
+): AsyncRuleFinding | null {
+  const artificialMethod = operations
+    .map((operation) => getArtificialPromiseMethod(context, operation))
+    .find(Boolean);
+  if (artificialMethod) {
+    return { messageId: "artificialAwait", data: { name, method: artificialMethod } };
+  }
 
-  const replacements = operations.map((node) =>
-    getAwaitedFsSyncMethod(node, bindings, localNames),
-  );
-  const hasUnknownReplacement = replacements.some((replacement) => !replacement);
-  if (hasUnknownReplacement) return null;
-
-  const knownReplacements = replacements.filter(
-    (replacement): replacement is string => typeof replacement === "string",
-  );
-  return Array.from(new Set(knownReplacements));
+  const synchronousType = operations.map(getSynchronousAwaitType).find(Boolean);
+  if (!synchronousType) return null;
+  return { messageId: "synchronousAwait", data: { name, type: synchronousType } };
 }
 
 function hasTryAncestor(node: AstNode, boundary: AstNode): boolean {
@@ -3232,20 +2909,16 @@ function isRemovableReturnAwait(operation: AstNode, functionNode: AstNode): bool
 }
 
 function getAsyncRuleFinding(
+  context: RuleContext,
   node: AstNode,
   body: AstNode,
-  bindings: AsyncFsBindings,
 ): AsyncRuleFinding | null {
   const name = getFunctionName(node);
   const operations = collectAwaitOperations(body);
   if (!operations.length) return { messageId: "unnecessaryAsync", data: { name } };
 
-  const localNames = getFunctionBindingNames(node, body);
-  const replacements = getSyncFsReplacements(operations, bindings, localNames);
-  if (replacements) {
-    const replacementList = replacements.join(", ");
-    return { messageId: "synchronousFilesystem", data: { name, replacements: replacementList } };
-  }
+  const invalidAwait = getInvalidAwaitFinding(context, operations, name);
+  if (invalidAwait) return invalidAwait;
 
   const onlyOperation = operations.length === 1 ? operations[0] : null;
   const hasSingleReturnAwait = isRecord(onlyOperation)
@@ -3255,11 +2928,7 @@ function getAsyncRuleFinding(
   return null;
 }
 
-function checkUnnecessaryAsync(
-  context: RuleContext,
-  node: AstNode,
-  bindings: AsyncFsBindings,
-): void {
+function checkUnnecessaryAsync(context: RuleContext, node: AstNode): void {
   const isAsyncFunction = Boolean(node.async);
   if (!isAsyncFunction) return;
 
@@ -3269,23 +2938,14 @@ function checkUnnecessaryAsync(
   const body = node.body;
   if (!isRecord(body)) return;
 
-  const finding = getAsyncRuleFinding(node, body, bindings);
+  const finding = getAsyncRuleFinding(context, node, body);
   if (!finding) return;
   context.report({ node, messageId: finding.messageId, data: finding.data });
 }
 
 function createNoUnnecessaryAsync(context: RuleContext): RuleListener {
-  const fs = new Set<string>();
-  const methods = new Map<string, string>();
-  const promises = new Set<string>();
-  const bindings = { fs, methods, promises };
-  const functionVisitors = createFunctionNodeVisitors((node) => {
-    checkUnnecessaryAsync(context, node, bindings);
-  });
-  return Object.assign({}, functionVisitors, {
-    ImportDeclaration(node: AstNode) {
-      trackFsImport(node, bindings);
-    },
+  return createFunctionNodeVisitors((node) => {
+    checkUnnecessaryAsync(context, node);
   });
 }
 
@@ -3717,7 +3377,6 @@ const rules = {
   ),
   "no-complex-ternaries": defineRule(NO_COMPLEX_TERNARIES_META, createNoComplexTernaries),
   "no-computed-values": defineRule(NO_COMPUTED_VALUES_META, createNoComputedValues),
-  "no-direct-node-bin-smoke": defineRule(NO_DIRECT_NODE_BIN_SMOKE_META, createNoDirectNodeBinSmoke),
   "no-hidden-side-effects": defineRule(NO_HIDDEN_SIDE_EFFECTS_META, createNoHiddenSideEffects),
   "no-mixed-filename-casing": defineCreateOnceRule(
     NO_MIXED_FILENAME_CASING_META,

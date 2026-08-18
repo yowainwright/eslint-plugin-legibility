@@ -1,4 +1,4 @@
-import packageManifest from "../package.json" with { type: "json" };
+import packageManifest = require("../package.json");
 import type { RuleMeta } from "./types.js";
 
 const PACKAGE_NAME = packageManifest.name;
@@ -241,54 +241,6 @@ export const DEFAULT_EXECUTABLE_ENTRY_PATTERNS = [
 
 export const DEFAULT_EXECUTABLE_RUNTIMES = ["bun", "deno", "node"];
 
-export const DEFAULT_DIRECT_BIN_ENTRY_PATTERNS = [
-  "app/*/index.js",
-  "dist/cli/index.js",
-  "dist/index.js",
-  "src/cli/index.js",
-  "src/cli/index.ts",
-  "src/index.js",
-  "src/index.ts",
-  "*/dist/cli/index.js",
-  "*/dist/index.js",
-];
-
-export const SHELL_COMMAND_FUNCTIONS = new Set(["exec", "execSync"]);
-export const ARG_COMMAND_FUNCTIONS = new Set(["execFile", "execFileSync", "spawn", "spawnSync"]);
-
-export const ASYNC_FS_MODULE_SPECIFIERS = new Set(["fs/promises", "node:fs/promises"]);
-export const FS_MODULE_SPECIFIERS = new Set(["fs", "node:fs"]);
-export const ASYNC_FS_SYNC_METHODS = new Map([
-  ["access", "accessSync"],
-  ["appendFile", "appendFileSync"],
-  ["chmod", "chmodSync"],
-  ["chown", "chownSync"],
-  ["copyFile", "copyFileSync"],
-  ["cp", "cpSync"],
-  ["glob", "globSync"],
-  ["lchmod", "lchmodSync"],
-  ["lchown", "lchownSync"],
-  ["link", "linkSync"],
-  ["lstat", "lstatSync"],
-  ["lutimes", "lutimesSync"],
-  ["mkdir", "mkdirSync"],
-  ["mkdtemp", "mkdtempSync"],
-  ["readFile", "readFileSync"],
-  ["readdir", "readdirSync"],
-  ["readlink", "readlinkSync"],
-  ["realpath", "realpathSync"],
-  ["rename", "renameSync"],
-  ["rm", "rmSync"],
-  ["rmdir", "rmdirSync"],
-  ["stat", "statSync"],
-  ["statfs", "statfsSync"],
-  ["symlink", "symlinkSync"],
-  ["truncate", "truncateSync"],
-  ["unlink", "unlinkSync"],
-  ["utimes", "utimesSync"],
-  ["writeFile", "writeFileSync"],
-]);
-
 export const NEGATIVE_CONDITION_NAME_PATTERN =
   /^(?:is|are|was|were|has|have|had|can|could|should|will|would|did|does)(?:Not|No)[A-Z]/;
 
@@ -324,7 +276,6 @@ export const COMMENT_RULE_NAMES = [
 ];
 
 export const STRICT_ONLY_RULE_NAMES = [
-  "no-direct-node-bin-smoke",
   "no-quadratic-patterns",
   "no-repeated-collection-search",
   "no-single-use-renaming-alias",
@@ -653,28 +604,6 @@ export const REQUIRE_JSDOC_MULTILINE_COMMENTS_META = defineMeta(
   },
 );
 
-export const NO_DIRECT_NODE_BIN_SMOKE_META = defineMeta("no-direct-node-bin-smoke", {
-  type: "problem",
-  docs: {
-    description:
-      "Prefer smoke-testing installed package binaries instead of direct node entrypoint execution.",
-    recommended: false,
-  },
-  schema: [
-    {
-      type: "object",
-      properties: {
-        entryPatterns: STRING_ARRAY_SCHEMA,
-      },
-      additionalProperties: false,
-    },
-  ],
-  messages: {
-    directNodeBin:
-      "Smoke tests should execute the installed package bin, not `node {{entry}}`, so bin shims and shebangs are exercised.",
-  },
-});
-
 export const MAX_CONTROL_FLOW_DEPTH_META = defineMeta("max-control-flow-depth", {
   type: "suggestion",
   docs: {
@@ -850,7 +779,7 @@ export const NO_UNNECESSARY_BLOCK_CALLBACK_META = defineMeta("no-unnecessary-blo
 export const NO_UNNECESSARY_ASYNC_META = defineMeta("no-unnecessary-async", {
   type: "suggestion",
   docs: {
-    description: "Avoid async functions when their work can remain synchronous.",
+    description: "Require async functions to await a real asynchronous operation.",
     recommended: false,
   },
   schema: [],
@@ -859,8 +788,10 @@ export const NO_UNNECESSARY_ASYNC_META = defineMeta("no-unnecessary-async", {
       "{{name}} is async but has no await operation. Remove async or add the missing await.",
     unnecessaryReturnAwait:
       "{{name}} only returns an awaited value. Return the Promise directly and remove async unless the await preserves local error handling.",
-    synchronousFilesystem:
-      "{{name}} only awaits filesystem operations with synchronous equivalents ({{replacements}}). Use the synchronous APIs unless non-blocking I/O is required.",
+    artificialAwait:
+      "{{name}} awaits Promise.{{method}}(...), which adds no asynchronous work. Remove async/await or await the original request.",
+    synchronousAwait:
+      "{{name}} awaits an obviously synchronous {{type}} value. Remove async/await or await the actual request.",
   },
 });
 

@@ -18,7 +18,7 @@ import type { RuleModule } from "../../../src/types.ts";
 const require = createRequire(import.meta.url);
 const plugin = (await import(pathToFileURL(join(process.cwd(), "dist", "index.js")).href))
   .default;
-const requiredPlugin = require(join(process.cwd(), "dist", "index.js"));
+const requiredPlugin = require("eslint-plugin-legibility");
 
 function createContext(options: any[] = [], overrides: any = {}) {
   const reports = [];
@@ -335,7 +335,8 @@ test("exports an ESLint and Oxlint compatible plugin shape", () => {
     "oxlint/recommended",
     "oxlint/strict",
   ]);
-  assert.equal(requiredPlugin, plugin);
+  assert.deepEqual(Object.keys(requiredPlugin.rules), Object.keys(plugin.rules));
+  assert.deepEqual(Object.keys(requiredPlugin.configs), Object.keys(plugin.configs));
   assert.equal(requiredPlugin.meta.name, "eslint-plugin-legibility");
   assert.equal(requiredPlugin.meta.namespace, "legibility");
 });
@@ -1025,26 +1026,6 @@ test("require-executable-shebang ignores wildcard patterns longer than the path"
   assert.equal(reports.length, 0);
 });
 
-test("no-direct-node-bin-smoke reports direct node smoke tests", () => {
-  const { visitor, reports } = createRule("no-direct-node-bin-smoke");
-  const execSync = call(id("execSync"), [literal("node src/index.js --help")]);
-
-  visitor.CallExpression(execSync);
-
-  assert.equal(reports.length, 1);
-  assert.equal(reports[0].messageId, "directNodeBin");
-});
-
-test("no-direct-node-bin-smoke matches nested wildcard bin paths", () => {
-  const { visitor, reports } = createRule("no-direct-node-bin-smoke");
-  const execSync = call(id("execSync"), [literal("node packages/cli/dist/index.js --help")]);
-
-  visitor.CallExpression(execSync);
-
-  assert.equal(reports.length, 1);
-  assert.equal(reports[0].messageId, "directNodeBin");
-});
-
 test("no-complex-ternaries reports nested ternaries", () => {
   const { visitor, reports } = createRule("no-complex-ternaries");
   const expression = {
@@ -1493,6 +1474,25 @@ test("no-unnecessary-async keeps async functions with meaningful awaited work", 
   assert.equal(reports.length, 0);
 });
 
+test("no-unnecessary-async rejects artificial and synchronous awaits", () => {
+  const { visitor, reports } = createRule("no-unnecessary-async");
+  const resolved = call(member(id("Promise"), "resolve"), [id("value")]);
+  const artificialAwait = { type: "AwaitExpression", argument: resolved };
+  const artificial = arrow([], block([expressionStatement(artificialAwait)]));
+  artificial.async = true;
+  const literalAwait = { type: "AwaitExpression", argument: literal(1) };
+  const synchronous = arrow([], block([expressionStatement(literalAwait)]));
+  synchronous.async = true;
+
+  visitor.ArrowFunctionExpression(artificial);
+  visitor.ArrowFunctionExpression(synchronous);
+
+  assert.deepEqual(
+    reports.map((report) => report.messageId),
+    ["artificialAwait", "synchronousAwait"],
+  );
+});
+
 test("no-small-collection-conversion reports small Map and Set inputs", () => {
   const { visitor, reports } = createRule("no-small-collection-conversion");
   const setNode = newExpression("Set", [arrayExpression([literal("a"), literal("b")])]);
@@ -1784,16 +1784,19 @@ test("flat config enables ESLint complexity limits", async () => {
   assert.deepEqual(coreRuleIds, ["complexity", "max-lines-per-function"]);
 });
 
-test("no-unnecessary-async ignores shadowed filesystem imports", async () => {
+test("no-unnecessary-async accepts filesystem requests and rejects artificial awaits", async () => {
   const { Linter } = await import("eslint");
   const source = [
     'import { readFile } from "node:fs/promises";',
     'import { promises as fs } from "node:fs";',
-    'async function readConfig() { return await readFile("config.json", "utf8"); }',
+    'async function readConfig() { const value = await readFile("config.json", "utf8"); return JSON.parse(value); }',
     'async function readData() { const value = await fs.readFile("data.json"); return value; }',
     'async function request() { const value = await fetch("/data"); return value.json(); }',
-    'async function readParameter(readFile) { const value = await readFile("remote"); return value; }',
-    'async function readClient() { const fs = client; const value = await fs.readFile("remote"); return value; }',
+    'async function handled() { try { return await readFile("optional.json", "utf8"); } catch { return ""; } }',
+    'async function artificial() { await Promise.resolve("done"); return "done"; }',
+    'async function rejected() { await Promise.reject(new Error("no")); }',
+    'async function synchronous() { await 1; return 1; }',
+    'async function shadowed(Promise) { const value = await Promise.resolve("done"); return value; }',
   ].join("\n");
   const linter = new Linter({ configType: "flat" });
   const messages = linter.verify(
@@ -1811,8 +1814,9 @@ test("no-unnecessary-async ignores shadowed filesystem imports", async () => {
   assert.deepEqual(
     messages.map((message) => ({ line: message.line, messageId: message.messageId })),
     [
-      { line: 3, messageId: "synchronousFilesystem" },
-      { line: 4, messageId: "synchronousFilesystem" },
+      { line: 7, messageId: "artificialAwait" },
+      { line: 8, messageId: "artificialAwait" },
+      { line: 9, messageId: "synchronousAwait" },
     ],
   );
 });

@@ -173,12 +173,6 @@ export interface AliasCandidate {
   target: string;
 }
 
-export interface AsyncFsBindings {
-  fs: Set<string>;
-  methods: Map<string, string>;
-  promises: Set<string>;
-}
-
 export interface AsyncRuleFinding {
   data: RuleReportData;
   messageId: string;

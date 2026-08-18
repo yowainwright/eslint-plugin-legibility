@@ -54,8 +54,8 @@ export function getTone(status: string): string {
   return tones.get(status) ?? "negative";
 }
 
-export async function getReady() {
-  const ready = await Promise.resolve(true);
+export async function getReady(request: () => Promise<boolean>) {
+  const ready = await request();
   if (!ready) {
     return false;
   }

@@ -120,7 +120,6 @@ All presets explicitly configure these core rules because ESLint's recommended c
 <details>
 <summary>Strict only rules</summary>
 
-- [`legibility/no-direct-node-bin-smoke`](#no-direct-node-bin-smoke)
 - [`legibility/no-quadratic-patterns`](#no-quadratic-patterns)
 - [`legibility/no-repeated-collection-search`](#no-repeated-collection-search)
 - [`legibility/no-single-use-renaming-alias`](#no-single-use-renaming-alias)
@@ -313,25 +312,6 @@ Prefer named values before computed returns and object values.
 + const total = subtotal + tax - discount;
 +
 + return total;
-```
-
----
-
-<a id="no-direct-node-bin-smoke"></a>
-
-### `legibility/no-direct-node-bin-smoke({options})`
-
-Smoke-test installed package bins instead of direct `node src/index.js` execution.
-
-#### options
-
-- `{entryPatterns: string[]}`: entry files that should be tested through the installed bin shim.
-
-#### do / don't
-
-```diff
-- execSync("node src/index.js --help");
-+ execSync("my-cli --help");
 ```
 
 ---
@@ -657,21 +637,23 @@ This rule has no options. Run ESLint or Oxlint with `--fix` to apply the autofix
 
 ### `legibility/no-unnecessary-async()`
 
-Flag async functions that have no await, only return one awaited value, or only await Node filesystem operations with synchronous equivalents. Filesystem detection covers named and namespace imports from `node:fs/promises`, `fs/promises`, `node:fs`, and `fs`.
+Flag async functions that have no await, only return one awaited value, await `Promise.resolve()` or `Promise.reject()`, or await an obviously synchronous value. Calls that request asynchronous work are allowed, including filesystem, network, subprocess, prompt, and timer operations.
 
-Use the filesystem diagnostic for local tooling and scripts. Non-blocking filesystem I/O remains appropriate in request-serving code.
+Filesystem I/O is real asynchronous work. `await readFile(...)` lets timers, spinners, subprocess output, and other event-loop work continue while the operating system reads the file. The rule does not recommend a synchronous filesystem API merely because one exists. For a one-shot CLI read with no concurrent work, choosing a synchronous API remains an architectural decision outside this rule.
 
 #### do / don't
 
 ```diff
-- import { readFile } from "node:fs/promises";
-+ import { readFileSync } from "node:fs";
-
-- async function readConfig() {
--   return await readFile("config.json", "utf8");
-+ function readConfig() {
-+   return readFileSync("config.json", "utf8");
+- async function value() {
+-   return await Promise.resolve("ready");
++ function value() {
++   return "ready";
   }
+
++ async function readConfig() {
++   const source = await readFile("config.json", "utf8");
++   return JSON.parse(source);
++ }
 ```
 
 ---

@@ -16,13 +16,17 @@ permissions:
 jobs:
   test-published-release:
     runs-on: ubuntu-latest
-    name: pnpm smoke
+    name: node ${{ matrix.node }}
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["22.0.0", 26]
 
     steps:
       - name: Setup Node.js and Nub
         uses: nubjs/setup-nub@47e5e7393d50f4e9544ddaf756aa277972afba2d # v0.4.0
         with:
-          node-version: 26
+          node-version: ${{ matrix.node }}
           cache: false
 
       - name: Determine version to test

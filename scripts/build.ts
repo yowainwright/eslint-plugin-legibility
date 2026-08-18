@@ -1,11 +1,21 @@
 import { spawnSync } from "node:child_process";
-import { chmodSync, copyFileSync, mkdirSync, readdirSync } from "node:fs";
+import {
+  chmodSync,
+  copyFileSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+} from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import mergeTsconfigs from "merge-tsconfigs";
 
 const binRoot = "bin";
 const agentBinRoot = join(binRoot, "agent");
+const cjsRoot = join("dist", "cjs");
+const cjsEntryPath = join("dist", "index.cjs");
+const cjsManifestPath = join(cjsRoot, "package.json");
 const compiledAgentRoot = join(".build", "scripts", "agent");
 const lintChangedSource = join(".build", "scripts", "diff.js");
 const lintChangedDestination = join(binRoot, "lint-changed.js");
@@ -16,10 +26,25 @@ const pluginCompilerOptions = {
   rootDir: "../src",
 };
 const pluginTsconfigPath = ".build/tsconfig.plugin.json";
+const cjsPluginTsconfigPath = ".build/tsconfig.plugin-cjs.json";
 const pluginConfig = {
   compilerOptions: pluginCompilerOptions,
   include: ["../src/**/*.ts"],
   out: pluginTsconfigPath,
+  tsconfigs: ["tsconfig.json"],
+};
+const cjsPluginConfig = {
+  compilerOptions: {
+    declaration: false,
+    ignoreDeprecations: "6.0",
+    module: "CommonJS",
+    moduleResolution: "Node",
+    noEmit: false,
+    outDir: "../dist/cjs",
+    rootDir: "..",
+  },
+  include: ["../src/**/*.ts"],
+  out: cjsPluginTsconfigPath,
   tsconfigs: ["tsconfig.json"],
 };
 const strictArgs = ["--noEmit", "--strict", "--noImplicitAny", "--noUncheckedIndexedAccess"];
@@ -36,6 +61,7 @@ export function buildBin(): void {
 
 export function buildConfig(): void {
   mergeTsconfigs(pluginConfig);
+  mergeTsconfigs(cjsPluginConfig);
 }
 
 function runTsc(args: string[]): void {
@@ -49,6 +75,20 @@ function runTsc(args: string[]): void {
 export function buildPlugin(): void {
   buildConfig();
   runTsc(["-p", pluginTsconfigPath]);
+  runTsc(["-p", cjsPluginTsconfigPath]);
+  writeCjsArtifacts();
+}
+
+function writeCjsArtifacts(): void {
+  const manifestText = readFileSync("package.json", "utf8");
+  const manifest = JSON.parse(manifestText) as { name: string; version: string };
+  const cjsManifest = { name: manifest.name, type: "commonjs", version: manifest.version };
+  const cjsManifestText = `${JSON.stringify(cjsManifest, null, 2)}\n`;
+  const cjsEntry = '"use strict";\nmodule.exports = require("./cjs/src/index.js").default;\n';
+
+  mkdirSync(cjsRoot, { recursive: true });
+  writeFileSync(cjsManifestPath, cjsManifestText);
+  writeFileSync(cjsEntryPath, cjsEntry);
 }
 
 export function typecheckStrict(): void {
