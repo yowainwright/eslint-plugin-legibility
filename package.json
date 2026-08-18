@@ -48,7 +48,7 @@
   ],
   "sideEffects": false,
   "engines": {
-    "node": ">=22.12 <27"
+    "node": ">=22.18 <27"
   },
   "devEngines": {
     "runtime": {

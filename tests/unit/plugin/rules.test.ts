@@ -31,6 +31,7 @@ function createContext(options: any[] = [], overrides: any = {}) {
       getText(node) {
         return node?.__text ?? "";
       },
+      isGlobalReference: () => true,
     },
     report(report) {
       reports.push(report);
@@ -582,6 +583,19 @@ test("require-jsdoc-multiline-comments autofixes the block opener", async () => 
 
   assert.equal(result.fixed, true);
   assert.equal(result.output, expected);
+  assert.equal(result.messages.length, 0);
+});
+
+test("require-jsdoc-multiline-comments preserves bang comments", async () => {
+  const { Linter } = await import("eslint");
+  const linter = new Linter({ configType: "flat" });
+  const source = ["/*!", " * Preserve this license.", " */"].join("\n");
+  const rules = { "legibility/require-jsdoc-multiline-comments": "error" } as const;
+  const config = [{ plugins: { legibility: plugin }, rules }];
+  const result = linter.verifyAndFix(source, config);
+
+  assert.equal(result.fixed, false);
+  assert.equal(result.output, source);
   assert.equal(result.messages.length, 0);
 });
 
@@ -1513,6 +1527,21 @@ test("no-small-collection-conversion ignores useful or unknown collection sizes"
   visitor.NewExpression(newExpression("Set"));
 
   assert.equal(reports.length, 0);
+});
+
+test("no-small-collection-conversion ignores shadowed constructors", async () => {
+  const { Linter } = await import("eslint");
+  const linter = new Linter({ configType: "flat" });
+  const sources = [
+    'function read(Map) { return new Map([["a", 1]]).get("a"); }',
+    'import { Set } from "./set.js"; new Set(["a"]).has("a");',
+    'class Map {} new Map([["a", 1]]).get("a");',
+  ];
+  const rules = { "legibility/no-small-collection-conversion": "error" } as const;
+  const config = [{ plugins: { legibility: plugin }, rules }];
+  const messageCounts = sources.map((source) => linter.verify(source, config).length);
+
+  assert.deepEqual(messageCounts, [0, 0, 0]);
 });
 
 test("prefer-flat-map reports map followed by flat", () => {

@@ -1409,7 +1409,9 @@ function isMultilineBlockComment(comment: AstNode): boolean {
 
 function isJsdocComment(context: RuleContext, comment: AstNode): boolean {
   const commentText = getNodeText(context, comment).trimStart();
-  if (commentText) return commentText.startsWith("/**");
+  if (commentText) {
+    return commentText.startsWith("/**") || commentText.startsWith("/*!");
+  }
 
   return getCommentValue(comment).startsWith("*");
 }
@@ -3287,14 +3289,22 @@ function createNoUnnecessaryAsync(context: RuleContext): RuleListener {
   });
 }
 
-function getCollectionConstructorName(node: AstNode): string | null {
+function getCollectionConstructorName(context: RuleContext, node: AstNode): string | null {
   const callee = node.callee;
   const isIdentifier = isRecord(callee) && callee.type === "Identifier";
   if (!isIdentifier) return null;
 
   const name = callee.name;
   const isLookupCollection = name === "Map" || name === "Set";
-  return isLookupCollection ? name : null;
+  if (!isLookupCollection) return null;
+
+  const sourceCode = getSourceCode(context);
+  const isGlobalReference = sourceCode?.isGlobalReference;
+  if (!isGlobalReference) return null;
+
+  const isGlobal = isGlobalReference.call(sourceCode, callee);
+  if (!isGlobal) return null;
+  return name;
 }
 
 function getArrayLiteralSize(node: AstNode): number | null {
@@ -3347,7 +3357,7 @@ function checkSmallCollectionConversion(
   node: AstNode,
   min: number,
 ): void {
-  const collection = getCollectionConstructorName(node);
+  const collection = getCollectionConstructorName(context, node);
   if (!collection) return;
 
   const isImmediateLookup = isImmediateCollectionLookup(node, collection);

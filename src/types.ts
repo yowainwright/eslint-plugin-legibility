@@ -41,6 +41,7 @@ export interface SourceCodeLike {
   text?: string;
   getAllComments?(): AstNode[];
   getText?(node?: AstNode): string;
+  isGlobalReference?(node: AstNode): boolean;
 }
 
 export interface RuleReport {
