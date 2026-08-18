@@ -87,9 +87,9 @@ test("ci workflow covers supported runtimes and linter hosts", () => {
 });
 
 test("package metadata declares supported runtimes and optional linter hosts", () => {
-  assert.equal(manifest.engines.node, ">=22.18 <27");
+  assert.equal(manifest.engines.node, ">=22.18");
   assert.equal(manifest.peerDependencies.eslint, "^8.57.0 || ^9.0.0 || ^10.0.0");
-  assert.equal(manifest.peerDependencies.oxlint, ">=1.55.0 <2");
+  assert.equal(manifest.peerDependencies.oxlint, ">=1.55.0");
   assert.equal(manifest.peerDependenciesMeta.eslint.optional, true);
   assert.equal(manifest.peerDependenciesMeta.oxlint.optional, true);
 });
