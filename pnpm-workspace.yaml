@@ -2,7 +2,6 @@ packages:
   - "."
 
 strictDepBuilds: true
-onlyBuiltDependencies:
-  - "@nubjs/nub"
-
-overrides: {}
+allowBuilds:
+  "@nubjs/nub": true
+  esbuild: true
