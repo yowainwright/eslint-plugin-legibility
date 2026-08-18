@@ -4,6 +4,7 @@ import {
   copyFileSync,
   mkdirSync,
   readdirSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
@@ -12,8 +13,9 @@ import mergeTsconfigs from "merge-tsconfigs";
 
 const binRoot = "bin";
 const agentBinRoot = join(binRoot, "agent");
-const cjsRoot = join("dist", "cjs");
-const cjsEntryPath = join("dist", "index.cjs");
+const distRoot = "dist";
+const cjsRoot = join(distRoot, "cjs");
+const cjsEntryPath = join(distRoot, "index.cjs");
 const compiledAgentRoot = join(".build", "scripts", "agent");
 const lintChangedSource = join(".build", "scripts", "diff.js");
 const lintChangedDestination = join(binRoot, "lint-changed.js");
@@ -61,6 +63,7 @@ function runTsc(args: string[]): void {
 }
 
 export function buildPlugin(): void {
+  cleanDist();
   buildConfig();
   runTsc(["-p", pluginTsconfigPath]);
   runCommand(tsupPath, [
@@ -74,6 +77,10 @@ export function buildPlugin(): void {
     "--clean",
   ]);
   writeCjsArtifacts();
+}
+
+function cleanDist(): void {
+  rmSync(distRoot, { force: true, recursive: true });
 }
 
 function writeCjsArtifacts(): void {
