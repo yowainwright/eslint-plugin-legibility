@@ -1513,6 +1513,22 @@ test("no-small-collection-conversion reports small Map and Set inputs", () => {
   );
 });
 
+test("no-small-collection-conversion supports legacy ESLint scopes", () => {
+  const setNode = newExpression("Set", [arrayExpression([literal("a")])]);
+  const references = [{ identifier: setNode.callee }];
+  const variable = { defs: [], references };
+  const scopeManager = { scopes: [{ set: new Map([["Set", variable]]) }] };
+  const sourceCode = { text: "", scopeManager };
+  const { visitor, reports } = createRule("no-small-collection-conversion", [], {
+    sourceCode,
+  });
+  methodCall(setNode, "has", [id("value")]);
+
+  visitor.NewExpression(setNode);
+
+  assert.equal(reports.length, 1);
+});
+
 test("no-small-collection-conversion ignores useful or unknown collection sizes", () => {
   const { visitor, reports } = createRule("no-small-collection-conversion");
   const values = arrayExpression([literal("a"), literal("b"), literal("c")]);

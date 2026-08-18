@@ -42,6 +42,20 @@ export interface SourceCodeLike {
   getAllComments?(): AstNode[];
   getText?(node?: AstNode): string;
   isGlobalReference?(node: AstNode): boolean;
+  scopeManager?: ScopeManagerLike;
+}
+
+export interface ScopeManagerLike {
+  scopes: ScopeLike[];
+}
+
+export interface ScopeLike {
+  set: Map<string, ScopeVariableLike>;
+}
+
+export interface ScopeVariableLike {
+  defs: unknown[];
+  references: { identifier: AstNode }[];
 }
 
 export interface RuleReport {

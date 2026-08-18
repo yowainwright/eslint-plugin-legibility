@@ -3289,6 +3289,17 @@ function createNoUnnecessaryAsync(context: RuleContext): RuleListener {
   });
 }
 
+function isGlobalReference(context: RuleContext, node: AstNode): boolean {
+  const sourceCode = getSourceCode(context);
+  const checkGlobalReference = sourceCode?.isGlobalReference;
+  if (checkGlobalReference) return checkGlobalReference.call(sourceCode, node);
+
+  const variable = sourceCode?.scopeManager?.scopes[0]?.set.get(String(node.name));
+  const isGlobal = Boolean(variable) && variable?.defs.length === 0;
+  if (!isGlobal) return false;
+  return variable.references.some((reference) => reference.identifier === node);
+}
+
 function getCollectionConstructorName(context: RuleContext, node: AstNode): string | null {
   const callee = node.callee;
   const isIdentifier = isRecord(callee) && callee.type === "Identifier";
@@ -3298,11 +3309,7 @@ function getCollectionConstructorName(context: RuleContext, node: AstNode): stri
   const isLookupCollection = name === "Map" || name === "Set";
   if (!isLookupCollection) return null;
 
-  const sourceCode = getSourceCode(context);
-  const isGlobalReference = sourceCode?.isGlobalReference;
-  if (!isGlobalReference) return null;
-
-  const isGlobal = isGlobalReference.call(sourceCode, callee);
+  const isGlobal = isGlobalReference(context, callee);
   if (!isGlobal) return null;
   return name;
 }
