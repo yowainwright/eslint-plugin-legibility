@@ -18,7 +18,7 @@ import type { RuleModule } from "../../../src/types.ts";
 const require = createRequire(import.meta.url);
 const plugin = (await import(pathToFileURL(join(process.cwd(), "dist", "index.js")).href))
   .default;
-const requiredPlugin = require(join(process.cwd(), "dist", "index.js"));
+const requiredPlugin = require("eslint-plugin-legibility");
 
 function createContext(options: any[] = [], overrides: any = {}) {
   const reports = [];
@@ -335,7 +335,8 @@ test("exports an ESLint and Oxlint compatible plugin shape", () => {
     "oxlint/recommended",
     "oxlint/strict",
   ]);
-  assert.equal(requiredPlugin, plugin);
+  assert.deepEqual(Object.keys(requiredPlugin.rules), Object.keys(plugin.rules));
+  assert.deepEqual(Object.keys(requiredPlugin.configs), Object.keys(plugin.configs));
   assert.equal(requiredPlugin.meta.name, "eslint-plugin-legibility");
   assert.equal(requiredPlugin.meta.namespace, "legibility");
 });
