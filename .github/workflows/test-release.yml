@@ -83,7 +83,7 @@ jobs:
           }
           EOF
 
-          node -e 'const plugin = require("eslint-plugin-legibility"); if (plugin.meta.name !== "legibility") throw new Error("Unexpected plugin name"); if (plugin.meta.version !== process.env.VERSION) throw new Error("Unexpected plugin version: " + plugin.meta.version);'
+          node -e 'const plugin = require("eslint-plugin-legibility"); if (plugin.meta.name !== "eslint-plugin-legibility") throw new Error("Unexpected plugin name"); if (plugin.meta.version !== process.env.VERSION) throw new Error("Unexpected plugin version: " + plugin.meta.version);'
 
           set +e
           nubx eslint eslint-bad.js > eslint.log 2>&1

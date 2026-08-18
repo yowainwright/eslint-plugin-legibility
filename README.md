@@ -22,9 +22,7 @@ The goal of rules in this package are to make code readable for reviewing lots o
 
 This project provides ESLint and Oxlint-compatible rules for readable, explicit, performance-conscious JavaScript and TypeScript.
 
-The package exports an ESLint-compatible plugin object. ESLint can load it as a normal plugin, and Oxlint can load the same package through JavaScript plugin support. 
-
-Runtime support is Node 22.12 through 26, Bun, and Deno. Node 22.12 is the minimum because it added [CommonJS interoperability for synchronous ESM loading][node-require-esm]. The supported hosts are ESLint 8.57 through 10 and Oxlint 1.55 through current. Both are optional peers, so consumers only install the linter they use. Oxlint's JavaScript plugin API is currently marked alpha by [Oxlint](https://oxc.rs/docs/guide/usage/linter/js-plugins).
+The package exports an ESLint-compatible plugin object. ESLint loads it directly. Oxlint loads it through JavaScript plugin support. Both are optional peer dependencies.
 
 ```sh
 # npm, pnpm, bun
@@ -1232,5 +1230,4 @@ The benchmark reports JSON with mean, median, p95, minimum, maximum, and mean-pe
 [MIT](./LICENSE)
 
 [eslint-prefer-object-spread]: https://eslint.org/docs/latest/rules/prefer-object-spread
-[node-require-esm]: https://nodejs.org/dist/latest/docs/api/modules.html
 [v8-spread]: https://v8.dev/blog/spread-elements

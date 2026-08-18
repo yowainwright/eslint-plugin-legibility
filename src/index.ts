@@ -1409,7 +1409,9 @@ function isMultilineBlockComment(comment: AstNode): boolean {
 
 function isJsdocComment(context: RuleContext, comment: AstNode): boolean {
   const commentText = getNodeText(context, comment).trimStart();
-  if (commentText) return commentText.startsWith("/**");
+  if (commentText) {
+    return commentText.startsWith("/**") || commentText.startsWith("/*!");
+  }
 
   return getCommentValue(comment).startsWith("*");
 }
@@ -3287,14 +3289,29 @@ function createNoUnnecessaryAsync(context: RuleContext): RuleListener {
   });
 }
 
-function getCollectionConstructorName(node: AstNode): string | null {
+function isGlobalReference(context: RuleContext, node: AstNode): boolean {
+  const sourceCode = getSourceCode(context);
+  const checkGlobalReference = sourceCode?.isGlobalReference;
+  if (checkGlobalReference) return checkGlobalReference.call(sourceCode, node);
+
+  const variable = sourceCode?.scopeManager?.scopes[0]?.set.get(String(node.name));
+  const isGlobal = Boolean(variable) && variable?.defs.length === 0;
+  if (!isGlobal) return false;
+  return variable.references.some((reference) => reference.identifier === node);
+}
+
+function getCollectionConstructorName(context: RuleContext, node: AstNode): string | null {
   const callee = node.callee;
   const isIdentifier = isRecord(callee) && callee.type === "Identifier";
   if (!isIdentifier) return null;
 
   const name = callee.name;
   const isLookupCollection = name === "Map" || name === "Set";
-  return isLookupCollection ? name : null;
+  if (!isLookupCollection) return null;
+
+  const isGlobal = isGlobalReference(context, callee);
+  if (!isGlobal) return null;
+  return name;
 }
 
 function getArrayLiteralSize(node: AstNode): number | null {
@@ -3347,7 +3364,7 @@ function checkSmallCollectionConversion(
   node: AstNode,
   min: number,
 ): void {
-  const collection = getCollectionConstructorName(node);
+  const collection = getCollectionConstructorName(context, node);
   if (!collection) return;
 
   const isImmediateLookup = isImmediateCollectionLookup(node, collection);
