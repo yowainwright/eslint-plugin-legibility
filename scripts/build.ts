@@ -61,7 +61,7 @@ export function buildBin(): void {
 
 export function buildConfig(): void {
   mergeTsconfigs(pluginConfig);
-  mergeTsconfigs(cjsPluginConfig);
+  mergeTsconfigs(cjsPluginConfig as Parameters<typeof mergeTsconfigs>[0]);
 }
 
 function runTsc(args: string[]): void {
