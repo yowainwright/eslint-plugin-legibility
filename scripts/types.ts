@@ -64,7 +64,7 @@ export type RepoCommandRunner = (
   args: readonly string[],
 ) => RepoCommandResult;
 
-export type RepoManagerTarget = "pack" | "validate";
+export type RepoManagerTarget = "pack" | "parse-pack-output" | "validate";
 
 export type TestRunMode = "bun-ts" | "coverage" | "deno-ts" | "node-ts";
 

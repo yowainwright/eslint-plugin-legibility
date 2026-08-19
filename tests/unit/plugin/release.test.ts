@@ -71,6 +71,10 @@ test("publish workflow uses npm trusted publishing", () => {
   assert.match(publishWorkflow, /registry-url: https:\/\/registry\.npmjs\.org/);
   assert.match(
     publishWorkflow,
+    /nub --node scripts\/repoManager\.ts parse-pack-output npm-pack\.json/,
+  );
+  assert.match(
+    publishWorkflow,
     /npm publish --access public --tag "\$\{\{ steps\.dist-tag\.outputs\.tag \}\}"/,
   );
   assert.match(
