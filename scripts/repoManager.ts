@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -9,7 +10,11 @@ import type {
 } from "./types.ts";
 
 const packArgs = ["pack", "--json", "--pack-destination", "./.npm-cache"];
-const repoManagerTargets: ReadonlySet<string> = new Set(["pack", "validate"]);
+const repoManagerTargets: ReadonlySet<string> = new Set([
+  "pack",
+  "parse-pack-output",
+  "validate",
+]);
 const validationStart = [
   ["run", "typecheck"],
   ["run", "typecheck:strict"],
@@ -43,6 +48,31 @@ function runNubSteps(
 
 export function getValidationSteps(): string[][] {
   return validationStart.concat([["run", "test"]], validationEnd);
+}
+
+interface PackResult {
+  filename?: unknown;
+}
+
+export function parsePackOutput(output: string): string {
+  const ansiEscape = String.fromCharCode(27);
+  const ansiEscapePattern = new RegExp(`${ansiEscape}\\[[0-?]*[ -/]*[@-~]`, "g");
+  const lines = output.replace(ansiEscapePattern, "").trim().split(/\r?\n/);
+
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const candidate = lines.slice(index).join("\n");
+    try {
+      const parsed = JSON.parse(candidate) as PackResult | PackResult[];
+      const packageResult = Array.isArray(parsed) ? parsed[0] : parsed;
+      const filename = packageResult?.filename;
+      if (typeof filename !== "string") continue;
+      if (filename.length > 0) return filename;
+    } catch {
+      continue;
+    }
+  }
+
+  throw new Error("Pack JSON output not found");
 }
 
 export class Pack {
@@ -86,7 +116,21 @@ export function runRepoManager(
   runner: RepoCommandRunner = runCommand,
 ): number {
   if (target === "pack") return new Pack(runner).run();
+  if (target === "parse-pack-output") {
+    throw new Error("parse-pack-output requires an output path");
+  }
   return new Validate(runner).run();
+}
+
+function runDirect(args: readonly string[]): number {
+  const target = parseRepoManagerTarget(args);
+  if (target !== "parse-pack-output") return runRepoManager(target);
+
+  const outputPath = args[1];
+  if (!outputPath) throw new Error("Pack output path is required");
+
+  console.log(parsePackOutput(readFileSync(outputPath, "utf8")));
+  return 0;
 }
 
 export function isDirectRun(metaUrl: string, argvPath: string | undefined): boolean {
@@ -97,8 +141,7 @@ export function isDirectRun(metaUrl: string, argvPath: string | undefined): bool
 
 if (isDirectRun(import.meta.url, process.argv[1])) {
   try {
-    const target = parseRepoManagerTarget(process.argv.slice(2));
-    process.exitCode = runRepoManager(target);
+    process.exitCode = runDirect(process.argv.slice(2));
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
