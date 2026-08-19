@@ -29,7 +29,9 @@ test("parses Nub pack output after ANSI build logs", () => {
 });
 
 test("parses object pack output", () => {
-  assert.equal(parsePackOutput('{"filename":"package.tgz"}'), "package.tgz");
+  const output = '{"filename":"/home/runner/work/package/./.npm-cache/package.tgz"}';
+
+  assert.equal(parsePackOutput(output), "/home/runner/work/package/.npm-cache/package.tgz");
 });
 
 test("rejects pack output without a filename", () => {
