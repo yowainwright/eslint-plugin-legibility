@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { normalize, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import type {
@@ -66,7 +66,9 @@ export function parsePackOutput(output: string): string {
       const packageResult = Array.isArray(parsed) ? parsed[0] : parsed;
       const filename = packageResult?.filename;
       if (typeof filename !== "string") continue;
-      if (filename.length > 0) return filename;
+      if (filename.length === 0) continue;
+      const normalizedFilename = normalize(filename);
+      if (normalizedFilename.length > 0) return normalizedFilename;
     } catch {
       continue;
     }
