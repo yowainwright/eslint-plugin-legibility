@@ -122,9 +122,12 @@ export function runRepoManager(
   return new Validate(runner).run();
 }
 
-function runDirect(args: readonly string[]): number {
+export function runDirect(
+  args: readonly string[],
+  runner: RepoCommandRunner = runCommand,
+): number {
   const target = parseRepoManagerTarget(args);
-  if (target !== "parse-pack-output") return runRepoManager(target);
+  if (target !== "parse-pack-output") return runRepoManager(target, runner);
 
   const outputPath = args[1];
   if (!outputPath) throw new Error("Pack output path is required");
