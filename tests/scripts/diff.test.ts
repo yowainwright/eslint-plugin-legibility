@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 import test from 'node:test';
 import { pathToFileURL } from 'node:url';
@@ -193,6 +193,36 @@ test('isDirectRun compares resolved file URLs', () => {
   assert.equal(isDirectRun(binUrl, binPath), true);
   assert.equal(isDirectRun(binUrl, undefined), false);
   assert.equal(isDirectRun(binUrl, join(process.cwd(), '.build', 'scripts', 'diff.js')), false);
+});
+
+test('isDirectRun resolves symlinked executable paths', (context) => {
+  const fixtureRoot = join(process.cwd(), 'tests', '.test-fixtures');
+  mkdirSync(fixtureRoot, { recursive: true });
+  const directory = mkdtempSync(join(fixtureRoot, 'lint-changed-link-'));
+  const symlinkPath = join(directory, 'lint-changed');
+  symlinkSync(binPath, symlinkPath);
+  context.after(() => rmSync(directory, { recursive: true }));
+
+  const binUrl = pathToFileURL(binPath).href;
+  assert.equal(isDirectRun(binUrl, symlinkPath), true);
+});
+
+test('lint-changed runs through a package-manager-style bin symlink', (context) => {
+  const repository = createCleanRepository();
+  context.after(() => rmSync(repository, { recursive: true }));
+  const binDirectory = join(repository, 'node_modules', '.bin');
+  const symlinkPath = join(binDirectory, 'lint-changed');
+  mkdirSync(binDirectory, { recursive: true });
+  symlinkSync(binPath, symlinkPath);
+  writeFileSync(join(repository, 'check.ts'), 'export const ready = ;\n');
+
+  const result = spawnSync(symlinkPath, ['HEAD'], {
+    cwd: repository,
+    encoding: 'utf8',
+    env: getFixtureEnvironment(),
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stdout, /modified file\(s\)/);
 });
 
 test('lint-changed reports no files in a clean checkout', (context) => {

@@ -12,10 +12,10 @@ test("runs the repository manager parser as a direct script", async () => {
 
   try {
     writeFileSync(outputPath, '{"filename":"package.tgz"}');
-    process.argv = [process.argv[0], resolve("scripts/repoManager.ts"), "parse-pack-output", outputPath];
+    process.argv = [process.argv[0], resolve("scripts/repo/index.ts"), "parse-pack-output", outputPath];
     process.exitCode = undefined;
 
-    await import("../../scripts/repoManager.ts");
+    await import("../../scripts/repo/index.ts");
 
     assert.equal(process.exitCode, 0);
   } finally {

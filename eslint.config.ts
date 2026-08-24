@@ -28,7 +28,7 @@ export default [
     rules: Object.assign({}, strictLegibilityConfig.rules, {
       "legibility/require-executable-shebang": [
         "error",
-        { files: ["scripts/diff.ts"] },
+        { files: ["scripts/repo/utils.ts"] },
       ],
     }),
   },

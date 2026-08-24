@@ -43,7 +43,7 @@ jobs:
         id: pack
         run: |
           nub pack --json --pack-destination ./.npm-cache > npm-pack.json
-          TARBALL="$(nub --node scripts/repoManager.ts parse-pack-output npm-pack.json)"
+          TARBALL="$(nub --node scripts/repo/index.ts parse-pack-output npm-pack.json)"
           test -n "$TARBALL"
           echo "tarball=$TARBALL" >> "$GITHUB_OUTPUT"
       - name: Attest npm tarball

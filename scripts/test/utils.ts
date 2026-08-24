@@ -1,17 +1,17 @@
 import { spawnSync } from "node:child_process";
+import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { composeFile, e2eModes } from "./constants.ts";
 import type { E2eCommandRunner, E2eMode, E2eRunPlan } from "./types.ts";
 
-const composeFile = "tests/e2e/docker/compose.yml";
-const modes = new Set<E2eMode>(["benchmark", "test"]);
 const runCommand: E2eCommandRunner = (command, args) =>
   spawnSync(command, Array.from(args), { stdio: "inherit" });
 
 export function parseE2eMode(args: readonly string[]): E2eMode {
   const mode = args[0] as E2eMode | undefined;
-  const isKnownMode = mode !== undefined && modes.has(mode);
+  const isKnownMode = mode !== undefined && e2eModes.has(mode);
   if (isKnownMode) return mode;
   throw new Error(`Invalid end-to-end mode: ${mode ?? "(missing)"}`);
 }
@@ -56,16 +56,18 @@ export function runE2e(
 
 export function isDirectRun(metaUrl: string, argvPath: string | undefined): boolean {
   if (!argvPath) return false;
-  return pathToFileURL(resolve(argvPath)).href === metaUrl;
+  const realMetaPath = getRealPath(fileURLToPath(metaUrl));
+  const realArgvPath = getRealPath(resolve(argvPath));
+
+  const argvUrl = pathToFileURL(realArgvPath).href;
+  const realMetaUrl = pathToFileURL(realMetaPath).href;
+  return argvUrl === realMetaUrl;
 }
 
-if (isDirectRun(import.meta.url, process.argv[1])) {
+function getRealPath(path: string): string {
   try {
-    const mode = parseE2eMode(process.argv.slice(2));
-    process.exitCode = runE2e(mode);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`${message}\n`);
-    process.exitCode = 1;
+    return realpathSync(path);
+  } catch {
+    return path;
   }
 }

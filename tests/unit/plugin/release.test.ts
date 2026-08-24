@@ -38,20 +38,20 @@ const publishWorkflow = readFileSync(".github/workflows/publish.yml", "utf8");
 const updateWorkflow = readFileSync(".github/workflows/update.yml", "utf8");
 
 test("release scripts use the publish confirmation wrapper", () => {
-  assert.equal(scripts.release, "nub --node scripts/release.ts");
-  assert.equal(scripts["release:current"], "nub --node scripts/release.ts --current");
-  assert.equal(scripts["release:current:dry"], "nub --node scripts/release.ts --current --dry-run");
-  assert.equal(scripts["release:patch"], "nub --node scripts/release.ts patch");
-  assert.equal(scripts["release:patch:dry"], "nub --node scripts/release.ts patch --dry-run");
-  assert.equal(scripts["release:minor"], "nub --node scripts/release.ts minor");
-  assert.equal(scripts["release:minor:dry"], "nub --node scripts/release.ts minor --dry-run");
-  assert.equal(scripts["release:major"], "nub --node scripts/release.ts major");
-  assert.equal(scripts["release:major:dry"], "nub --node scripts/release.ts major --dry-run");
-  assert.equal(scripts["release:beta"], "nub --node scripts/release.ts --preRelease=beta");
-  assert.equal(scripts["release:beta:dry"], "nub --node scripts/release.ts --preRelease=beta --dry-run");
-  assert.equal(scripts["release:alpha"], "nub --node scripts/release.ts --preRelease=alpha");
-  assert.equal(scripts["release:alpha:dry"], "nub --node scripts/release.ts --preRelease=alpha --dry-run");
-  assert.equal(scripts["release:dry"], "nub --node scripts/release.ts patch --dry-run");
+  assert.equal(scripts.release, "nub --node scripts/repo/index.ts release");
+  assert.equal(scripts["release:current"], "nub --node scripts/repo/index.ts release --current");
+  assert.equal(scripts["release:current:dry"], "nub --node scripts/repo/index.ts release --current --dry-run");
+  assert.equal(scripts["release:patch"], "nub --node scripts/repo/index.ts release patch");
+  assert.equal(scripts["release:patch:dry"], "nub --node scripts/repo/index.ts release patch --dry-run");
+  assert.equal(scripts["release:minor"], "nub --node scripts/repo/index.ts release minor");
+  assert.equal(scripts["release:minor:dry"], "nub --node scripts/repo/index.ts release minor --dry-run");
+  assert.equal(scripts["release:major"], "nub --node scripts/repo/index.ts release major");
+  assert.equal(scripts["release:major:dry"], "nub --node scripts/repo/index.ts release major --dry-run");
+  assert.equal(scripts["release:beta"], "nub --node scripts/repo/index.ts release --preRelease=beta");
+  assert.equal(scripts["release:beta:dry"], "nub --node scripts/repo/index.ts release --preRelease=beta --dry-run");
+  assert.equal(scripts["release:alpha"], "nub --node scripts/repo/index.ts release --preRelease=alpha");
+  assert.equal(scripts["release:alpha:dry"], "nub --node scripts/repo/index.ts release --preRelease=alpha --dry-run");
+  assert.equal(scripts["release:dry"], "nub --node scripts/repo/index.ts release patch --dry-run");
 });
 
 test("release-it creates git releases while GitHub Actions publishes npm", () => {
@@ -71,7 +71,7 @@ test("publish workflow uses npm trusted publishing", () => {
   assert.match(publishWorkflow, /registry-url: https:\/\/registry\.npmjs\.org/);
   assert.match(
     publishWorkflow,
-    /nub --node scripts\/repoManager\.ts parse-pack-output npm-pack\.json/,
+    /nub --node scripts\/repo\/index\.ts parse-pack-output npm-pack\.json/,
   );
   assert.match(
     publishWorkflow,

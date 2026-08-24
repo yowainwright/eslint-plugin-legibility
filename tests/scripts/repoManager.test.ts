@@ -9,11 +9,11 @@ import {
   Pack,
   parsePackOutput,
   parseRepoManagerTarget,
-  runDirect,
+  runRepoDirect,
   runRepoManager,
   Validate,
-} from "../../scripts/repoManager.ts";
-import type { RepoCommandRunner } from "../../scripts/types.ts";
+} from "../../scripts/repo/utils.ts";
+import type { RepoCommandRunner } from "../../scripts/repo/types.ts";
 
 test("parses repository manager targets", () => {
   assert.equal(parseRepoManagerTarget(["pack"]), "pack");
@@ -86,9 +86,9 @@ test("runs the pack target directly", () => {
       return { status: 0 };
     };
 
-    assert.equal(runDirect(["pack"], runner), 0);
-    assert.equal(runDirect(["parse-pack-output", outputPath]), 0);
-    assert.throws(() => runDirect(["parse-pack-output"]), /Pack output path is required/);
+    assert.equal(runRepoDirect(["pack"], runner), 0);
+    assert.equal(runRepoDirect(["parse-pack-output", outputPath]), 0);
+    assert.throws(() => runRepoDirect(["parse-pack-output"]), /Pack output path is required/);
   } finally {
     rmSync(directory, { force: true, recursive: true });
   }

@@ -14,13 +14,15 @@ x-runner: &runner
     ESLINT_USE_FLAT_CONFIG: "true"
   network_mode: none
   read_only: true
+  tmpfs:
+    - /tmp
   security_opt:
     - no-new-privileges:true
 
 services:
   test:
     <<: *runner
-    command: ["tests/e2e/correctness.ts"]
+    command: ["tests/e2e/e2e.ts"]
 
   benchmark:
     <<: *runner

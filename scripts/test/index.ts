@@ -1,12 +1,19 @@
 import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { dirname, join } from "node:path";
+
+import {
+  coverageFile,
+  testFileExtension,
+  testModes,
+} from "./constants.ts";
+import {
+  isDirectRun,
+  parseE2eMode,
+  runE2e,
+} from "./utils.ts";
 import type { TestCommandRunner, TestRunMode, TestRunPlan } from "./types.ts";
 
-const testModes = new Set<TestRunMode>(["bun-ts", "coverage", "deno-ts", "node-ts"]);
-const coverageFile = "coverage/lcov.info";
-const testFileExtension = ".test.ts";
 const runTestCommand: TestCommandRunner = (command, args) =>
   spawnSync(command, Array.from(args), { stdio: "inherit" });
 
@@ -114,20 +121,33 @@ export function runTests(mode: TestRunMode): number {
   return status;
 }
 
-export function isDirectRun(metaUrl: string, argvPath: string | undefined): boolean {
-  if (!argvPath) return false;
-
-  const argvUrl = pathToFileURL(resolve(argvPath)).href;
-  const isDirect = argvUrl === metaUrl;
-  return isDirect;
-}
-
-if (isDirectRun(import.meta.url, process.argv[1])) {
+function runTestCli(args: readonly string[]): void {
   try {
-    const mode = parseTestRunMode(process.argv.slice(2));
+    const mode = parseTestRunMode(args);
     process.exitCode = runTests(mode);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
   }
+}
+
+function runE2eCli(args: readonly string[]): void {
+  try {
+    process.exitCode = runE2e(parseE2eMode(args));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`${message}\n`);
+    process.exitCode = 1;
+  }
+}
+
+function runCli(args: readonly string[]): void {
+  const isE2e = args[0] === "e2e";
+  if (isE2e) return runE2eCli(args.slice(1));
+
+  runTestCli(args);
+}
+
+if (isDirectRun(import.meta.url, process.argv[1])) {
+  runCli(process.argv.slice(2));
 }

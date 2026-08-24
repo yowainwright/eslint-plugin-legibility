@@ -39,4 +39,4 @@ COPY --chown=node:node tests/fixtures ./tests/fixtures
 COPY --chown=node:node tests/e2e/docker/consumer ./tests/e2e
 RUN node tests/e2e/generate-workload.ts
 ENTRYPOINT ["node"]
-CMD ["tests/e2e/correctness.ts"]
+CMD ["tests/e2e/e2e.ts"]

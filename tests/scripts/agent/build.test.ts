@@ -9,7 +9,7 @@ import {
   parseBuildTargets,
   renderAgentSkill,
   writeAgentArtifacts,
-} from "../../../scripts/agent/build.ts";
+} from "../../../scripts/agent/utils.ts";
 
 function createTempDirectory(): string {
   return mkdtempSync(join(tmpdir(), "legibility-agent-build-"));
