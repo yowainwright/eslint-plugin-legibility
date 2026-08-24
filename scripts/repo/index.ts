@@ -27,7 +27,7 @@ import {
   tscPath,
   tsupPath,
 } from "./constants.ts";
-import { isDirectRun, runRelease, runRepoDirect } from "./utils.ts";
+import { isDirectRun, preserveExitCode, runRelease, runRepoDirect } from "./utils.ts";
 
 export function buildBin(): void {
   mkdirSync(agentBinRoot, { recursive: true });
@@ -154,7 +154,7 @@ function runRepoCli(args: readonly string[]): number | Promise<number> {
 
 if (isDirectRun(import.meta.url, process.argv[1])) {
   try {
-    process.exitCode = await runRepoCli(process.argv.slice(2));
+    process.exitCode = preserveExitCode(await runRepoCli(process.argv.slice(2)));
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;

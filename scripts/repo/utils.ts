@@ -505,6 +505,13 @@ export function runLintChanged(args: readonly string[]): number {
   return Math.max(newFileExitCode, modifiedFileExitCode, policyExitCode);
 }
 
+export function preserveExitCode(commandExitCode: number): number {
+  const recordedExitCode = process.exitCode;
+  const hasRecordedFailure = typeof recordedExitCode === "number" && recordedExitCode !== 0;
+  if (hasRecordedFailure) return recordedExitCode;
+  return commandExitCode;
+}
+
 const isMain = isDirectRun(import.meta.url, process.argv[1]);
 if (isMain) process.exitCode = runLintChanged(process.argv.slice(2));
 

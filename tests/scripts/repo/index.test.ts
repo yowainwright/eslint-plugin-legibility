@@ -9,11 +9,12 @@ import {
   Pack,
   parsePackOutput,
   parseRepoManagerTarget,
+  preserveExitCode,
   runRepoDirect,
   runRepoManager,
   Validate,
-} from "../../scripts/repo/utils.ts";
-import type { RepoCommandRunner } from "../../scripts/repo/types.ts";
+} from "../../../scripts/repo/utils.ts";
+import type { RepoCommandRunner } from "../../../scripts/repo/types.ts";
 
 test("parses repository manager targets", () => {
   assert.equal(parseRepoManagerTarget(["pack"]), "pack");
@@ -91,5 +92,19 @@ test("runs the pack target directly", () => {
     assert.throws(() => runRepoDirect(["parse-pack-output"]), /Pack output path is required/);
   } finally {
     rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+test("preserves a recorded failure over a successful CLI result", () => {
+  const originalExitCode = process.exitCode;
+
+  try {
+    process.exitCode = 17;
+    assert.equal(preserveExitCode(0), 17);
+
+    process.exitCode = 0;
+    assert.equal(preserveExitCode(9), 9);
+  } finally {
+    process.exitCode = originalExitCode;
   }
 });
