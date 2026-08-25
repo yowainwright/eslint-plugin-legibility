@@ -1,5 +1,14 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -9,7 +18,7 @@ import {
   installAgentSkill,
   parseInstallOptions,
   resolveInstallRoot,
-} from "../../../scripts/agent/install.ts";
+} from "../../../scripts/agent/utils.ts";
 
 function createTempDirectory(): string {
   return mkdtempSync(join(tmpdir(), "legibility-agent-install-"));
@@ -72,6 +81,31 @@ test("force replaces an installed artifact", () => {
     installAgentSkill({ force: true, path: directory, target: "agents" });
 
     assert.match(readFileSync(skillPath, "utf8"), /npx lint-changed/);
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+test("installs through the package manager bin symlink", () => {
+  const directory = createTempDirectory();
+  const binDirectory = join(directory, "node_modules", ".bin");
+  const symlinkPath = join(binDirectory, "eslint-plugin-legibility-install-skill");
+  const installRoot = join(directory, "installed");
+  const installScript = join(process.cwd(), "bin", "agent", "install.js");
+
+  try {
+    mkdirSync(binDirectory, { recursive: true });
+    symlinkSync(installScript, symlinkPath);
+    const result = spawnSync(
+      process.execPath,
+      [symlinkPath, "--target", "agents", "--path", installRoot],
+      { cwd: directory, encoding: "utf8" },
+    );
+
+    const skillPath = join(installRoot, "eslint-plugin-legibility", "SKILL.md");
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(existsSync(skillPath), true);
+    assert.match(result.stdout, /installed eslint-plugin-legibility/);
   } finally {
     rmSync(directory, { force: true, recursive: true });
   }

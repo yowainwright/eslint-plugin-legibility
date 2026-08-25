@@ -7,41 +7,35 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { join } from "node:path";
 import mergeTsconfigs from "merge-tsconfigs";
 
-const binRoot = "bin";
-const agentBinRoot = join(binRoot, "agent");
-const distRoot = "dist";
-const cjsRoot = join(distRoot, "cjs");
-const cjsEntryPath = join(distRoot, "index.cjs");
-const compiledAgentRoot = join(".build", "scripts", "agent");
-const lintChangedSource = join(".build", "scripts", "diff.js");
-const lintChangedDestination = join(binRoot, "lint-changed.js");
-const pluginEntryPath = join("src", "index.ts");
-const pluginCompilerOptions = {
-  declaration: true,
-  noEmit: false,
-  outDir: "../dist",
-  rootDir: "../src",
-};
-const pluginTsconfigPath = ".build/tsconfig.plugin.json";
-const tsupPath = join("node_modules", ".bin", "tsup");
-const pluginConfig = {
-  compilerOptions: pluginCompilerOptions,
-  include: ["../src/**/*.ts"],
-  out: pluginTsconfigPath,
-  tsconfigs: ["tsconfig.json"],
-};
-const strictArgs = ["--noEmit", "--strict", "--noImplicitAny", "--noUncheckedIndexedAccess"];
-const tscPath = join("node_modules", ".bin", "tsc");
+import {
+  agentBinRoot,
+  cjsEntryPath,
+  cjsRoot,
+  compiledAgentRoot,
+  distRoot,
+  lintChangedDestination,
+  lintChangedSource,
+  pluginConfig,
+  pluginEntryPath,
+  pluginTsconfigPath,
+  repoConstantsDestination,
+  repoConstantsSource,
+  strictArgs,
+  tscPath,
+  tsupPath,
+} from "./constants.ts";
+import { isDirectRun, preserveExitCode, runRelease, runRepoDirect } from "./utils.ts";
 
 export function buildBin(): void {
   mkdirSync(agentBinRoot, { recursive: true });
   copyFileSync(lintChangedSource, lintChangedDestination);
+  copyFileSync(repoConstantsSource, repoConstantsDestination);
   const agentScriptPaths = copyAgentScripts();
-  const executablePaths = [lintChangedDestination].concat(agentScriptPaths);
+  const installPath = copyAgentInstallAlias();
+  const executablePaths = [lintChangedDestination, installPath].concat(agentScriptPaths);
 
   executablePaths.forEach(makeExecutable);
 }
@@ -121,17 +115,48 @@ function copyAgentScript(file: string): string {
   return destination;
 }
 
+function copyAgentInstallAlias(): string {
+  const source = join(agentBinRoot, "index.js");
+  const destination = join(agentBinRoot, "install.js");
+  copyFileSync(source, destination);
+  return destination;
+}
+
 function makeExecutable(path: string): void {
   chmodSync(path, 0o755);
 }
 
-export function isDirectRun(metaUrl: string, argvPath: string | undefined): boolean {
-  if (!argvPath) return false;
+function runRepoCli(args: readonly string[]): number | Promise<number> {
+  const command = args[0];
+  if (command === "plugin") {
+    build("plugin");
+    return 0;
+  }
 
-  const argvUrl = pathToFileURL(resolve(argvPath)).href;
-  return argvUrl === metaUrl;
+  if (command === "bin") {
+    build("bin");
+    return 0;
+  }
+
+  if (command === "config") {
+    build("config");
+    return 0;
+  }
+
+  if (command === "strict") {
+    build("strict");
+    return 0;
+  }
+
+  if (command === "release") return runRelease({ args: args.slice(1) });
+  return runRepoDirect(args);
 }
 
 if (isDirectRun(import.meta.url, process.argv[1])) {
-  build(process.argv[2]);
+  try {
+    process.exitCode = preserveExitCode(await runRepoCli(process.argv.slice(2)));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
 }

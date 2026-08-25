@@ -9,8 +9,8 @@ import {
   parseReleaseArgs,
   resolveDistTag,
   runRelease,
-} from "../../../scripts/release.ts";
-import type { ReleaseCommandResult, ReleaseRunner } from "../../../scripts/types.ts";
+} from "../../../scripts/repo/utils.ts";
+import type { ReleaseCommandResult, ReleaseRunner } from "../../../scripts/repo/types.ts";
 
 interface MockRunner {
   calls: string[];

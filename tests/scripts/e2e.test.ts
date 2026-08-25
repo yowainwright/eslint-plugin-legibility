@@ -9,8 +9,8 @@ import {
   isDirectRun,
   parseE2eMode,
   runE2e,
-} from "../../scripts/e2e.ts";
-import type { E2eCommandRunner } from "../../scripts/types.ts";
+} from "../../scripts/test/utils.ts";
+import type { E2eCommandRunner } from "../../scripts/test/types.ts";
 
 test("parses Docker end-to-end modes", () => {
   assert.equal(parseE2eMode(["test"]), "test");
@@ -81,7 +81,7 @@ test("cleans Docker resources when the runner throws", () => {
 });
 
 test("detects direct Docker runner execution", () => {
-  const scriptPath = resolve("scripts/e2e.ts");
+  const scriptPath = resolve("scripts/test/utils.ts");
   const scriptUrl = pathToFileURL(scriptPath).href;
 
   assert.equal(isDirectRun(scriptUrl, scriptPath), true);
