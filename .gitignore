@@ -149,6 +149,8 @@ vite.config.ts.timestamp-*
 .dolt/
 *.db
 .beads-credential-key
+.agents/
+.codex/
 .claude/
 CLAUDE.md
 .beads/

@@ -108,7 +108,7 @@ const maintenanceEdits = [
   "- Update rule metadata and implementation in `src/constants.ts` and `src/index.ts`.",
   "- Add positive and negative tests in `tests/unit/plugin`.",
   "- Update README rule tables and examples when public behavior changed.",
-  "- Rebuild generated agent artifacts with `nub run build:agent -- --target all`.",
+  "- Rebuild the package skill with `nub run build:agent` after changing agent guidance.",
 ].join("\n");
 
 const reviewHeading = "## Review Guidance";
