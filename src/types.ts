@@ -250,8 +250,12 @@ export interface LegibilityPlugin {
   };
   rules: Record<string, RuleModule>;
   configs: {
+    "flat/agent-recommended": FlatConfig;
+    "flat/agent-strict": FlatConfig;
     "flat/recommended": FlatConfig;
     "flat/strict": FlatConfig;
+    "oxlint/agent-recommended": OxlintConfig;
+    "oxlint/agent-strict": OxlintConfig;
     "oxlint/recommended": OxlintConfig;
     "oxlint/strict": OxlintConfig;
   };

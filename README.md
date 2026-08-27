@@ -55,6 +55,26 @@ import legibility from "eslint-plugin-legibility";
 export default [legibility.configs["flat/strict"]];
 ```
 
+### `flat/agent-recommended`
+
+Mirrors `flat/recommended`, but requires named values before object construction and returns.
+
+```ts
+import legibility from "eslint-plugin-legibility";
+
+export default [legibility.configs["flat/agent-recommended"]];
+```
+
+### `flat/agent-strict`
+
+Mirrors `flat/strict`, but requires named values before object construction and returns.
+
+```ts
+import legibility from "eslint-plugin-legibility";
+
+export default [legibility.configs["flat/agent-strict"]];
+```
+
 ### `oxlint/recommended`
 
 Mirrors `flat/recommended` in `oxlint.config.ts`.
@@ -77,6 +97,28 @@ import legibility from "eslint-plugin-legibility";
 export default defineConfig(legibility.configs["oxlint/strict"]);
 ```
 
+### `oxlint/agent-recommended`
+
+Mirrors `flat/agent-recommended` in `oxlint.config.ts`.
+
+```ts
+import { defineConfig } from "oxlint";
+import legibility from "eslint-plugin-legibility";
+
+export default defineConfig(legibility.configs["oxlint/agent-recommended"]);
+```
+
+### `oxlint/agent-strict`
+
+Mirrors `flat/agent-strict` in `oxlint.config.ts`.
+
+```ts
+import { defineConfig } from "oxlint";
+import legibility from "eslint-plugin-legibility";
+
+export default defineConfig(legibility.configs["oxlint/agent-strict"]);
+```
+
 All presets explicitly configure these core rules because ESLint's recommended config does not enable them:
 
 - `complexity`: maximum cyclomatic complexity of `20`.
@@ -86,7 +128,7 @@ All presets explicitly configure these core rules because ESLint's recommended c
 
 ## Rules
 
-`recommended` contains broadly applicable legibility checks. `strict` includes every recommended rule plus more opinionated performance and code-shape analysis. Composition style, executable-entry checks, filename schemas, and blanket comment policies remain opt-in because they require a project decision.
+`recommended` contains broadly applicable legibility checks. `strict` includes every recommended rule plus more opinionated performance and code-shape analysis. `agent-recommended` and `agent-strict` keep the same rule membership as their base presets, but make computed object and return values stricter for agent-authored code. Composition style, executable-entry checks, filename schemas, and blanket comment policies remain opt-in because they require a project decision.
 
 <!-- rule section links grouped by preset membership from src/constants.ts -->
 <details>
@@ -305,6 +347,10 @@ Prefer named values before computed returns and object values.
 - `{max: number}`: allowed weighted operators in a computed value. Default: `1`.
 - `{operators: string[]}`: operators to count.
 - `{complexity: Record<string, number>}`: per-operator weights.
+- `{objectValues: "computed" | "named"}`: object value mode. Default: `"computed"`.
+- `{returnValues: "computed" | "named"}`: return value mode. Default: `"computed"`.
+
+Use `"named"` mode to require a named identifier or literal before object construction and returns.
 
 #### do / don't
 
@@ -313,6 +359,11 @@ Prefer named values before computed returns and object values.
 + const total = subtotal + tax - discount;
 +
 + return total;
+
+- return { route: getRouteName(url.pathname) };
++ const route = getRouteName(url.pathname);
++
++ return route;
 ```
 
 ---

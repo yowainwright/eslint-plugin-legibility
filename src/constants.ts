@@ -384,11 +384,34 @@ const OPERATOR_OPTIONS_SCHEMA = {
   operators: STRING_ARRAY_SCHEMA,
 };
 
+const COMPUTED_VALUE_MODE_SCHEMA = {
+  enum: ["computed", "named"],
+  type: "string",
+};
+
 function maxOperatorRuleSchema(minimum: number): RuleMeta["schema"] {
   return [
     {
       type: "object",
       properties: Object.assign({}, { max: { type: "number", minimum } }, OPERATOR_OPTIONS_SCHEMA),
+      additionalProperties: false,
+    },
+  ];
+}
+
+function computedValueRuleSchema(): RuleMeta["schema"] {
+  return [
+    {
+      type: "object",
+      properties: Object.assign(
+        {},
+        {
+          max: { type: "number", minimum: 0 },
+          objectValues: COMPUTED_VALUE_MODE_SCHEMA,
+          returnValues: COMPUTED_VALUE_MODE_SCHEMA,
+        },
+        OPERATOR_OPTIONS_SCHEMA,
+      ),
       additionalProperties: false,
     },
   ];
@@ -573,12 +596,16 @@ export const NO_COMPUTED_VALUES_META = defineMeta("no-computed-values", {
       "Prefer named values before returning computed expressions or assigning computed object values.",
     recommended: true,
   },
-  schema: maxOperatorRuleSchema(0),
+  schema: computedValueRuleSchema(),
   messages: {
     computedObjectValue:
       "Object value has {{count}} computed operators (max {{max}}). Extract it into a named value before building the object.",
     computedReturn:
       "Return value has {{count}} computed operators (max {{max}}). Extract it into a named value before returning.",
+    unnamedObjectValue:
+      "Object value is computed. Extract it into a named value before building the object.",
+    unnamedReturnValue:
+      "Return value is computed. Extract it into a named value before returning.",
   },
 });
 
