@@ -330,8 +330,12 @@ test("exports an ESLint and Oxlint compatible plugin shape", () => {
   ).toSorted();
   assert.deepEqual(categorizedRules, Object.keys(plugin.rules).toSorted());
   assert.deepEqual(Object.keys(plugin.configs).sort(), [
+    "flat/agent-recommended",
+    "flat/agent-strict",
     "flat/recommended",
     "flat/strict",
+    "oxlint/agent-recommended",
+    "oxlint/agent-strict",
     "oxlint/recommended",
     "oxlint/strict",
   ]);
@@ -344,14 +348,45 @@ test("exports an ESLint and Oxlint compatible plugin shape", () => {
 test("Oxlint presets mirror the ESLint rules and register the plugin", () => {
   const recommended = plugin.configs["oxlint/recommended"];
   const strict = plugin.configs["oxlint/strict"];
+  const agentRecommended = plugin.configs["oxlint/agent-recommended"];
+  const agentStrict = plugin.configs["oxlint/agent-strict"];
   const jsPlugins = [{ name: "legibility", specifier: "eslint-plugin-legibility" }];
 
   assert.deepEqual(recommended.jsPlugins, jsPlugins);
   assert.deepEqual(strict.jsPlugins, jsPlugins);
+  assert.deepEqual(agentRecommended.jsPlugins, jsPlugins);
+  assert.deepEqual(agentStrict.jsPlugins, jsPlugins);
   assert.deepEqual(recommended.rules, plugin.configs["flat/recommended"].rules);
   assert.deepEqual(strict.rules, plugin.configs["flat/strict"].rules);
+  assert.deepEqual(agentRecommended.rules, plugin.configs["flat/agent-recommended"].rules);
+  assert.deepEqual(agentStrict.rules, plugin.configs["flat/agent-strict"].rules);
   assert.notEqual(recommended.rules, plugin.configs["flat/recommended"].rules);
   assert.notEqual(strict.rules, plugin.configs["flat/strict"].rules);
+  assert.notEqual(agentRecommended.rules, plugin.configs["flat/agent-recommended"].rules);
+  assert.notEqual(agentStrict.rules, plugin.configs["flat/agent-strict"].rules);
+});
+
+test("agent presets require named computed values", () => {
+  const recommendedConfig = plugin.configs["flat/recommended"];
+  const strictConfig = plugin.configs["flat/strict"];
+  const agentRecommendedConfig = plugin.configs["flat/agent-recommended"];
+  const agentStrictConfig = plugin.configs["flat/agent-strict"];
+  const expectedRecommended = [
+    "warn",
+    { objectValues: "named", returnValues: "named" },
+  ];
+  const expectedStrict = [
+    "error",
+    { objectValues: "named", returnValues: "named" },
+  ];
+
+  assert.equal(recommendedConfig.rules["legibility/no-computed-values"], "warn");
+  assert.equal(strictConfig.rules["legibility/no-computed-values"], "error");
+  assert.deepEqual(
+    agentRecommendedConfig.rules["legibility/no-computed-values"],
+    expectedRecommended,
+  );
+  assert.deepEqual(agentStrictConfig.rules["legibility/no-computed-values"], expectedStrict);
 });
 
 test("createOnce exposes the same visitor events as ESLint create", () => {
@@ -1094,6 +1129,94 @@ test("no-computed-values reports computed object values", () => {
   assert.equal(reports[0].messageId, "computedObjectValue");
 });
 
+test("no-computed-values allows unnamed object values by default", () => {
+  const { visitor, reports } = createRule("no-computed-values");
+  const routeName = call(id("getRouteName"), [member(id("url"), "pathname")]);
+
+  visitor.Property({
+    type: "Property",
+    value: routeName,
+  });
+
+  assert.equal(reports.length, 0);
+});
+
+test("no-computed-values reports unnamed call object values in named mode", () => {
+  const { visitor, reports } = createRule("no-computed-values", [{ objectValues: "named" }]);
+  const routeName = call(id("getRouteName"), [member(id("url"), "pathname")]);
+
+  visitor.Property({
+    type: "Property",
+    value: routeName,
+  });
+
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].messageId, "unnamedObjectValue");
+  assert.equal(reports[0].node, routeName);
+});
+
+test("no-computed-values reports unnamed return values in named mode", () => {
+  const { visitor, reports } = createRule("no-computed-values", [{ returnValues: "named" }]);
+  const routeName = call(id("getRouteName"), [member(id("url"), "pathname")]);
+
+  visitor.ReturnStatement({
+    type: "ReturnStatement",
+    argument: routeName,
+  });
+
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].messageId, "unnamedReturnValue");
+  assert.equal(reports[0].node, routeName);
+});
+
+test("no-computed-values reports returned object once in named return mode", () => {
+  const { visitor, reports } = createRule("no-computed-values", [
+    { objectValues: "named", returnValues: "named" },
+  ]);
+  const routeName = call(id("getRouteName"), [member(id("url"), "pathname")]);
+  const property: any = { type: "Property", value: routeName };
+  const object: any = { type: "ObjectExpression", properties: [property] };
+  const returnStatement: any = { type: "ReturnStatement", argument: object };
+  property.parent = object;
+  object.parent = returnStatement;
+
+  visitor.Property(property);
+  visitor.ReturnStatement(returnStatement);
+
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].messageId, "unnamedReturnValue");
+  assert.equal(reports[0].node, object);
+});
+
+test("no-computed-values allows named and literal values in named mode", () => {
+  const { visitor, reports } = createRule("no-computed-values", [
+    { objectValues: "named", returnValues: "named" },
+  ]);
+
+  visitor.Property({
+    type: "Property",
+    value: id("route"),
+  });
+  visitor.Property({
+    type: "Property",
+    value: literal("settings"),
+  });
+  visitor.Property({
+    type: "Property",
+    value: { type: "TemplateLiteral", expressions: [] },
+  });
+  visitor.ReturnStatement({
+    type: "ReturnStatement",
+    argument: id("route"),
+  });
+  visitor.ReturnStatement({
+    type: "ReturnStatement",
+    argument: literal("settings"),
+  });
+
+  assert.equal(reports.length, 0);
+});
+
 test("no-computed-values allows custom computed operator complexity", () => {
   const { visitor, reports } = createRule("no-computed-values", [
     { complexity: { "+": 2 }, max: 1, operators: ["+"] },
@@ -1764,6 +1887,24 @@ test("flat config works through ESLint Linter when ESLint is installed", async (
 
   assert.equal(messages.length, 1);
   assert.equal(messages[0].ruleId, "legibility/hoist-if-operators");
+});
+
+test("agent flat config reports unnamed computed values through ESLint", async () => {
+  const { Linter } = await import("eslint");
+  const source = [
+    "function getRoute(url) {",
+    "  const route = { name: getRouteName(url.pathname) };",
+    "  return getRouteName(url.pathname);",
+    "}",
+  ].join("\n");
+  const linter = new Linter({ configType: "flat" });
+  const messages = linter.verify(source, [plugin.configs["flat/agent-recommended"]]);
+  const computedMessages = messages
+    .filter((message) => message.ruleId === "legibility/no-computed-values")
+    .map((message) => message.messageId)
+    .toSorted();
+
+  assert.deepEqual(computedMessages, ["unnamedObjectValue", "unnamedReturnValue"]);
 });
 
 test("flat config enables ESLint complexity limits", async () => {

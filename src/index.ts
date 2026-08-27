@@ -126,6 +126,7 @@ import type {
 } from "./types.js";
 
 type StaticEvaluation = { value: AstPrimitive };
+type ComputedValueMode = "computed" | "named";
 
 const MAX_STATIC_BIGINT_BITS = 4_096;
 const MAX_STATIC_BIGINT_BITS_VALUE = BigInt(MAX_STATIC_BIGINT_BITS);
@@ -2018,24 +2019,66 @@ function createComputedValueReporter(
   context: RuleContext,
   max: number,
   complexity: OperatorComplexity,
-): (node: MaybeAstNode, messageId: string) => void {
+): (node: MaybeAstNode, messageId: string) => boolean {
   return (node, messageId) => {
     const isNode = isRecord(node);
-    if (!isNode) return;
+    if (!isNode) return false;
 
     const count = countComputedValueOperators(node, complexity);
     const isWithinLimit = count <= max;
-    if (isWithinLimit) return;
+    if (isWithinLimit) return false;
 
     context.report({ node, messageId, data: { count, max } });
+    return true;
   };
 }
 
-function isComputedReturnSkipped(argument: MaybeAstNode): boolean {
-  const isArgumentNode = isRecord(argument);
-  if (!isArgumentNode) return true;
+function getComputedValueMode(context: RuleContext, key: string): ComputedValueMode {
+  const mode = getConfiguredString(context, key);
+  if (mode === "named") return mode;
+  return "computed";
+}
 
-  const isObjectReturn = argument.type === "ObjectExpression";
+function isNamedComputedValue(value: AstNode): boolean {
+  const isIdentifier = value.type === "Identifier";
+  if (isIdentifier) return true;
+
+  const isLiteral = value.type === "Literal";
+  if (isLiteral) return true;
+
+  const isStaticTemplate =
+    value.type === "TemplateLiteral" && (value.expressions ?? []).length === 0;
+  return isStaticTemplate;
+}
+
+function reportUnnamedComputedValue(
+  context: RuleContext,
+  mode: ComputedValueMode,
+  node: AstNode,
+  messageId: string,
+): void {
+  if (mode === "computed") return;
+
+  const isNamedValue = isNamedComputedValue(node);
+  if (isNamedValue) return;
+
+  context.report({ node, messageId });
+}
+
+function isReturnedObjectProperty(property: AstNode): boolean {
+  const object = property.parent;
+  const isObjectProperty = isRecord(object) && object.type === "ObjectExpression";
+  if (!isObjectProperty) return false;
+
+  const parent = object.parent;
+  const isReturnParent = isRecord(parent) && parent.type === "ReturnStatement";
+  if (!isReturnParent) return false;
+
+  return parent.argument === object;
+}
+
+function isComputedReturnSkipped(argument: AstNode, mode: ComputedValueMode): boolean {
+  const isObjectReturn = mode === "computed" && argument.type === "ObjectExpression";
   if (isObjectReturn) return true;
 
   const isFunctionReturn = isFunctionNode(argument);
@@ -2046,6 +2089,8 @@ function isComputedReturnSkipped(argument: MaybeAstNode): boolean {
 
 function createNoComputedValues(context: RuleContext): RuleListener {
   const max = getConfiguredMax(context, DEFAULT_MAX_COMPUTED_VALUE_OPERATORS);
+  const objectValues = getComputedValueMode(context, "objectValues");
+  const returnValues = getComputedValueMode(context, "returnValues");
   const complexity = getConfiguredOperatorComplexity(
     context,
     DEFAULT_COMPUTED_VALUE_OPERATOR_COMPLEXITY,
@@ -2063,14 +2108,26 @@ function createNoComputedValues(context: RuleContext): RuleListener {
       const isJsxValue = isJsxNode(value);
       if (isJsxValue) return;
 
-      reportComputedValue(value, "computedObjectValue");
+      const isReportedByNamedReturn = returnValues === "named" && isReturnedObjectProperty(node);
+      if (isReportedByNamedReturn) return;
+
+      const wasReported = reportComputedValue(value, "computedObjectValue");
+      if (wasReported) return;
+
+      reportUnnamedComputedValue(context, objectValues, value, "unnamedObjectValue");
     },
     ReturnStatement(node) {
       const argument = node.argument;
-      const shouldSkipReturn = isComputedReturnSkipped(argument);
+      const isArgumentNode = isRecord(argument);
+      if (!isArgumentNode) return;
+
+      const shouldSkipReturn = isComputedReturnSkipped(argument, returnValues);
       if (shouldSkipReturn) return;
 
-      reportComputedValue(argument, "computedReturn");
+      const wasReported = reportComputedValue(argument, "computedReturn");
+      if (wasReported) return;
+
+      reportUnnamedComputedValue(context, returnValues, argument, "unnamedReturnValue");
     },
   };
 }
@@ -3829,6 +3886,19 @@ function buildOxlintConfig(rules: Record<string, RuleConfig>): OxlintConfig {
   return { jsPlugins: [jsPlugin], rules: configRules };
 }
 
+function buildAgentRuleConfig(
+  rules: Record<string, RuleConfig>,
+  level: RuleLevel,
+): Record<string, RuleConfig> {
+  const noComputedValues = [
+    level,
+    { objectValues: "named", returnValues: "named" },
+  ] as const satisfies RuleConfig;
+  return Object.assign({}, rules, {
+    [`${PLUGIN_NAME}/no-computed-values`]: noComputedValues,
+  });
+}
+
 const recommendedRuleNames = RECOMMENDED_RULE_NAMES.concat(COMMENT_RULE_NAMES);
 const recommendedPluginRules = buildRuleConfig(recommendedRuleNames, "warn");
 const recommendedCoreRules = buildCoreRuleConfig("warn");
@@ -3837,8 +3907,12 @@ const strictRuleNames = recommendedRuleNames.concat(STRICT_ONLY_RULE_NAMES);
 const strictPluginRules = buildRuleConfig(strictRuleNames, "error");
 const strictCoreRules = buildCoreRuleConfig("error");
 const strictRules = Object.assign({}, strictPluginRules, strictCoreRules);
+const agentRecommendedRules = buildAgentRuleConfig(recommendedRules, "warn");
+const agentStrictRules = buildAgentRuleConfig(strictRules, "error");
 const oxlintRecommendedConfig = buildOxlintConfig(recommendedRules);
 const oxlintStrictConfig = buildOxlintConfig(strictRules);
+const oxlintAgentRecommendedConfig = buildOxlintConfig(agentRecommendedRules);
+const oxlintAgentStrictConfig = buildOxlintConfig(agentStrictRules);
 
 const plugin: LegibilityPlugin = {
   meta: {
@@ -3864,8 +3938,24 @@ plugin.configs["flat/strict"] = {
   rules: strictRules,
 };
 
+plugin.configs["flat/agent-recommended"] = {
+  plugins: {
+    [PLUGIN_NAME]: plugin,
+  },
+  rules: agentRecommendedRules,
+};
+
+plugin.configs["flat/agent-strict"] = {
+  plugins: {
+    [PLUGIN_NAME]: plugin,
+  },
+  rules: agentStrictRules,
+};
+
 plugin.configs["oxlint/recommended"] = oxlintRecommendedConfig;
 plugin.configs["oxlint/strict"] = oxlintStrictConfig;
+plugin.configs["oxlint/agent-recommended"] = oxlintAgentRecommendedConfig;
+plugin.configs["oxlint/agent-strict"] = oxlintAgentStrictConfig;
 
 export default plugin;
 export { plugin as "module.exports" };
