@@ -1188,6 +1188,30 @@ test("no-computed-values reports returned object once in named return mode", () 
   assert.equal(reports[0].node, object);
 });
 
+test("no-computed-values reports nested returned objects once in named return mode", () => {
+  const { visitor, reports } = createRule("no-computed-values", [
+    { objectValues: "named", returnValues: "named" },
+  ]);
+  const routeName = call(id("getRouteName"), [member(id("url"), "pathname")]);
+  const innerProperty: any = { type: "Property", value: routeName };
+  const innerObject: any = { type: "ObjectExpression", properties: [innerProperty] };
+  const outerProperty: any = { type: "Property", value: innerObject };
+  const outerObject: any = { type: "ObjectExpression", properties: [outerProperty] };
+  const returnStatement: any = { type: "ReturnStatement", argument: outerObject };
+  innerProperty.parent = innerObject;
+  innerObject.parent = outerProperty;
+  outerProperty.parent = outerObject;
+  outerObject.parent = returnStatement;
+
+  visitor.Property(innerProperty);
+  visitor.Property(outerProperty);
+  visitor.ReturnStatement(returnStatement);
+
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].messageId, "unnamedReturnValue");
+  assert.equal(reports[0].node, outerObject);
+});
+
 test("no-computed-values allows named and literal values in named mode", () => {
   const { visitor, reports } = createRule("no-computed-values", [
     { objectValues: "named", returnValues: "named" },

@@ -2065,16 +2065,22 @@ function reportUnnamedComputedValue(
   context.report({ node, messageId });
 }
 
-function isReturnedObjectProperty(property: AstNode): boolean {
-  const object = property.parent;
-  const isObjectProperty = isRecord(object) && object.type === "ObjectExpression";
-  if (!isObjectProperty) return false;
+function isInsideReturnedExpression(node: AstNode): boolean {
+  let child: MaybeAstNode = node;
+  let parent = node.parent;
 
-  const parent = object.parent;
-  const isReturnParent = isRecord(parent) && parent.type === "ReturnStatement";
-  if (!isReturnParent) return false;
+  while (isRecord(parent)) {
+    const isFunctionAncestor = FUNCTION_NODE_TYPES.has(String(parent.type));
+    if (isFunctionAncestor) return false;
 
-  return parent.argument === object;
+    const isDirectReturnArgument = parent.type === "ReturnStatement" && parent.argument === child;
+    if (isDirectReturnArgument) return true;
+
+    child = parent;
+    parent = parent.parent;
+  }
+
+  return false;
 }
 
 function isComputedReturnSkipped(argument: AstNode, mode: ComputedValueMode): boolean {
@@ -2108,7 +2114,7 @@ function createNoComputedValues(context: RuleContext): RuleListener {
       const isJsxValue = isJsxNode(value);
       if (isJsxValue) return;
 
-      const isReportedByNamedReturn = returnValues === "named" && isReturnedObjectProperty(node);
+      const isReportedByNamedReturn = returnValues === "named" && isInsideReturnedExpression(node);
       if (isReportedByNamedReturn) return;
 
       const wasReported = reportComputedValue(value, "computedObjectValue");
