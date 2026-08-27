@@ -2065,22 +2065,22 @@ function reportUnnamedComputedValue(
   context.report({ node, messageId });
 }
 
-function isInsideReturnedExpression(node: AstNode): boolean {
-  let child: MaybeAstNode = node;
+function getReturnedExpressionAncestor(node: AstNode): AstNode | null {
+  let child = node;
   let parent = node.parent;
 
   while (isRecord(parent)) {
     const isFunctionAncestor = FUNCTION_NODE_TYPES.has(String(parent.type));
-    if (isFunctionAncestor) return false;
+    if (isFunctionAncestor) return null;
 
     const isDirectReturnArgument = parent.type === "ReturnStatement" && parent.argument === child;
-    if (isDirectReturnArgument) return true;
+    if (isDirectReturnArgument) return child;
 
     child = parent;
     parent = parent.parent;
   }
 
-  return false;
+  return null;
 }
 
 function isComputedReturnSkipped(argument: AstNode, mode: ComputedValueMode): boolean {
@@ -2091,6 +2091,16 @@ function isComputedReturnSkipped(argument: AstNode, mode: ComputedValueMode): bo
   if (isFunctionReturn) return true;
 
   return isJsxNode(argument);
+}
+
+function isReportedByNamedReturn(node: AstNode, returnValues: ComputedValueMode): boolean {
+  const isNamedReturnMode = returnValues === "named";
+  if (!isNamedReturnMode) return false;
+
+  const returnedExpression = getReturnedExpressionAncestor(node);
+  if (returnedExpression === null) return false;
+
+  return !isComputedReturnSkipped(returnedExpression, returnValues);
 }
 
 function createNoComputedValues(context: RuleContext): RuleListener {
@@ -2114,8 +2124,8 @@ function createNoComputedValues(context: RuleContext): RuleListener {
       const isJsxValue = isJsxNode(value);
       if (isJsxValue) return;
 
-      const isReportedByNamedReturn = returnValues === "named" && isInsideReturnedExpression(node);
-      if (isReportedByNamedReturn) return;
+      const isHandledByNamedReturn = isReportedByNamedReturn(node, returnValues);
+      if (isHandledByNamedReturn) return;
 
       const wasReported = reportComputedValue(value, "computedObjectValue");
       if (wasReported) return;
