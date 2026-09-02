@@ -33,7 +33,7 @@ export type RuleCreate = (context: RuleContext) => RuleListener;
 
 export type RuleCreateOnce = RuleCreate;
 
-export type RuleVisitor = (node: AstNode) => void;
+export type RuleVisitor = (node: AstNode, ...args: unknown[]) => void;
 
 export type RuleListener = Record<string, RuleVisitor>;
 
@@ -162,7 +162,7 @@ export type RuleSchema = RuleOptionValue | readonly RuleOptionValue[];
 
 export interface RuleModule {
   meta: RuleMeta;
-  create: RuleCreate;
+  create?: RuleCreate;
   createOnce?: RuleCreateOnce;
 }
 
@@ -240,6 +240,17 @@ export interface OxlintRules extends Record<string, OxlintRuleConfig> {
 export interface OxlintConfig {
   jsPlugins: Array<string | OxlintJsPlugin>;
   rules: OxlintRules;
+}
+
+export interface OxlintLegibilityPlugin {
+  meta: LegibilityPlugin["meta"];
+  rules: LegibilityPlugin["rules"];
+  configs: {
+    agentRecommended: OxlintConfig;
+    agentStrict: OxlintConfig;
+    recommended: OxlintConfig;
+    strict: OxlintConfig;
+  };
 }
 
 export interface LegibilityPlugin {

@@ -5,12 +5,14 @@ export const agentBinRoot = `${binRoot}/agent`;
 export const distRoot = "dist";
 export const cjsRoot = `${distRoot}/cjs`;
 export const cjsEntryPath = `${distRoot}/index.cjs`;
+export const cjsOxlintEntryPath = `${distRoot}/oxlint.cjs`;
 export const compiledAgentRoot = ".build/scripts/agent";
 export const repoConstantsSource = ".build/scripts/repo/constants.js";
 export const repoConstantsDestination = `${binRoot}/constants.js`;
 export const lintChangedSource = ".build/scripts/repo/utils.js";
 export const lintChangedDestination = `${binRoot}/lint-changed.js`;
 export const pluginEntryPath = "src/index.ts";
+export const pluginOxlintEntryPath = "src/oxlint.ts";
 export const pluginCompilerOptions = {
   declaration: true,
   noEmit: false,

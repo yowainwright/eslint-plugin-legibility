@@ -118,6 +118,7 @@ import type {
   RuleListener,
   RuleMeta,
   RuleReport,
+  RuleModule,
   ScopeCallback,
   ScopeStack,
   SourceCodeLike,
@@ -135,8 +136,8 @@ const STATIC_LOGICAL_OPERATORS = new Set(["&&", "??", "||"]);
 function defineRule(
   meta: RuleMeta,
   create: RuleCreate,
-): { meta: RuleMeta; create: RuleCreate } {
-  return { meta, create };
+): { meta: RuleMeta; create: RuleCreate; createOnce: RuleCreateOnce } {
+  return { meta, create, createOnce: createOnceFromCreate(create) };
 }
 
 function defineCreateOnceRule(
@@ -144,6 +145,65 @@ function defineCreateOnceRule(
   create: RuleCreateOnce,
 ): { meta: RuleMeta; create: RuleCreate; createOnce: RuleCreateOnce } {
   return { meta, create, createOnce: create };
+}
+
+function createNoopContext(): RuleContext {
+  return {
+    cwd: "",
+    filename: "",
+    options: [],
+    sourceCode: {
+      text: "",
+      getAllComments: () => [],
+      getText: () => "",
+      isGlobalReference: () => true,
+      scopeManager: { scopes: [] },
+    },
+    report: () => undefined,
+  };
+}
+
+function getRuleVisitorNames(create: RuleCreate): string[] {
+  const probeListener = create(createNoopContext());
+  return Object.keys(probeListener);
+}
+
+function createDelegatingVisitors(
+  visitorNames: string[],
+  getActiveListener: () => RuleListener,
+): RuleListener {
+  const visitorEntries = visitorNames.map((name) => {
+    const visitor = (node: AstNode, ...args: unknown[]) => {
+      const listener = getActiveListener();
+      const activeVisitor = listener[name];
+      if (!activeVisitor) return;
+      activeVisitor(node, ...args);
+    };
+    return [name, visitor] as const;
+  });
+  return Object.fromEntries(visitorEntries) as RuleListener;
+}
+
+function createOnceFromCreate(create: RuleCreate): RuleCreateOnce {
+  return (context) => {
+    const visitorNames = getRuleVisitorNames(create);
+    let activeListener: RuleListener | null = null;
+    const getActiveListener = (): RuleListener => {
+      if (activeListener) return activeListener;
+      activeListener = create(context);
+      return activeListener;
+    };
+    const listener = createDelegatingVisitors(visitorNames, getActiveListener);
+
+    return Object.assign(listener, {
+      before() {
+        activeListener = create(context);
+      },
+      after() {
+        activeListener = null;
+      },
+    }) as RuleListener;
+  };
 }
 
 function isRecord(value: unknown): value is AstNode {
@@ -3772,7 +3832,7 @@ function createNoMixedFilenameCasing(context: RuleContext): RuleListener {
   };
 }
 
-const rules = {
+const rules: Record<string, RuleModule> = {
   "hoist-if-operators": defineRule(HOIST_IF_OPERATORS_META, createHoistIfOperators),
   "max-array-chain-depth": defineRule(MAX_ARRAY_CHAIN_DEPTH_META, createMaxArrayChainDepth),
   "max-control-flow-depth": defineRule(MAX_CONTROL_FLOW_DEPTH_META, createControlFlowVisitors),
