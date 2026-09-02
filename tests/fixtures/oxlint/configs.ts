@@ -1,3 +1,7 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+
 export const oxlintConfigFilename = "oxlint.config.mjs";
 export const oxlintFixtureRoot = "tests/fixtures/oxlint";
 
@@ -13,6 +17,24 @@ export function getOxlintFixtureConfigs(): OxlintFixtureConfig[] {
     { directory: "strict", content: createPresetOxlintConfig("strict") },
     { directory: "opt-in", content: createOptInOxlintConfig() },
   ];
+}
+
+export function writeOxlintFixtureConfigs(root = oxlintFixtureRoot): void {
+  const writeConfig = (config: OxlintFixtureConfig): void =>
+    writeOxlintFixtureConfig(root, config);
+
+  getOxlintFixtureConfigs().forEach(writeConfig);
+}
+
+function writeOxlintFixtureConfig(root: string, config: OxlintFixtureConfig): void {
+  const directory = join(root, config.directory);
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(join(directory, oxlintConfigFilename), config.content);
+}
+
+function isDirectRun(argvPath = process.argv[1]): boolean {
+  if (!argvPath) return false;
+  return import.meta.url === pathToFileURL(resolve(argvPath)).href;
 }
 
 function createOxlintConfigHeader(): string {
@@ -71,4 +93,8 @@ export default defineConfig({
   rules: Object.assign({}, preset.rules, optInRules),
 });
 `;
+}
+
+if (isDirectRun()) {
+  writeOxlintFixtureConfigs();
 }

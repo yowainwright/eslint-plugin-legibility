@@ -31,10 +31,7 @@ import {
 } from "./constants.ts";
 import { isDirectRun, preserveExitCode, runRelease, runRepoDirect } from "./utils.ts";
 import {
-  getOxlintFixtureConfigs,
-  oxlintConfigFilename,
-  oxlintFixtureRoot,
-  type OxlintFixtureConfig,
+  writeOxlintFixtureConfigs,
 } from "../../tests/fixtures/oxlint/configs.ts";
 
 export function buildBin(): void {
@@ -100,11 +97,8 @@ export function typecheckStrict(): void {
   runTsc(["-p", pluginTsconfigPath].concat(strictArgs));
 }
 
-export function buildOxlintFixtureConfigs(root = oxlintFixtureRoot): void {
-  const writeConfig = (config: OxlintFixtureConfig): void =>
-    writeOxlintFixtureConfig(root, config);
-
-  getOxlintFixtureConfigs().forEach(writeConfig);
+export function buildOxlintFixtureConfigs(root?: string): void {
+  writeOxlintFixtureConfigs(root);
 }
 
 export function build(target: string | undefined): void {
@@ -115,12 +109,6 @@ export function build(target: string | undefined): void {
   if (target === "plugin") return buildPlugin();
   if (target === "strict") return typecheckStrict();
   throw new Error(`Unknown build target: ${target ?? "(missing)"}`);
-}
-
-function writeOxlintFixtureConfig(root: string, config: OxlintFixtureConfig): void {
-  const directory = join(root, config.directory);
-  mkdirSync(directory, { recursive: true });
-  writeFileSync(join(directory, oxlintConfigFilename), config.content);
 }
 
 function copyAgentScripts(): string[] {

@@ -139,7 +139,7 @@ export function getFixtureRoot(matrixCase: MatrixCase): string {
 }
 
 export function getConfigPath(matrixCase: MatrixCase): string {
-  const configName = `${matrixCase.engine}.config.ts`;
+  const configName = matrixCase.engine === "oxlint" ? "oxlint.config.mjs" : "eslint.config.ts";
   return join(getFixtureRoot(matrixCase), configName);
 }
 
