@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
+import { getOxlintFixtureConfigs } from "../../../tests/fixtures/oxlint/configs.ts";
+import { buildOxlintFixtureConfigs } from "../../../scripts/repo/index.ts";
 import {
   getValidationSteps,
   Pack,
@@ -46,6 +48,25 @@ test("builds validation steps", () => {
 
   assert.deepEqual(steps[3], ["run", "test"]);
   assert.deepEqual(steps.at(-1), ["run", "pack:check"]);
+});
+
+test("generates Oxlint fixture configs", () => {
+  const root = join("tests/.test-fixtures", "oxlint-generated");
+  const configs = getOxlintFixtureConfigs();
+  const directories = configs.map((config) => config.directory);
+
+  assert.deepEqual(directories, ["default", "recommended", "strict", "opt-in"]);
+
+  try {
+    buildOxlintFixtureConfigs(root);
+
+    configs.forEach((config) => {
+      const path = join(root, config.directory, "oxlint.config.mjs");
+      assert.equal(readFileSync(path, "utf8"), config.content);
+    });
+  } finally {
+    rmSync(root, { force: true, recursive: true });
+  }
 });
 
 test("Pack runs Nub pack with the repository cache destination", () => {

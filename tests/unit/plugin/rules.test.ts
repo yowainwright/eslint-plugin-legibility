@@ -13,31 +13,51 @@ import {
   RECOMMENDED_RULE_NAMES,
   STRICT_ONLY_RULE_NAMES,
 } from "../../../dist/constants.js";
-import type { RuleModule } from "../../../src/types.ts";
+import type { AstNode, RuleModule } from "../../../src/types.ts";
 
 const require = createRequire(import.meta.url);
 const plugin = (await import(pathToFileURL(join(process.cwd(), "dist", "index.js")).href))
   .default;
+const oxlintPlugin = (
+  await import(pathToFileURL(join(process.cwd(), "dist", "oxlint.js")).href)
+).default;
 const requiredPlugin = require("eslint-plugin-legibility");
+const requiredOxlintPlugin = require("eslint-plugin-legibility/oxlint");
 
 function createContext(options: any[] = [], overrides: any = {}) {
   const reports = [];
-  const context = {
-    options,
-    filename: "/repo/src/index.js",
-    cwd: "/repo",
-    sourceCode: {
+  const sourceCode = Object.assign(
+    {
+      ast: { type: "Program" },
       text: "const value = true;\n",
       getText(node) {
         return node?.__text ?? "";
       },
       isGlobalReference: () => true,
     },
+    overrides.sourceCode,
+  );
+  const filename = overrides.filename ?? "/repo/src/index.js";
+  const cwd = overrides.cwd ?? "/repo";
+  const fileContext = {
+    filename,
+    cwd,
+    sourceCode,
+    getFilename: () => filename,
+    getCwd: () => cwd,
+    getSourceCode: () => sourceCode,
+  };
+  const context = {
+    options,
+    filename,
+    cwd,
+    sourceCode,
     report(report) {
       reports.push(report);
     },
     ...overrides,
   };
+  Object.setPrototypeOf(context, fileContext);
   return { context, reports };
 }
 
@@ -136,12 +156,13 @@ function block(body: any[] = []): any {
   return node;
 }
 
-function id(name: string): any {
-  return {
+function id(name: string): AstNode {
+  const node = {
     type: "Identifier",
     name,
     __text: name,
   };
+  return node;
 }
 
 function literal(value: any): any {
@@ -343,6 +364,7 @@ test("exports an ESLint and Oxlint compatible plugin shape", () => {
   assert.deepEqual(Object.keys(requiredPlugin.configs), Object.keys(plugin.configs));
   assert.equal(requiredPlugin.meta.name, "eslint-plugin-legibility");
   assert.equal(requiredPlugin.meta.namespace, "legibility");
+  assert.deepEqual(Object.keys(requiredOxlintPlugin.rules), Object.keys(plugin.rules));
 });
 
 test("Oxlint presets mirror the ESLint rules and register the plugin", () => {
@@ -364,6 +386,29 @@ test("Oxlint presets mirror the ESLint rules and register the plugin", () => {
   assert.notEqual(strict.rules, plugin.configs["flat/strict"].rules);
   assert.notEqual(agentRecommended.rules, plugin.configs["flat/agent-recommended"].rules);
   assert.notEqual(agentStrict.rules, plugin.configs["flat/agent-strict"].rules);
+});
+
+test("Oxlint export exposes cleaner preset names and export specifier", () => {
+  const recommended = oxlintPlugin.configs.recommended;
+  const strict = oxlintPlugin.configs.strict;
+  const agentRecommended = oxlintPlugin.configs.agentRecommended;
+  const agentStrict = oxlintPlugin.configs.agentStrict;
+  const jsPlugins = [{ name: "legibility", specifier: "eslint-plugin-legibility/oxlint" }];
+
+  assert.deepEqual(Object.keys(oxlintPlugin.configs).sort(), [
+    "agentRecommended",
+    "agentStrict",
+    "recommended",
+    "strict",
+  ]);
+  assert.deepEqual(recommended.jsPlugins, jsPlugins);
+  assert.deepEqual(strict.jsPlugins, jsPlugins);
+  assert.deepEqual(agentRecommended.jsPlugins, jsPlugins);
+  assert.deepEqual(agentStrict.jsPlugins, jsPlugins);
+  assert.deepEqual(recommended.rules, plugin.configs["flat/recommended"].rules);
+  assert.deepEqual(strict.rules, plugin.configs["flat/strict"].rules);
+  assert.deepEqual(agentRecommended.rules, plugin.configs["flat/agent-recommended"].rules);
+  assert.deepEqual(agentStrict.rules, plugin.configs["flat/agent-strict"].rules);
 });
 
 test("agent presets require named computed values", () => {
@@ -389,7 +434,7 @@ test("agent presets require named computed values", () => {
   assert.deepEqual(agentStrictConfig.rules["legibility/no-computed-values"], expectedStrict);
 });
 
-test("createOnce exposes the same visitor events as ESLint create", () => {
+test("rules expose createOnce visitors for Oxlint", () => {
   const pluginRules = plugin.rules as Record<string, RuleModule>;
   const createOnceRules = Object.values(pluginRules).filter((rule) => rule.createOnce);
 
@@ -397,13 +442,17 @@ test("createOnce exposes the same visitor events as ESLint create", () => {
     const { context } = createContext();
     const createOnce = rule.createOnce;
     assert.ok(createOnce);
-    const eslintListenerNames = Object.keys(rule.create(context)).toSorted();
-    const oxlintListenerNames = Object.keys(createOnce(context)).toSorted();
+    const create = rule.create;
+    assert.ok(create);
+    const eslintListenerNames = Object.keys(create(context)).toSorted();
+    const oxlintListenerNames = Object.keys(createOnce(context))
+      .filter((name) => name !== "after" && name !== "before")
+      .toSorted();
 
     assert.deepEqual(oxlintListenerNames, eslintListenerNames);
   });
 
-  assert.equal(createOnceRules.length, 12);
+  assert.equal(createOnceRules.length, Object.keys(pluginRules).length);
 });
 
 test("max-function-parameters reports functions with too many positional parameters", () => {
@@ -2161,7 +2210,7 @@ function runOxlintFixture(directory: string, filenames: readonly string[]): Oxli
   const oxlintName = process.platform === "win32" ? "oxlint.cmd" : "oxlint";
   const oxlintPath = join(process.cwd(), "node_modules", ".bin", oxlintName);
   const fixtureRoot = join("tests", "fixtures", "oxlint", directory);
-  const configPath = join(fixtureRoot, "oxlint.config.ts");
+  const configPath = join(fixtureRoot, "oxlint.config.mjs");
   const sourcePaths = filenames.map((filename) => join(fixtureRoot, filename));
   const result = spawnSync(
     oxlintPath,

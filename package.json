@@ -32,6 +32,12 @@
       "require": "./dist/index.cjs",
       "default": "./dist/index.js"
     },
+    "./oxlint": {
+      "types": "./dist/oxlint.d.ts",
+      "import": "./dist/oxlint.js",
+      "require": "./dist/oxlint.cjs",
+      "default": "./dist/oxlint.js"
+    },
     "./package.json": "./package.json"
   },
   "bin": {
@@ -65,9 +71,10 @@
   "packageManager": "pnpm@11.21.0",
   "scripts": {
     "benchmark:e2e": "nub --node scripts/test/index.ts e2e benchmark",
-    "build": "nub run build:agent && nub run build:plugin && nub run build:bin",
+    "build": "nub run build:agent && nub run build:plugin && nub run build:bin && nub run build:oxlint-fixtures",
     "build:agent": "nub --node scripts/agent/index.ts",
     "build:bin": "nub run build:runtime && nub --node scripts/repo/index.ts bin",
+    "build:oxlint-fixtures": "nub --node scripts/repo/index.ts oxlint-fixtures",
     "build:plugin": "nub --node scripts/repo/index.ts plugin",
     "build:runtime": "tsc -p tsconfig.json --noEmit false --declaration false --outDir .build --rootDir .",
     "codependence": "codependence",
@@ -162,6 +169,9 @@
             "@eslint/js": "^9.0.0"
           },
           {
+            "@oxlint/plugins": "^1.81.0"
+          },
+          {
             "@nubjs/nub": "^0.7.0"
           },
           {
@@ -212,7 +222,9 @@
       }
     ]
   },
-  "dependencies": {},
+  "dependencies": {
+    "@oxlint/plugins": "^1.81.0"
+  },
   "peerDependencies": {
     "eslint": "^8.57.0 || ^9.0.0 || ^10.0.0",
     "oxlint": ">=1.55.0"

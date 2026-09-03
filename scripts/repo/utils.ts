@@ -225,6 +225,12 @@ function getCommentRuleArgs(bin: string, forbidComments: boolean): string[] {
   return ['--rule', `${FORBID_COMMENTS_RULE}:error`];
 }
 
+function getNewFileLinterArgs(bin: string, files: string[]): string[] {
+  const isEslint = bin.endsWith('/eslint') || bin === 'eslint';
+  const ignoredFileWarningArgs = isEslint ? ['--no-warn-ignored'] : [];
+  return ['--max-warnings', '0'].concat(ignoredFileWarningArgs, files);
+}
+
 function getCommentPolicyArgs(bin: string, files: string[]): string[] {
   const isOxlint = bin.endsWith('/oxlint') || bin === 'oxlint';
   const policyArgs = isOxlint
@@ -438,8 +444,10 @@ function runNewFileLinters(linters: string[], files: string[]): number {
   if (files.length === 0) return 0;
 
   process.stdout.write(`+ ${files.length} new file(s) — strict\n`);
-  const codes = linters.map((bin) => runLinter(bin, ['--max-warnings', '0'].concat(files)));
-  return codes.some((code) => code !== 0) ? 1 : 0;
+  const codes = linters.map((bin) => runLinter(bin, getNewFileLinterArgs(bin, files)));
+  if (hasFailedCode(codes)) return 1;
+
+  return 0;
 }
 
 function runModifiedFileLinters(linters: string[], files: string[]): number {
@@ -447,7 +455,13 @@ function runModifiedFileLinters(linters: string[], files: string[]): number {
 
   process.stdout.write(`~ ${files.length} modified file(s) — warn\n`);
   const codes = linters.map((bin) => runLinter(bin, files));
-  return codes.some((code) => code !== 0) ? 1 : 0;
+  if (hasFailedCode(codes)) return 1;
+
+  return 0;
+}
+
+function hasFailedCode(codes: readonly number[]): boolean {
+  return codes.some((code) => code !== 0);
 }
 
 function runSessionPolicy(input: SessionPolicyInput): number {

@@ -25,7 +25,7 @@ interface ReleaseItConfig {
 }
 
 interface ManifestExports {
-  ".": {
+  [key: string]: {
     import?: string;
     require?: string;
   };
@@ -100,6 +100,7 @@ test("ci workflow covers supported runtimes and linter hosts", () => {
 test("package metadata declares supported runtimes and optional linter hosts", () => {
   assert.equal(manifest.engines.node, ">=22");
   assert.ok(manifest.engines.node);
+  assert.ok(manifest.dependencies["@oxlint/plugins"]);
   assert.ok(manifest.peerDependencies.eslint);
   assert.ok(manifest.peerDependencies.oxlint);
   assert.equal(manifest.peerDependenciesMeta.eslint.optional, true);
@@ -112,6 +113,8 @@ test("package metadata publishes separate ESM and CommonJS entries", () => {
   assert.equal(manifest.main, "./dist/index.cjs");
   assert.equal(packageExports["."].import, "./dist/index.js");
   assert.equal(packageExports["."].require, "./dist/index.cjs");
+  assert.equal(packageExports["./oxlint"].import, "./dist/oxlint.js");
+  assert.equal(packageExports["./oxlint"].require, "./dist/oxlint.cjs");
 });
 
 test("update workflow maintains dependencies and override metadata", () => {

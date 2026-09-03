@@ -22,7 +22,7 @@ The goal of rules in this package are to make code readable for reviewing lots o
 
 This project provides ESLint and Oxlint-compatible rules for readable, explicit, performance-conscious JavaScript and TypeScript.
 
-The package exports an ESLint-compatible plugin object. ESLint loads it directly. Oxlint loads it through JavaScript plugin support. Both are optional peer dependencies.
+The package exports an ESLint-compatible root plugin and an Oxlint-focused `eslint-plugin-legibility/oxlint` entry. ESLint loads the root package directly. Oxlint loads the Oxlint entry through JavaScript plugin support.
 
 ```sh
 # npm, pnpm, bun
@@ -75,48 +75,48 @@ import legibility from "eslint-plugin-legibility";
 export default [legibility.configs["flat/agent-strict"]];
 ```
 
-### `oxlint/recommended`
+### `oxlint.configs.recommended`
 
 Mirrors `flat/recommended` in `oxlint.config.ts`.
 
 ```ts
 import { defineConfig } from "oxlint";
-import legibility from "eslint-plugin-legibility";
+import legibility from "eslint-plugin-legibility/oxlint";
 
-export default defineConfig(legibility.configs["oxlint/recommended"]);
+export default defineConfig(legibility.configs.recommended);
 ```
 
-### `oxlint/strict`
+### `oxlint.configs.strict`
 
 Mirrors `flat/strict` in `oxlint.config.ts`.
 
 ```ts
 import { defineConfig } from "oxlint";
-import legibility from "eslint-plugin-legibility";
+import legibility from "eslint-plugin-legibility/oxlint";
 
-export default defineConfig(legibility.configs["oxlint/strict"]);
+export default defineConfig(legibility.configs.strict);
 ```
 
-### `oxlint/agent-recommended`
+### `oxlint.configs.agentRecommended`
 
 Mirrors `flat/agent-recommended` in `oxlint.config.ts`.
 
 ```ts
 import { defineConfig } from "oxlint";
-import legibility from "eslint-plugin-legibility";
+import legibility from "eslint-plugin-legibility/oxlint";
 
-export default defineConfig(legibility.configs["oxlint/agent-recommended"]);
+export default defineConfig(legibility.configs.agentRecommended);
 ```
 
-### `oxlint/agent-strict`
+### `oxlint.configs.agentStrict`
 
 Mirrors `flat/agent-strict` in `oxlint.config.ts`.
 
 ```ts
 import { defineConfig } from "oxlint";
-import legibility from "eslint-plugin-legibility";
+import legibility from "eslint-plugin-legibility/oxlint";
 
-export default defineConfig(legibility.configs["oxlint/agent-strict"]);
+export default defineConfig(legibility.configs.agentStrict);
 ```
 
 All presets explicitly configure these core rules because ESLint's recommended config does not enable them:
@@ -1171,14 +1171,14 @@ const legibility = require("eslint-plugin-legibility");
 ### Usage With Oxlint
 
 Oxlint JavaScript plugins use the same ESLint-compatible rule API.
-Use an `oxlint/*` preset above with `oxlint.config.ts`. For `.oxlintrc.json`, register the plugin and configure rules explicitly:
+Use a `legibility.configs.*` preset from `eslint-plugin-legibility/oxlint` with `oxlint.config.ts`. For `.oxlintrc.json`, register the plugin and configure rules explicitly:
 
 ```json
 {
   "jsPlugins": [
     {
       "name": "legibility",
-      "specifier": "eslint-plugin-legibility"
+      "specifier": "eslint-plugin-legibility/oxlint"
     }
   ],
   "rules": {

@@ -13,6 +13,7 @@ import mergeTsconfigs from "merge-tsconfigs";
 import {
   agentBinRoot,
   cjsEntryPath,
+  cjsOxlintEntryPath,
   cjsRoot,
   compiledAgentRoot,
   distRoot,
@@ -20,6 +21,7 @@ import {
   lintChangedSource,
   pluginConfig,
   pluginEntryPath,
+  pluginOxlintEntryPath,
   pluginTsconfigPath,
   repoConstantsDestination,
   repoConstantsSource,
@@ -28,6 +30,9 @@ import {
   tsupPath,
 } from "./constants.ts";
 import { isDirectRun, preserveExitCode, runRelease, runRepoDirect } from "./utils.ts";
+import {
+  writeOxlintFixtureConfigs,
+} from "../../tests/fixtures/oxlint/configs.ts";
 
 export function buildBin(): void {
   mkdirSync(agentBinRoot, { recursive: true });
@@ -62,6 +67,7 @@ export function buildPlugin(): void {
   runTsc(["-p", pluginTsconfigPath]);
   runCommand(tsupPath, [
     pluginEntryPath,
+    pluginOxlintEntryPath,
     "--format",
     "cjs",
     "--out-dir",
@@ -79,9 +85,11 @@ function cleanDist(): void {
 
 function writeCjsArtifacts(): void {
   const cjsEntry = '"use strict";\nmodule.exports = require("./cjs/index.cjs").default;\n';
+  const oxlintCjsEntry = '"use strict";\nmodule.exports = require("./cjs/oxlint.cjs").default;\n';
 
   mkdirSync(cjsRoot, { recursive: true });
   writeFileSync(cjsEntryPath, cjsEntry);
+  writeFileSync(cjsOxlintEntryPath, oxlintCjsEntry);
 }
 
 export function typecheckStrict(): void {
@@ -89,10 +97,15 @@ export function typecheckStrict(): void {
   runTsc(["-p", pluginTsconfigPath].concat(strictArgs));
 }
 
+export function buildOxlintFixtureConfigs(root?: string): void {
+  writeOxlintFixtureConfigs(root);
+}
+
 export function build(target: string | undefined): void {
   const isBinTarget = target === undefined || target === "bin";
   if (isBinTarget) return buildBin();
   if (target === "config") return buildConfig();
+  if (target === "oxlint-fixtures") return buildOxlintFixtureConfigs();
   if (target === "plugin") return buildPlugin();
   if (target === "strict") return typecheckStrict();
   throw new Error(`Unknown build target: ${target ?? "(missing)"}`);
@@ -140,6 +153,11 @@ function runRepoCli(args: readonly string[]): number | Promise<number> {
 
   if (command === "config") {
     build("config");
+    return 0;
+  }
+
+  if (command === "oxlint-fixtures") {
+    build("oxlint-fixtures");
     return 0;
   }
 

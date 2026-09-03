@@ -36,6 +36,7 @@ RUN nub add --save-dev --save-exact \
   "typescript@${TYPESCRIPT_VERSION}" \
   "typescript-eslint@${TYPESCRIPT_ESLINT_VERSION}"
 COPY --chown=node:node tests/fixtures ./tests/fixtures
+RUN nub --node tests/fixtures/oxlint/configs.ts
 COPY --chown=node:node tests/e2e/docker/consumer ./tests/e2e
 RUN node tests/e2e/generate-workload.ts
 ENTRYPOINT ["node"]

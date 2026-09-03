@@ -48,6 +48,7 @@ web_modules/
 *.tsbuildinfo
 .build/
 tests/.test-fixtures/
+tests/fixtures/oxlint/**/oxlint.config.mjs
 
 # Optional npm cache directory
 .npm
