@@ -86,11 +86,12 @@ const optInRules = {
     { schema: "index", minDepth: 1 },
   ],
 };
+const rules = Object.assign({}, preset.rules, optInRules);
 
 export default defineConfig({
   ignorePatterns: ["oxlint.config.mjs"],
   jsPlugins: preset.jsPlugins,
-  rules: Object.assign({}, preset.rules, optInRules),
+  rules,
 });
 `;
 }

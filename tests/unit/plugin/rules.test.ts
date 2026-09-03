@@ -13,7 +13,7 @@ import {
   RECOMMENDED_RULE_NAMES,
   STRICT_ONLY_RULE_NAMES,
 } from "../../../dist/constants.js";
-import type { RuleModule } from "../../../src/types.ts";
+import type { AstNode, RuleModule } from "../../../src/types.ts";
 
 const require = createRequire(import.meta.url);
 const plugin = (await import(pathToFileURL(join(process.cwd(), "dist", "index.js")).href))
@@ -156,12 +156,13 @@ function block(body: any[] = []): any {
   return node;
 }
 
-function id(name: string): any {
-  return {
+function id(name: string): AstNode {
+  const node = {
     type: "Identifier",
     name,
     __text: name,
   };
+  return node;
 }
 
 function literal(value: any): any {

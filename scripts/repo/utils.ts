@@ -445,7 +445,9 @@ function runNewFileLinters(linters: string[], files: string[]): number {
 
   process.stdout.write(`+ ${files.length} new file(s) — strict\n`);
   const codes = linters.map((bin) => runLinter(bin, getNewFileLinterArgs(bin, files)));
-  return codes.some((code) => code !== 0) ? 1 : 0;
+  if (hasFailedCode(codes)) return 1;
+
+  return 0;
 }
 
 function runModifiedFileLinters(linters: string[], files: string[]): number {
@@ -453,7 +455,13 @@ function runModifiedFileLinters(linters: string[], files: string[]): number {
 
   process.stdout.write(`~ ${files.length} modified file(s) — warn\n`);
   const codes = linters.map((bin) => runLinter(bin, files));
-  return codes.some((code) => code !== 0) ? 1 : 0;
+  if (hasFailedCode(codes)) return 1;
+
+  return 0;
+}
+
+function hasFailedCode(codes: readonly number[]): boolean {
+  return codes.some((code) => code !== 0);
 }
 
 function runSessionPolicy(input: SessionPolicyInput): number {
