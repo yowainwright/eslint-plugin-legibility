@@ -37,7 +37,7 @@ Choose the preset for your linter and severity.
 
 ### `flat/recommended`
 
-Enables the broadly applicable legibility rules and core complexity limits as warnings.
+Enables the broadly applicable legibility rules and core complexity limits as warnings. Filename casing violations are errors.
 
 ```ts
 import legibility from "eslint-plugin-legibility";
@@ -47,12 +47,22 @@ export default [legibility.configs["flat/recommended"]];
 
 ### `flat/strict`
 
-Enables every recommended rule plus the more opinionated analysis rules as errors.
+Enables every plugin rule and the core complexity limits as errors. Newly registered rules are automatically included.
 
 ```ts
 import legibility from "eslint-plugin-legibility";
 
 export default [legibility.configs["flat/strict"]];
+```
+
+### `flat/all`
+
+Alias for `flat/strict`: enables every plugin rule as an error.
+
+```ts
+import legibility from "eslint-plugin-legibility";
+
+export default [legibility.configs["flat/all"]];
 ```
 
 ### `flat/agent-recommended`
@@ -97,6 +107,17 @@ import legibility from "eslint-plugin-legibility/oxlint";
 export default defineConfig(legibility.configs.strict);
 ```
 
+### `oxlint.configs.all`
+
+Mirrors `flat/all` in `oxlint.config.ts`.
+
+```ts
+import { defineConfig } from "oxlint";
+import legibility from "eslint-plugin-legibility/oxlint";
+
+export default defineConfig(legibility.configs.all);
+```
+
 ### `oxlint.configs.agentRecommended`
 
 Mirrors `flat/agent-recommended` in `oxlint.config.ts`.
@@ -128,7 +149,9 @@ All presets explicitly configure these core rules because ESLint's recommended c
 
 ## Rules
 
-`recommended` contains broadly applicable legibility checks. `strict` includes every recommended rule plus more opinionated performance and code-shape analysis. `agent-recommended` and `agent-strict` keep the same rule membership as their base presets, but make computed object and return values stricter for agent-authored code. Composition style, executable-entry checks, filename schemas, and blanket comment policies remain opt-in because they require a project decision.
+`recommended` contains broadly applicable legibility checks. `strict` and its alias `all` enable every plugin rule. `agent-recommended` and `agent-strict` keep the same rule membership as their base presets, but make computed object and return values stricter for agent-authored code.
+
+`strict`, `all`, and `agent-strict` reject comments by default, prefer `concat` and `Object.assign` over literal spread, require shebangs in `src/cli/index.js` and `src/cli/index.ts`, and use the `dirname` filename schema at a minimum directory depth of three. These presets now enable the rules that were previously opt-in. Each rule has working defaults and can be overridden.
 
 <!-- rule section links grouped by preset membership from src/constants.ts -->
 <details>
@@ -173,7 +196,7 @@ All presets explicitly configure these core rules because ESLint's recommended c
 </details>
 
 <details>
-<summary>Opt-in project policy rules</summary>
+<summary>Project policy rules included in strict and all</summary>
 
 - [`legibility/no-unmatched-comments`](#no-unmatched-comments)
 - [`legibility/prefer-concat-object-assign`](#prefer-concat-object-assign)
@@ -426,12 +449,30 @@ Reject `map` and `filter` callbacks that keep every item unchanged.
 
 <a id="no-mixed-filename-casing"></a>
 
-### `legibility/no-mixed-filename-casing()`
+### `legibility/no-mixed-filename-casing({options})`
 
 <!-- no-mixed-filename-casing behavior from src/constants.ts and src/index.ts -->
-Use one filename convention: kebab-case, camelCase, PascalCase, or snake_case. Leading dots and file extensions are ignored.
+Allow kebab-case or camelCase by default. Both `get-user.ts` and `getUser.ts` are valid, including in the same directory. Other styles and mixed casing such as `get-userName.ts` are errors in every bundled preset. Leading dots and file extensions are ignored.
 
-This rule has no options. It rejects conventions mixed within one filename; it does not require every file in the project to use the same convention. For example, `user-profile.ts`, `userProfile.ts`, `UserProfile.ts`, and `user_profile.ts` are all valid.
+Use `case` to require one style, or `cases` to replace the allowed styles. Supported values are `kebabCase`, `camelCase`, `snakeCase`, and `pascalCase`. Use only one of `case` or `cases`; `cases` must enable at least one style. These option names follow [Unicorn's filename-case configuration](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/docs/rules/filename-case.md).
+
+ESLint scopes rules with `files`. For example, require kebab-case in scripts and camelCase in source files:
+
+```ts
+export default [
+  legibility.configs["flat/recommended"],
+  {
+    files: ["scripts/**/*.ts"],
+    rules: { "legibility/no-mixed-filename-casing": ["error", { case: "kebabCase" }] },
+  },
+  {
+    files: ["src/**/*.ts"],
+    rules: { "legibility/no-mixed-filename-casing": ["error", { case: "camelCase" }] },
+  },
+];
+```
+
+Oxlint uses the same rule options inside `overrides` entries with `files` patterns. Change `error` to `warn` to lower severity. To allow a different combination, use `{ cases: { camelCase: true, pascalCase: true } }`.
 
 #### do / don't
 
@@ -440,7 +481,7 @@ This rule has no options. It rejects conventions mixed within one filename; it d
 + my-file.ts
 
 - user_profile-card.test.ts
-+ user_profile_card.test.ts
++ user-profile-card.test.ts
 
 - accountSettings-helper.ts
 + account-settings-helper.ts
@@ -754,7 +795,7 @@ Report array and object literals containing spread when a project prefers method
 - Object literal spread is reported in favor of `Object.assign` with a new target.
 - Function-call spread and rest syntax are unchanged.
 
-This rule has no options or autofix. Enable it explicitly:
+This rule has no options or autofix. It is enabled in `strict`, `all`, and `agent-strict`. To enable it in `recommended`:
 
 ```diff
  import legibility from "eslint-plugin-legibility";
@@ -770,7 +811,7 @@ This rule has no options or autofix. Enable it explicitly:
  ];
 ```
 
-#### why it is opt-in
+#### composition tradeoffs
 
 This is a style opinion, not a universal performance rule. `concat` names the array composition operation. `Object.assign` names the object composition operation, makes the fresh target visible, and preserves source precedence in argument order.
 
@@ -915,7 +956,7 @@ Prefer positive boolean names over names like `isNotReady`.
 <!-- require-executable-shebang runtime defaults from src/constants.ts -->
 Require configured CLI entry source files to include a Node, Bun, or Deno shebang.
 
-This rule is opt-in because a common source index is not necessarily executable. Enable it only for actual command entry paths.
+Enabled in `strict`, `all`, and `agent-strict`. By default, it checks `src/cli/index.js` and `src/cli/index.ts`. Configure `files` for other executable entry paths.
 
 #### options
 
@@ -938,11 +979,11 @@ This rule is opt-in because a common source index is not necessarily executable.
 ### `legibility/require-filename-matches-dirname({options})`
 
 <!-- require-filename-matches-dirname defaults and behavior from src/constants.ts and src/index.ts -->
-Require filenames to match an explicitly selected schema. The rule is not included in a preset because projects must choose `dirname`, `index`, or a custom schema.
+Require filenames to match a schema. Enabled in `strict`, `all`, and `agent-strict`, with `dirname` as the default. Projects can select `index` or a custom schema instead. This layout check is separate from filename casing.
 
 #### options
 
-- `{schema: "dirname" | "index" | "custom"}`: required filename schema.
+- `{schema: "dirname" | "index" | "custom"}`: filename schema. Default: `"dirname"`.
 - `{minDepth: number}`: minimum parent depth to check. Default: `3`.
 - `{allowedQualifiers: string[]}`: `dirname` schema suffixes.
 - `{allowedFilenames: string[]}`: `dirname` schema standalone basenames.
@@ -1058,7 +1099,7 @@ Use `max` and `min` to tune rule sensitivity.
 
 ## Recipes
 
-The bundled presets check comment quality. They do not ban every comment. Use a session flag or configure `no-unmatched-comments` when comments need an explicit allow policy.
+`recommended` and `agent-recommended` check comment quality. `strict`, `all`, and `agent-strict` also reject comments by default through `no-unmatched-comments`. Configure its allow options for permitted comments. The session flag below limits the extra comment policy to added lines.
 
 ### Block comments during an agent session
 
@@ -1129,7 +1170,7 @@ Run the same project policy in pre-commit checks:
 npx lint-changed
 ```
 
-These checks allow comments unless the project config explicitly restricts them. The bundled comment-quality rules still apply. Reserve `--comments=forbid` for active agent sessions.
+These checks use the project config, including the comment restrictions in `strict`, `all`, and `agent-strict`. Reserve `--comments=forbid` for an additional check of comments added during agent sessions.
 
 ---
 

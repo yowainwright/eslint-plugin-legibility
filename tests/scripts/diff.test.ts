@@ -49,13 +49,28 @@ function runGit(repository: string, args: string[]): void {
   assert.equal(result.status, 0, result.stderr);
 }
 
+function writeFixtureConfigs(repository: string): void {
+  const eslintConfig = [
+    'import legibility from "eslint-plugin-legibility";',
+    'import tseslint from "typescript-eslint";',
+    'export default [{',
+    '  files: ["**/*.ts"],',
+    '  languageOptions: { parser: tseslint.parser },',
+    '  plugins: { legibility },',
+    '}];',
+  ].join('\n');
+  writeFileSync(join(repository, 'eslint.config.mjs'), `${eslintConfig}\n`);
+  writeFileSync(join(repository, '.oxlintrc.json'), '{}\n');
+}
+
 function createCleanRepository(): string {
   const fixtureRoot = join(process.cwd(), 'tests', '.test-fixtures');
   mkdirSync(fixtureRoot, { recursive: true });
   const repository = mkdtempSync(join(fixtureRoot, 'lint-changed-'));
   runGit(repository, ['init', '--quiet']);
+  writeFixtureConfigs(repository);
   writeFileSync(join(repository, 'check.ts'), 'export const ready = true;\n');
-  runGit(repository, ['add', 'check.ts']);
+  runGit(repository, ['add', 'check.ts', 'eslint.config.mjs', '.oxlintrc.json']);
   const commitArgs = gitIdentityArgs.concat(['commit', '--quiet', '-m', 'initial']);
   runGit(repository, commitArgs);
   return repository;
@@ -297,5 +312,5 @@ test('lint-changed permits existing comments in pure renames', (context) => {
     encoding: 'utf8',
     env: getFixtureEnvironment(),
   });
-  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
 });

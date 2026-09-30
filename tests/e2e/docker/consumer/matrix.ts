@@ -41,7 +41,9 @@ const defaultFeatureRules = [
   "prefer-object-lookup",
 ];
 const recommendedFeatureRules = getPresetRuleNames("flat/recommended");
-const strictFeatureRules = getPresetRuleNames("flat/strict");
+const strictFeatureRules = getPresetRuleNames("flat/strict").filter(
+  (name) => name !== "require-executable-shebang" && name !== "prefer-concat-object-assign",
+);
 const optInFeatureRules = Object.keys(legibility.rules);
 
 function getPresetRuleNames(preset: "flat/recommended" | "flat/strict"): string[] {
@@ -58,7 +60,8 @@ function createDiagnostics(
   return ruleNames
     .map((ruleName) => {
       const code = engine === "eslint" ? `legibility/${ruleName}` : `legibility(${ruleName})`;
-      return { code, severity };
+      const level = ruleName === "no-mixed-filename-casing" ? "error" : severity;
+      return { code, severity: level };
     })
     .toSorted((left, right) => left.code.localeCompare(right.code));
 }
@@ -84,7 +87,7 @@ export const matrixCases: readonly MatrixCase[] = [
     engine: "eslint",
     expected: createDiagnostics("eslint", recommendedFeatureRules, "warning"),
     invalidFiles: ["features.ts", "invalid.ts", "mixed-File.ts"],
-    invalidStatus: 0,
+    invalidStatus: 1,
     profile: "recommended",
     validFiles: ["valid.ts"],
   },
@@ -94,7 +97,7 @@ export const matrixCases: readonly MatrixCase[] = [
     invalidFiles: ["features.ts", "invalid.ts", "mixed-File.ts"],
     invalidStatus: 1,
     profile: "strict",
-    validFiles: ["valid.ts"],
+    validFiles: ["index.ts"],
   },
   {
     engine: "oxlint",
@@ -116,7 +119,7 @@ export const matrixCases: readonly MatrixCase[] = [
     engine: "oxlint",
     expected: createDiagnostics("oxlint", recommendedFeatureRules, "warning"),
     invalidFiles: ["features.ts", "invalid.ts", "mixed-File.ts"],
-    invalidStatus: 0,
+    invalidStatus: 1,
     profile: "recommended",
     validFiles: ["valid.ts"],
   },
@@ -126,7 +129,7 @@ export const matrixCases: readonly MatrixCase[] = [
     invalidFiles: ["features.ts", "invalid.ts", "mixed-File.ts"],
     invalidStatus: 1,
     profile: "strict",
-    validFiles: ["valid.ts"],
+    validFiles: ["index.ts"],
   },
 ];
 

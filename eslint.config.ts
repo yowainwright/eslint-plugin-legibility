@@ -13,6 +13,7 @@ export default [
       "dist/**",
       "node_modules/**",
       "pnpm-lock.yaml",
+      "tests/.test-fixtures/**",
       "tests/fixtures/eslint/**",
       "tests/fixtures/oxlint/**",
     ],

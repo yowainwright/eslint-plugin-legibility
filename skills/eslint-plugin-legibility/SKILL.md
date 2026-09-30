@@ -14,7 +14,7 @@ Use this as the shared workflow for Codex, Claude, and generic agent skill roots
 
 ## Comments
 
-Both presets enforce the same comment-quality rules. Use the session flag to reject comments added while an agent works.
+All presets check comment quality. The strict, all, and agent-strict presets also reject unmatched comments by default. Use the session flag to check comments added while an agent works.
 
 - Agents do not add source comments by default.
 - Run `npx lint-changed --comments=forbid` during agent sessions.

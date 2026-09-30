@@ -9,7 +9,6 @@ import { pathToFileURL } from "node:url";
 import manifest from "../../../package.json" with { type: "json" };
 import {
   COMMENT_RULE_NAMES,
-  OPT_IN_RULE_NAMES,
   RECOMMENDED_RULE_NAMES,
   STRICT_ONLY_RULE_NAMES,
 } from "../../../dist/constants.js";
@@ -326,16 +325,11 @@ test("exports an ESLint and Oxlint compatible plugin shape", () => {
     assert.equal(plugin.configs["flat/recommended"].rules[ruleId], "warn");
     assert.equal(plugin.configs["flat/strict"].rules[ruleId], "error");
   });
-  OPT_IN_RULE_NAMES.forEach((ruleName) => {
-    const ruleId = `legibility/${ruleName}`;
-    assert.equal(plugin.rules[ruleName].meta.docs.recommended, false);
-    assert.equal(plugin.configs["flat/recommended"].rules[ruleId], undefined);
-    assert.equal(plugin.configs["flat/strict"].rules[ruleId], undefined);
-  });
   RECOMMENDED_RULE_NAMES.forEach((ruleName) => {
     const ruleId = `legibility/${ruleName}`;
+    const severity = ruleName === "no-mixed-filename-casing" ? "error" : "warn";
     assert.equal(plugin.rules[ruleName].meta.docs.recommended, true);
-    assert.equal(plugin.configs["flat/recommended"].rules[ruleId], "warn");
+    assert.equal(plugin.configs["flat/recommended"].rules[ruleId], severity);
     assert.equal(plugin.configs["flat/strict"].rules[ruleId], "error");
   });
   STRICT_ONLY_RULE_NAMES.forEach((ruleName) => {
@@ -347,16 +341,17 @@ test("exports an ESLint and Oxlint compatible plugin shape", () => {
   const categorizedRules = RECOMMENDED_RULE_NAMES.concat(
     COMMENT_RULE_NAMES,
     STRICT_ONLY_RULE_NAMES,
-    Array.from(OPT_IN_RULE_NAMES),
   ).toSorted();
   assert.deepEqual(categorizedRules, Object.keys(plugin.rules).toSorted());
   assert.deepEqual(Object.keys(plugin.configs).sort(), [
     "flat/agent-recommended",
     "flat/agent-strict",
+    "flat/all",
     "flat/recommended",
     "flat/strict",
     "oxlint/agent-recommended",
     "oxlint/agent-strict",
+    "oxlint/all",
     "oxlint/recommended",
     "oxlint/strict",
   ]);
@@ -398,6 +393,7 @@ test("Oxlint export exposes cleaner preset names and export specifier", () => {
   assert.deepEqual(Object.keys(oxlintPlugin.configs).sort(), [
     "agentRecommended",
     "agentStrict",
+    "all",
     "recommended",
     "strict",
   ]);
@@ -742,11 +738,12 @@ function lintFilename(filename: string, options: any): any[] {
   return reports;
 }
 
-test("require-filename-matches-dirname requires a schema", () => {
-  const reports = lintFilename("/repo/src/components/foo/index.ts", { minDepth: 2 });
-
-  assert.equal(reports.length, 1);
-  assert.equal(reports[0].messageId, "missingSchema");
+test("require-filename-matches-dirname defaults to the dirname schema", () => {
+  assert.equal(lintFilename("/repo/src/components/foo/index.ts", {}).length, 0);
+  assert.equal(lintFilename("/repo/src/components/foo/foo.ts", {}).length, 0);
+  const reports = lintFilename("/repo/src/components/foo/unrelated.ts", {});
+  assert.equal(reports[0].messageId, "mismatch");
+  assert.equal(reports[0].data.schema, "dirname");
 });
 
 test("require-filename-matches-dirname enforces the dirname schema", () => {
@@ -826,7 +823,7 @@ test("require-filename-matches-dirname exempts files below minDepth", () => {
   assert.equal(reports.length, 0);
 });
 
-test("require-filename-matches-dirname validates the required schema option", async () => {
+test("require-filename-matches-dirname accepts empty options in ESLint", async () => {
   const { Linter } = await import("eslint");
   const linter = new Linter({ configType: "flat" });
   const ruleConfig: ["error", Record<string, never>] = ["error", {}];
@@ -834,7 +831,7 @@ test("require-filename-matches-dirname validates the required schema option", as
   const config = [{ plugins: { legibility: plugin }, rules }];
   const verify = () => linter.verify("const value = true;", config);
 
-  assert.throws(verify, /required property 'schema'/);
+  assert.doesNotThrow(verify);
 });
 
 test("no-mixed-filename-casing reports hyphen mixed with uppercase", () => {
@@ -868,16 +865,16 @@ test("no-mixed-filename-casing allows camelCase", () => {
   assert.equal(reports.length, 0);
 });
 
-test("no-mixed-filename-casing allows PascalCase", () => {
+test("no-mixed-filename-casing rejects PascalCase by default", () => {
   const { visitor, reports } = createRule("no-mixed-filename-casing", [], { filename: "/repo/src/MyFile.ts" });
   visitor.Program({ type: "Program" });
-  assert.equal(reports.length, 0);
+  assert.equal(reports.length, 1);
 });
 
-test("no-mixed-filename-casing allows snake_case", () => {
+test("no-mixed-filename-casing rejects snake_case by default", () => {
   const { visitor, reports } = createRule("no-mixed-filename-casing", [], { filename: "/repo/src/my_file.ts" });
   visitor.Program({ type: "Program" });
-  assert.equal(reports.length, 0);
+  assert.equal(reports.length, 1);
 });
 
 test("no-mixed-filename-casing allows dotfile names", () => {
@@ -2173,8 +2170,10 @@ const defaultFixtureRuleNames = [
   "prefer-object-lookup",
 ];
 const recommendedFixtureRuleNames = RECOMMENDED_RULE_NAMES.concat(COMMENT_RULE_NAMES);
-const strictFixtureRuleNames = recommendedFixtureRuleNames.concat(STRICT_ONLY_RULE_NAMES);
-const optInFixtureRuleNames = strictFixtureRuleNames.concat(Array.from(OPT_IN_RULE_NAMES));
+const optInFixtureRuleNames = Object.keys(plugin.rules);
+const strictFixtureRuleNames = optInFixtureRuleNames.filter(
+  (name) => name !== "require-executable-shebang" && name !== "prefer-concat-object-assign",
+);
 
 function createFixtureDiagnostics(
   engine: "eslint" | "oxlint",
@@ -2184,7 +2183,8 @@ function createFixtureDiagnostics(
   return ruleNames
     .map((ruleName) => {
       const code = engine === "eslint" ? `legibility/${ruleName}` : `legibility(${ruleName})`;
-      return { code, severity };
+      const level = ruleName === "no-mixed-filename-casing" ? "error" : severity;
+      return { code, severity: level };
     })
     .toSorted((left, right) => left.code.localeCompare(right.code));
 }
@@ -2254,7 +2254,7 @@ const oxlintFixtureCases: LintFixtureCase[] = [
     directory: "recommended",
     expected: createFixtureDiagnostics("oxlint", recommendedFixtureRuleNames, "warning"),
     invalidFiles: ["features.ts", "invalid.ts", "mixed-File.ts"],
-    invalidStatus: 0,
+    invalidStatus: 1,
     validFiles: ["valid.ts"],
   },
   {
@@ -2262,7 +2262,7 @@ const oxlintFixtureCases: LintFixtureCase[] = [
     expected: createFixtureDiagnostics("oxlint", strictFixtureRuleNames, "error"),
     invalidFiles: ["features.ts", "invalid.ts", "mixed-File.ts"],
     invalidStatus: 1,
-    validFiles: ["valid.ts"],
+    validFiles: ["index.ts"],
   },
   {
     directory: "opt-in",
@@ -2355,7 +2355,7 @@ const eslintFixtureCases: LintFixtureCase[] = [
     directory: "recommended",
     expected: createFixtureDiagnostics("eslint", recommendedFixtureRuleNames, "warning"),
     invalidFiles: ["features.ts", "invalid.ts", "mixed-File.ts"],
-    invalidStatus: 0,
+    invalidStatus: 1,
     validFiles: ["valid.ts"],
   },
   {
@@ -2363,7 +2363,7 @@ const eslintFixtureCases: LintFixtureCase[] = [
     expected: createFixtureDiagnostics("eslint", strictFixtureRuleNames, "error"),
     invalidFiles: ["features.ts", "invalid.ts", "mixed-File.ts"],
     invalidStatus: 1,
-    validFiles: ["valid.ts"],
+    validFiles: ["index.ts"],
   },
   {
     directory: "opt-in",
