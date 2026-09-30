@@ -1010,17 +1010,42 @@ test("no-quadratic-patterns reports nested iteration", () => {
   assert.deepEqual(reports[0].data, { outer: "map", inner: "map" });
 });
 
-test("require-executable-shebang reports configured executable sources without shebangs", () => {
-  const { visitor, reports } = createRule("require-executable-shebang");
+["js", "ts"].forEach((extension) => {
+  test(`require-executable-shebang ignores library ${extension} entrypoints by default`, () => {
+    const filename = `/repo/src/index.${extension}`;
+    const { visitor, reports } = createRule("require-executable-shebang", [], { filename });
 
-  visitor.Program({ type: "Program" });
+    visitor.Program({ type: "Program" });
 
-  assert.equal(reports.length, 1);
-  assert.equal(reports[0].messageId, "missingShebang");
+    assert.equal(reports.length, 0);
+  });
+
+  test(`require-executable-shebang checks CLI ${extension} entrypoints by default`, () => {
+    const filename = `/repo/src/cli/index.${extension}`;
+    const { visitor, reports } = createRule("require-executable-shebang", [], { filename });
+
+    visitor.Program({ type: "Program" });
+
+    assert.equal(reports.length, 1);
+    assert.equal(reports[0].messageId, "missingShebang");
+  });
+
+  test(`require-executable-shebang checks explicitly configured root ${extension} entrypoints`, () => {
+    const path = `src/index.${extension}`;
+    const filename = `/repo/${path}`;
+    const options = [{ files: [path] }];
+    const { visitor, reports } = createRule("require-executable-shebang", options, { filename });
+
+    visitor.Program({ type: "Program" });
+
+    assert.equal(reports.length, 1);
+    assert.equal(reports[0].messageId, "missingShebang");
+  });
 });
 
 test("require-executable-shebang accepts Deno shebangs by default", () => {
   const { visitor, reports } = createRule("require-executable-shebang", [], {
+    filename: "/repo/src/cli/index.ts",
     sourceCode: {
       text: "#!/usr/bin/env deno run --allow-read\nconsole.log('ok');\n",
       getText: () => "",
@@ -1036,7 +1061,7 @@ test("text rules use readable fallbacks for comment-only direct sources", () => 
   const sourceText = "#!/usr/bin/env node\nconsole.log('ok');\n";
   const sourceCode = { getAllComments: () => [] };
   const getSourceCode = () => ({ getText: () => sourceText });
-  const overrides = { sourceCode, getSourceCode };
+  const overrides = { sourceCode, getSourceCode, filename: "/repo/src/cli/index.js" };
   const { visitor, reports } = createRule("require-executable-shebang", [], overrides);
 
   visitor.Program({ type: "Program" });

@@ -241,8 +241,6 @@ export const ARRAY_MUTATING_METHODS = new Set([
 ]);
 
 export const DEFAULT_EXECUTABLE_ENTRY_PATTERNS = [
-  "src/index.js",
-  "src/index.ts",
   "src/cli/index.js",
   "src/cli/index.ts",
 ];

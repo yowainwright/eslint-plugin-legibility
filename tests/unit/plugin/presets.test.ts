@@ -25,6 +25,15 @@ function lint(config: unknown, filename?: string) {
     });
     assert.deepEqual(lint([preset], "index.js"), []);
   });
+
+  test(`${name} requires shebangs only for default CLI entrypoints`, () => {
+    const preset = plugin.configs[name];
+    assert.deepEqual(lint([preset], "src/index.js"), []);
+    const messages = lint([preset], "src/cli/index.js");
+    assert.equal(messages.length, 1);
+    assert.equal(messages[0].ruleId, "legibility/require-executable-shebang");
+    assert.equal(messages[0].severity, 2);
+  });
 });
 
 test("all exports mirror strict for ESLint and Oxlint", () => {
