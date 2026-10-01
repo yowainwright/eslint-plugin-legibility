@@ -17,6 +17,8 @@ import {
   DEFAULT_EXECUTABLE_RUNTIMES,
   DEFAULT_INDEX_FILENAME_SCHEMA,
   DEFAULT_IF_CONDITION_OPERATOR_COMPLEXITY,
+  DEFAULT_FILENAME_CASES,
+  DEFAULT_FILENAME_SCHEMA,
   DEFAULT_MAX_ARRAY_CHAIN_DEPTH,
   DEFAULT_MAX_COMPUTED_VALUE_OPERATORS,
   DEFAULT_MAX_CONTROL_FLOW_DEPTH,
@@ -38,6 +40,7 @@ import {
   EXPRESSION_CONTAINER_NODE_TYPES,
   FLAT_METHODS,
   FS_MODULE_SPECIFIERS,
+  FILENAME_CASE_PATTERNS,
   FUNCTION_NODE_TYPES,
   HOIST_IF_OPERATORS_META,
   ITERATION_METHODS,
@@ -85,7 +88,6 @@ import {
   SIDE_EFFECT_FREE_ITERATION_METHODS,
   SHELL_COMMAND_FUNCTIONS,
   SKIP_KEYS,
-  STRICT_ONLY_RULE_NAMES,
   TERMINAL_STATEMENT_TYPES,
 } from "./constants.js";
 import type {
@@ -3718,7 +3720,7 @@ function checkObjectLookupPreference(
 }
 
 function getFilenameSchema(context: RuleContext): FilenameSchema | null {
-  const schema = getConfiguredString(context, "schema");
+  const schema = getConfiguredString(context, "schema") ?? DEFAULT_FILENAME_SCHEMA;
   const isCustom = schema === "custom";
   const isDirname = schema === "dirname";
   const isIndex = schema === "index";
@@ -3806,30 +3808,35 @@ function createRequireFilenameMatchesDirname(context: RuleContext): RuleListener
   return { Program: (node) => checkFilenameSchema(context, node) };
 }
 
+function getFilenameCases(context: RuleContext): string[] {
+  const selectedCase = getConfiguredString(context, "case");
+  if (selectedCase) return [selectedCase];
+  const options = context.options?.[0];
+  const cases = isRecord(options) ? options.cases : null;
+  if (!isRecord(cases)) return DEFAULT_FILENAME_CASES;
+  return Object.keys(cases).filter((name) => Boolean(cases[name]));
+}
+
+function checkFilenameCasing(context: RuleContext, node: AstNode): void {
+  const filename = context.filename;
+  if (!filename) return;
+  const raw = basename(filename);
+  const isVirtual = raw.startsWith("<") && raw.endsWith(">");
+  if (isVirtual) return;
+  const stripped = raw.startsWith(".") ? raw.slice(1) : raw;
+  const [name = ""] = stripped.split(".");
+  const cases = getFilenameCases(context);
+  const matches = Object.entries(FILENAME_CASE_PATTERNS).some(
+    ([style, pattern]) => cases.includes(style) && pattern.test(name),
+  );
+  if (matches) return;
+  const allowedCases = cases.join(", ");
+  const data = { name, cases: allowedCases };
+  context.report({ node, messageId: "mixedCasing", data });
+}
+
 function createNoMixedFilenameCasing(context: RuleContext): RuleListener {
-  return {
-    Program(node: AstNode) {
-      const filename = context.filename;
-      if (!filename) return;
-      const raw = basename(filename);
-      const stripped = raw.startsWith(".") ? raw.slice(1) : raw;
-      const name = stripped.includes(".") ? stripped.slice(0, stripped.indexOf(".")) : stripped;
-      const characterLookup = new Set(name);
-
-      const hasHyphens = characterLookup.has("-");
-      const hasUnderscores = characterLookup.has("_");
-      const hasUppercase = /[A-Z]/.test(name);
-      const hasLowercase = /[a-z]/.test(name);
-
-      const mixesHyphenWithUpper = hasHyphens && hasUppercase;
-      const mixesUnderscoreWithMixedCase = hasUnderscores && hasUppercase && hasLowercase;
-      const mixesSeparators = hasHyphens && hasUnderscores;
-      const isMixed = mixesHyphenWithUpper || mixesUnderscoreWithMixedCase || mixesSeparators;
-
-      if (!isMixed) return;
-      context.report({ node, messageId: "mixedCasing", data: { name } });
-    },
-  };
+  return { Program: (node) => checkFilenameCasing(context, node) };
 }
 
 const rules: Record<string, RuleModule> = {
@@ -3978,8 +3985,9 @@ function buildAgentRuleConfig(
 const recommendedRuleNames = RECOMMENDED_RULE_NAMES.concat(COMMENT_RULE_NAMES);
 const recommendedPluginRules = buildRuleConfig(recommendedRuleNames, "warn");
 const recommendedCoreRules = buildCoreRuleConfig("warn");
-const recommendedRules = Object.assign({}, recommendedPluginRules, recommendedCoreRules);
-const strictRuleNames = recommendedRuleNames.concat(STRICT_ONLY_RULE_NAMES);
+const filenameRules: Record<string, RuleConfig> = { "legibility/no-mixed-filename-casing": "error" };
+const recommendedRules = Object.assign({}, recommendedPluginRules, recommendedCoreRules, filenameRules);
+const strictRuleNames = Object.keys(rules);
 const strictPluginRules = buildRuleConfig(strictRuleNames, "error");
 const strictCoreRules = buildCoreRuleConfig("error");
 const strictRules = Object.assign({}, strictPluginRules, strictCoreRules);
@@ -4014,6 +4022,8 @@ plugin.configs["flat/strict"] = {
   rules: strictRules,
 };
 
+plugin.configs["flat/all"] = plugin.configs["flat/strict"];
+
 plugin.configs["flat/agent-recommended"] = {
   plugins: {
     [PLUGIN_NAME]: plugin,
@@ -4030,6 +4040,7 @@ plugin.configs["flat/agent-strict"] = {
 
 plugin.configs["oxlint/recommended"] = oxlintRecommendedConfig;
 plugin.configs["oxlint/strict"] = oxlintStrictConfig;
+plugin.configs["oxlint/all"] = oxlintStrictConfig;
 plugin.configs["oxlint/agent-recommended"] = oxlintAgentRecommendedConfig;
 plugin.configs["oxlint/agent-strict"] = oxlintAgentStrictConfig;
 

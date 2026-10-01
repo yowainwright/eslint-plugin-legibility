@@ -248,6 +248,7 @@ export interface OxlintLegibilityPlugin {
   configs: {
     agentRecommended: OxlintConfig;
     agentStrict: OxlintConfig;
+    all: OxlintConfig;
     recommended: OxlintConfig;
     strict: OxlintConfig;
   };
@@ -263,10 +264,12 @@ export interface LegibilityPlugin {
   configs: {
     "flat/agent-recommended": FlatConfig;
     "flat/agent-strict": FlatConfig;
+    "flat/all": FlatConfig;
     "flat/recommended": FlatConfig;
     "flat/strict": FlatConfig;
     "oxlint/agent-recommended": OxlintConfig;
     "oxlint/agent-strict": OxlintConfig;
+    "oxlint/all": OxlintConfig;
     "oxlint/recommended": OxlintConfig;
     "oxlint/strict": OxlintConfig;
   };

@@ -10,6 +10,14 @@ export const PLUGIN_NAME = "legibility";
 
 export const DEFAULT_MAX_EXPRESSION_OPERATORS = 4;
 export const DEFAULT_MIN_DIRNAME_MATCH_DEPTH = 3;
+export const DEFAULT_FILENAME_SCHEMA = "dirname";
+export const DEFAULT_FILENAME_CASES = ["kebabCase", "camelCase"];
+export const FILENAME_CASE_PATTERNS = {
+  kebabCase: /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/,
+  camelCase: /^[a-z][a-zA-Z0-9]*$/,
+  snakeCase: /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/,
+  pascalCase: /^[A-Z][a-zA-Z0-9]*$/,
+};
 
 export const DEFAULT_ALLOWED_FILENAME_QUALIFIERS = new Set([
   "constants",
@@ -233,8 +241,6 @@ export const ARRAY_MUTATING_METHODS = new Set([
 ]);
 
 export const DEFAULT_EXECUTABLE_ENTRY_PATTERNS = [
-  "src/index.js",
-  "src/index.ts",
   "src/cli/index.js",
   "src/cli/index.ts",
 ];
@@ -331,21 +337,17 @@ export const STRICT_ONLY_RULE_NAMES = [
   "no-small-collection-conversion",
   "no-standalone-array-mutations",
   "no-unnecessary-async",
-];
-
-export const OPT_IN_RULE_NAMES = new Set([
   "no-unmatched-comments",
   "prefer-concat-object-assign",
   "require-executable-shebang",
   "require-filename-matches-dirname",
-]);
+];
 
 const STRING_ARRAY_SCHEMA = { type: "array", items: { type: "string" } };
 
 const FILENAME_MIN_DEPTH_SCHEMA = { type: "integer", minimum: 1 };
 const DIRNAME_FILENAME_SCHEMA = {
   type: "object",
-  required: ["schema"],
   properties: {
     schema: { enum: ["dirname"] },
     minDepth: FILENAME_MIN_DEPTH_SCHEMA,
@@ -1000,7 +1002,7 @@ export const PREFER_OBJECT_LOOKUP_META = defineMeta("prefer-object-lookup", {
 export const REQUIRE_FILENAME_MATCHES_DIRNAME_META = defineMeta("require-filename-matches-dirname", {
   type: "suggestion",
   docs: {
-    description: "Require filenames to match an explicitly selected schema.",
+    description: "Require filenames to match a schema, defaulting to dirname.",
     recommended: false,
   },
   schema: [
@@ -1017,12 +1019,35 @@ export const REQUIRE_FILENAME_MATCHES_DIRNAME_META = defineMeta("require-filenam
 export const NO_MIXED_FILENAME_CASING_META = defineMeta("no-mixed-filename-casing", {
   type: "suggestion",
   docs: {
-    description: "Flag filenames that mix casing conventions.",
+    description: "Require kebab-case or camelCase filenames, or explicitly configured styles.",
     recommended: true,
   },
-  schema: [],
+  schema: [
+    {
+      type: "object",
+      properties: {
+        case: { enum: Object.keys(FILENAME_CASE_PATTERNS) },
+        cases: {
+          type: "object",
+          properties: {
+            kebabCase: { type: "boolean" },
+            camelCase: { type: "boolean" },
+            snakeCase: { type: "boolean" },
+            pascalCase: { type: "boolean" },
+          },
+          additionalProperties: false,
+          anyOf: Object.keys(FILENAME_CASE_PATTERNS).map((name) => ({
+            required: [name],
+            properties: { [name]: { enum: [true] } },
+          })),
+        },
+      },
+      additionalProperties: false,
+      not: { required: ["case", "cases"] },
+    },
+  ],
   messages: {
     mixedCasing:
-      "Filename \"{{name}}\" mixes casing conventions. Use one: kebab-case, camelCase, PascalCase, or snake_case.",
+      "Filename \"{{name}}\" must use one of the configured styles: {{cases}}.",
   },
 });

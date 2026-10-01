@@ -26,6 +26,7 @@ const oxlintPluginBase: OxlintLegibilityPlugin = {
   configs: {
     recommended: withOxlintSpecifier(plugin.configs["oxlint/recommended"]),
     strict: withOxlintSpecifier(plugin.configs["oxlint/strict"]),
+    all: withOxlintSpecifier(plugin.configs["oxlint/all"]),
     agentRecommended: withOxlintSpecifier(plugin.configs["oxlint/agent-recommended"]),
     agentStrict: withOxlintSpecifier(plugin.configs["oxlint/agent-strict"]),
   },
